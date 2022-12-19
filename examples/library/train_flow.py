@@ -98,8 +98,6 @@ def training(training_data, device, data_dim, y_distribution):
   x = torch.randn(10, data_dim, device=device)
   assert torch.allclose(normalizing_flow.invert(normalizing_flow(x)[0]), x, rtol=1e-04, atol=1e-06)
 
-  print(normalizing_flow)
-
   optimizer = torch.optim.Adam(normalizing_flow.parameters(), lr=0.0002, weight_decay=0.9)
   dataloader = DataLoader(np.float32(training_data), batch_size=32, shuffle=True)
   training_loss = train_flow(normalizing_flow, optimizer, dataloader, y_distribution, nb_epochs=60,

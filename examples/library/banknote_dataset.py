@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 col_names = ['Variance_WT', 'Skewness_WT', 'Curtosis_WT', 'Entropy', 'Class']
 
 def plotting_data(data_authentic=[], data_inauthentic=[], title=""):
-  fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+  fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
   fig.suptitle(title, fontsize=16)
   X_plot = [t[0] for t in data_authentic]
   Y_plot = [t[1] for t in data_authentic]
