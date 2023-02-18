@@ -40,3 +40,12 @@ def plotting_data(data_authentic=[], data_inauthentic=[], title=""):
   ax2.axis('equal')
   ax2.legend();
   plt.show()
+
+def plotting_histogram(authentic, inauthentic, bins=10, title=""):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle(title, fontsize=16)
+    ax1.hist(authentic, bins=bins)
+    ax1.set_title("Authentic")
+    ax2.hist(inauthentic, bins=bins)
+    ax2.set_title("Inauthentic")
+    plt.show()
