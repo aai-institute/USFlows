@@ -1,3 +1,10 @@
+#
+.idea
+config_local.json
+config_local.yml
+temp
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -12,6 +19,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+data/
 eggs/
 .eggs/
 lib/
@@ -70,6 +78,9 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/intro_bayesian_ml/
+notebooks/_build/
+notebooks/runs/
 
 # PyBuilder
 target/
@@ -127,3 +138,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# reports
+pylint.html
