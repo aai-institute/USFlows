@@ -1,0 +1,66 @@
+---
+experiment:
+  __class__experiment_type: laplace_flows.experiments.predefined.ExperimentCollection
+  experiment_params:
+    name: cfair_basedist_comparison
+    experiments:
+      - experiment:
+          __class__experiment_type: laplace_flows.experiments.predefined.HyperoptExperiment
+          experiment_params:
+            name: normal
+            __class__scheduler: &scheduler ray.tune.schedulers.ASHAScheduler
+            num_hyperopt_samples: &num_hyperopt_samples 25
+            gpus_per_trial: &gpus_per_trial 0
+            scheduler_params: &scheduler_params 
+              max_t: 26
+              grace_period: 26
+              reduction_factor: 2 
+            tuner_params: &tuner_params
+              metric: val_loss
+              mode: min
+            trial_config:
+              train: &train /Users/fariedabuzaid/Projects/laplace-flows/experiments/cfair/data/train.csv
+              test: &test /Users/fariedabuzaid/Projects/laplace-flows/experiments/cfair/data/test.csv 
+              val: &val /Users/fariedabuzaid/Projects/laplace-flows/experiments/cfair/data/val.csv
+              epochs: &epochs 25 
+              iters: &iters 500
+              __tune__batch_size: &batch_size choice([32, 64])
+              __class__optim: &optim torch.optim.Adam 
+              optim_params: &optim_params
+                __tune__lr: loguniform(1e-5, 5e-3)
+                weight_decay: 0.0
+              
+              __class__model: laplace_flows.flows.NiceFlow
+              model_params:
+                __tune__coupling_layers: &coupling_layers choice([2, 3, 4, 5, 6])
+                __tune__coupling_nn_layers: &coupling_nn_layers choice([[512], [256], [1024], [512, 512], [256, 256], [1024, 1024], [256, 512], [1024, 256], [256, 1024], [512, 256], [1024, 512], [512, 1024]])
+                __tune__split_dim: &split_dim choice([64, 128, 256, 512])
+                __tune__nonlinearity: &nonlinearity choice([torch.nn.ReLU(), torch.nn.Softplus(), torch.nn.Sigmoid()])
+                base_distribution: Normal
+      - experiment:
+          __class__experiment_type: laplace_flows.experiments.predefined.HyperoptExperiment
+          experiment_params:
+            name: laplace
+            __class__scheduler: *scheduler
+            num_hyperopt_samples: *num_hyperopt_samples
+            gpus_per_trial: *gpus_per_trial
+            scheduler_params: *scheduler_params
+            tuner_params: *tuner_params
+            trial_config:
+              train: *train
+              test: *test 
+              val: *val
+              epochs: *epochs
+              iters: *iters
+              __tune__batch_size: *batch_size
+              __class__optim: *optim
+              optim_params: *optim_params
+              
+              __class__model: laplace_flows.flows.NiceFlow
+              model_params:
+                __tune__coupling_layers: *coupling_layers
+                __tune__coupling_nn_layers: *coupling_nn_layers
+                __tune__split_dim: *split_dim
+                __tune__nonlinearity: *nonlinearity
+                base_distribution: Laplace       
+      
