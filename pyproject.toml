@@ -21,11 +21,15 @@ torchvision = "^0.15.2"
 torch = "^2.0.1"
 torchaudio = "^2.0.2"
 fsspec = "^2023.6.0"
+rise = "^5.7.1"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 matplotlib = "^3.7.2"
+jupyter-contrib-nbextensions = "^0.7.0"
+jupyter = "^1.0.0"
+notebook = "6.4.8"
 
 [build-system]
 requires = ["poetry-core"]
