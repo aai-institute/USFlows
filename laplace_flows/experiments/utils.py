@@ -1,5 +1,6 @@
+from copy import deepcopy
 import numpy as np
-from typing import Iterable, Union, Tuple, List, Optional, Dict
+from typing import Any, Iterable, Union, Tuple, List, Optional, Dict
 from pathlib import Path
 from importlib import import_module
 import yaml
@@ -125,13 +126,113 @@ def create_checkerboard_mask(h, w, invert=False):
         mask = 1 - mask
     return mask
 
+def unfold_raw_config(d: Dict[str, Any]):
+    """Unfolds an ordered DAG given as a dictionary into a tree given as dictionary. 
+    That means that unfold_dict(d) is bisimilar to d but no two distinct key paths in the resulting
+    dictionary reference the same object
+    
+    Args:
+        d: The dictionary to unfold
+    """
+    du = dict()
+    for k, v in d.items():
+        if isinstance(v, dict):
+            du[k] = unfold_raw_config(v)
+        elif isinstance(v, list):
+            du[k] = [unfold_raw_config(x) for x in v]
+        else:
+            du[k] = deepcopy(v)
+    
+    return du
+
+def push_overwrites(item: Any, attributes: Dict[str, Any]) -> Any:
+    """Pushes the overwrites in the given dictionary to the given item.
+    
+    If the item already specifies an overwrite, it is updated.
+    If the item is a dictionary, an overwrite specification for the dictionary is created. 
+    If the item is a list, the overwrites are pushed each element and the processed list is returned.
+    Otherwise, item is overwritten by attributen
+    
+    Args:
+        item: The item to push the overwrites to.
+        overwrites: The overwrites to push.
+    """
+    try:
+        if "__exact__" in attributes:
+                return deepcopy(attributes["__exact__"])
+    except:
+        pass
+    
+    if isinstance(item, dict):
+        if "__overwrites__" not in item:
+            result = deepcopy(attributes)
+            result["__overwrites__"] = item
+        else:
+            result = item
+            result["__overwrites__"].update(attributes)
+    elif isinstance(item, list): 
+        result = [push_overwrites(x, attributes) for x in item]
+    else:
+        result = deepcopy(attributes)
+        
+    return result
+    
+
+def apply_overwrite(d: Dict[str, Any], recurse=True):
+    """Applies the "__overwrites__" keyword sematic to a unfolded raw config dictionary and returns the result.
+    Except for the special semantics that applies to dictionaries and lists (see below),
+    all keys $k$ that are present in in the  "__overwrites__" dictionary $o$ are overwritten in $d$ by $o[k]$. 
+    
+    ** Dict/List overwrites **:
+    - If $d[k]$ is a dictionary, then $d[k]$ must be a dictionary and overwrites of $o[k]$ are recursively 
+    to the corresponding $d[k]$, i.e. lower-lever overwrites are specified/updated (see notes on recursion).
+    The only exception is if $o[k]$ contains the special key "__exact__" with value True. In this case
+    $d[k$]$ is replaced by $o[k]["__exact__"]$.
+    - If $o[k]$ is a list, then $o[k]$ is pushed to all list elements. 
+    
+    ** Recursion **:
+    If recursion is enabled, overwrites are are fully expanded in infix order where nested overwrites 
+    (see behavior on dict/list overwrites) are pushed (and overwrite) to the next level, i.e. 
+    higher level overwrites lower level. Else, only the top-level overwrites are applied.
+    
+    ** Note **: Applying this function to a non-unfolded dictionary
+    can result in unexpected behavior due to side side-effects.
+      
+    Args:
+        d: The unfolded raw config dictionary.
+        recurse: If True, the overwrites are applied recursively. Defaults to True. 
+            Can be useful for efficient combination of this method with other parsing methods.
+    """
+    
+    # Apply top-level overwrite
+    if "__overwrites__" in d:
+        overwritten_attr = d 
+        d = overwritten_attr.pop("__overwrites__")
+        
+        for k, v in overwritten_attr.items():
+            if k not in d:
+                d[k] = v
+            else:
+                d[k] = push_overwrites(d[k], v)
+            
+                    
+    if recurse:
+        for k, v in d.items():
+            if isinstance(v, dict):
+                d[k] = apply_overwrite(v)
+            elif isinstance(v, list):
+                d[k] = [apply_overwrite(x) for x in v]
+            
+    return d
+    
+        
 def read_config(yaml_path: Union[str, Path]) -> dict:
     """Loads a yaml file and returns the corresponding dictionary.
     Besides the standard yaml syntax, the function also supports the following
     additional functionality:
     
     Special keys:
-    __class__<key>: The value of this key is interpreted as the class name of the object. 
+    __class__: The value of this key is interpreted as the class name of the object. 
     The class is imported and stored in the result dictionary under the key <key>.
     Example:
         entry in yaml: __class__model: laplace_flows.flows.NiceFlow)
@@ -149,28 +250,43 @@ def read_config(yaml_path: Union[str, Path]) -> dict:
     
     with open(yaml_path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
-        
-        
-    def parse(d: dict):
-        for k, v in d.items():
-            if isinstance(v, Dict):
-                d[k] = parse(v)
-            if isinstance(v, List):
-                d[k] = [parse(x) for x in v]
-                
-        if "__object__" in d:
-            module, cls = d["__object__"].rsplit(".", 1)
-            C = getattr(import_module(module), cls)
-            d.pop("__object__")
-            return C(**d)
-        elif "__eval__" in d:
-            return eval(d["__eval__"])
-        elif "__class__" in d:
-            module, cls = d["__class__"].rsplit(".", 1)
-            C = getattr(import_module(module), cls)
-            return C
-        else:    
-            return d
     
-    config = parse(config)
+    config = unfold_raw_config(config)   
+    config = parse_raw_config(config)
+
     return config
+        
+def parse_raw_config(d: dict):
+    """Parses an unfolded raw config dictionary and returns the corresponding dictionary.
+    Parsing includes the following steps:
+    - Overwrites are applied (see apply_overwrite)
+    - The "__object__" key is interpreted as a class name and the corresponding class is imported.
+    - The "__eval__" key is evaluated.
+    - The "__class__" key is interpreted as a class name and the corresponding class is imported.
+    
+    Args:
+        d: The raw config dictionary.
+    """
+    d = apply_overwrite(d, recurse=False)
+        
+    # Depth-first recursion
+    for k, v in d.items():
+        if isinstance(v, Dict):
+            d[k] = parse_raw_config(v)
+        if isinstance(v, List):
+            d[k] = [parse_raw_config(x) for x in v]
+            
+    if "__object__" in d:
+        module, cls = d["__object__"].rsplit(".", 1)
+        C = getattr(import_module(module), cls)
+        d.pop("__object__")
+        return C(**d)
+    elif "__eval__" in d:
+        return eval(d["__eval__"])
+    elif "__class__" in d:
+        module, cls = d["__class__"].rsplit(".", 1)
+        C = getattr(import_module(module), cls)
+        return C
+    else:    
+        return d
+
