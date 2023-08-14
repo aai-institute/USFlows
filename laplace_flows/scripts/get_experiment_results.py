@@ -12,6 +12,7 @@ def build_report(expdir, report_file, config_prefix=""):
                 with open(expdir + "/" + d + "/result.json", "r") as f:
                     result = json.loads("{\"test_" + f.read().split("{\"test_")[-1])
             except:
+                print(f"error at {expdir + '/' + d}")
                 continue
             
             config = result["config"]

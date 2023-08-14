@@ -6,9 +6,10 @@ from laplace_flows.experiments.utils import read_config
 Pathable = T.Union[str, os.PathLike] # In principle one can cast it to os.path.Path
 
 @click.command()
-@click.option("--report_dir", default="./", help="Report file")
+@click.option("--report_dir", default="./reports", help="Report file")
 @click.option("--config", default="./config.yaml", help="Prefix for config items")
-def run(report_dir: Pathable, config: Pathable):
+@click.option("--storage_path", default=None, help="Prefix for config items")
+def run(report_dir: Pathable, config: Pathable, storage_path: Pathable):
     """Loads an experiment from config file conducts the experiment it.
     
     Args:
@@ -16,22 +17,24 @@ def run(report_dir: Pathable, config: Pathable):
         config (str): Path to config file. The report is expected to be specified in .yaml format with
         support to some special key functionalities (see :func:`~laplace_flows.experiments.utils.read_config)
         Defaults to "./config.yaml".
+        storage_path (str): Path to Ray storage directory. Defaults to None.
     """
-    sepline = "\n" + ("-" * 80) + "\n"
+    sepline = "\n" + ("-" * 80) + "\n" + ("-" * 80) + "\n"
     print(
-        f"{sepline}Parsing config file:"
+        f"{sepline}Parsing config file:{sepline}"
         )
     config = os.path.abspath(config)
     experiment = read_config(config)
     print(
-        f"Done.{sepline}"
+        f"{sepline}Done.{sepline}"
         )
     print(
-        f"{sepline}Conducting experiment"
+        f"{sepline}Conducting experiment{sepline}"
         )
-    experiment.conduct(report_dir)
+    # Conduct experiment
+    experiment.conduct(report_dir, storage_path=storage_path)
     print(
-        f"Done.{sepline}"
+        f"{sepline}Done.{sepline}"
         )
     
 if __name__ == "__main__":
