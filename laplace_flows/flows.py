@@ -147,7 +147,7 @@ class NiceFlow(Flow):
         rdim = input_dim - split_dim
         layers = []
         for i in range(coupling_layers):
-            layers.append(self._get_permutation(permutation))
+            layers.append(self._get_permutation(permutation, i))
             layers.append(AffineCoupling(split_dim, AdditiveAffineNN(split_dim, coupling_nn_layers, rdim, nonlinearity=nonlinearity)))
 
             if scale_every_coupling:
@@ -158,15 +158,22 @@ class NiceFlow(Flow):
 
         super().__init__(base_distribution, layers, *args, **kwargs)
     
-    def _get_permutation(self, permtype: Permutation):
+    def _get_permutation(self, permtype: Permutation, i=0):
         """Returns a permutation layer
         """
         if permtype == "random":
             return Permute(torch.randperm(self.input_dim, dtype=torch.long))
         elif permtype == "half":
-            perm = torch.arange(self.input_dim, dtype=torch.long)
-            perm = perm.reshape(2, -1).flip(0).reshape(-1)
+            if i % 2 == 0: # every 2nd pixel
+                perm = torch.arange(self.input_dim, dtype=torch.long)
+                perm = perm.reshape(-1, 2).moveaxis(0, 1).reshape(-1)
+            elif i % 2 == 1: # interchange conditioning variables and output variables
+                perm = torch.arange(self.input_dim, dtype=torch.long)
+                perm = perm.reshape(2, -1).flip(0).reshape(-1)
+            else: # random permutation
+                perm = torch.randperm(self.input_dim, dtype=torch.long)
             return Permute(perm)
+            
         else:
             raise ValueError(f"Unknown permutation type {permtype}")
 

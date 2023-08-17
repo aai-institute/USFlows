@@ -172,15 +172,14 @@ class FashionMnistDequantized(DequantizedDataset):
         path = os.path.join(dataloc, rel_path)
         if not os.path.exists(path):
             FashionMNIST(path, train=train, download=True)
-        # TODO: remove hardcoding of 3x3 downsampling
+        # TODO: remove hardcoding of 3x3 downsampling, vectorizing
         dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
-        dataset = idx2numpy.convert_from_file(path)
-        dataset = dataset.reshape(dataset.shape[0], 1, 28, 28)  
+        dataset = dataset.reshape(dataset.shape[0], -1)  
         if label is not None:
             rel_path = "FashionMNIST/raw/train-labels-idx1-ubyte" if train else "FashionMNIST/raw/t10k-labels-idx1-ubyte"
             path = os.path.join(dataloc, rel_path)
             labels = idx2numpy.convert_from_file(path)
-            dataset = dataset[labels == label]     
+            dataset = dataset[labels == label]   
         super().__init__(dataset, num_bits=8)
     
     def __getitem__(self, index: int):
