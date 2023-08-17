@@ -20,7 +20,7 @@ from datetime import datetime
 
 import ray
 from ray import tune
-from ray.air import session
+from ray.air import session, RunConfig
 from ray.air.checkpoint import Checkpoint
 from copy import deepcopy
 
@@ -48,9 +48,9 @@ class ExperimentCollection(Experiment):
         return Experiment.from_dict(config)
         
     
-    def conduct(self, report_dir: os.PathLike):
+    def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         for i, exp in enumerate(self.experiments):
-            exp.conduct(os.path.join(report_dir, f"{i}_{exp.name}"))
+            exp.conduct(os.path.join(report_dir, f"{i}_{exp.name}"), storage_path=storage_path)
     
 
 HyperParams = Literal["train", "test", "coupling_layers", "coupling_nn_layers", "split_dim", "epochs", "iters", "batch_size", 
@@ -165,13 +165,20 @@ class HyperoptExperiment(Experiment):
         return {"test_loss_best": test_loss, "val_loss_best": best_loss, "val_loss": val_loss}
 
 
-    def conduct(self, report_dir: os.PathLike):
+    def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         """Run hyperparameter optimization experiment.
 
         Args:
             report_dir (os.PathLike): report directory
+            storage_path (os.PathLike, optional): Ray logging path. Defaults to None.
         """
-
+        home = os.path.expanduser( '~' )
+        
+        if storage_path is not None:
+            tuner_config = {"run_config": RunConfig(storage_path=storage_path)}
+        else:
+            tuner_config = {}
+            
         exptime = str(datetime.now())
         
         tuner = tune.Tuner(
@@ -185,11 +192,12 @@ class HyperoptExperiment(Experiment):
                 **(self.tuner_params)
             ),
             param_space=self.trial_config,
+            **(tuner_config)
         )
         results = tuner.fit()
         
-        home = os.path.expanduser( '~' )
-        exppath = home + "/ray_results/" + [f for f in sorted(os.listdir(home + "/ray_results")) if f.startswith("_trial")][-1]
+        # TODO: hacky way to dertmine the last experiment
+        exppath = storage_path + ["/" + f for f in sorted(os.listdir(storage_path)) if f.startswith("_trial")][-1]
         build_report(exppath, report_file=os.path.join(report_dir, f"report_{self.name}_" + exptime + ".csv"))
         #best_result = results.get_best_result("val_loss", "min")
 

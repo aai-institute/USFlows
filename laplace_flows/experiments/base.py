@@ -33,7 +33,7 @@ class Experiment(object):
             raise ValueError("Invalid config file. The config file needs to contain an experiment field.")
         return cls._init_rec(config)
     
-    def conduct(self, report_dir: os.PathLike) -> None:
+    def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None) -> None:
         """Conducts the experiment and saves the results to the report directory. The method is expected to store all results in report_dir.
         """
         raise NotImplementedError
