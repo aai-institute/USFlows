@@ -30,6 +30,8 @@ matplotlib = "^3.7.2"
 jupyter-contrib-nbextensions = "^0.7.0"
 jupyter = "^1.0.0"
 notebook = "6.4.8"
+spellchecker = "^0.4"
+tensorboard = "^2.14.0"
 
 [build-system]
 requires = ["poetry-core"]
