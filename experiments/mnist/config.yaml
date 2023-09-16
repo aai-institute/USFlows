@@ -37,9 +37,9 @@ experiments:
             __class__: &model laplace_flows.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
-              __eval__: tune.choice([ 4, 6, 8])
+              __eval__: tune.choice([ 2, 3, 4, 5])
             coupling_nn_layers: &coupling_nn_layers 
-              __eval__: tune.choice([[w]*l for w in [50, 100], for l in range(4, 10)])
+              __eval__: tune.choice([[w]*l for w in [50, 100] for l in range(1, 3)])
             nonlinearity: &nonlinearity 
               __eval__: tune.choice([torch.nn.ReLU()])
             split_dim: &split_dim 50
