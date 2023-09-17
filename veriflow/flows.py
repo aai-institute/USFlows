@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 
 import pyro 
 from pyro import distributions as dist
+from pyro.distributions.transforms import LeakyReLUTransform
 from pyro.nn import DenseNN
 from pyro.distributions.transforms import AffineCoupling, LowerCholeskyAffine
 from pyro.infer import SVI
@@ -13,9 +14,10 @@ from torch.utils.data import DataLoader
 
 from sklearn.datasets import load_digits
 from tqdm import tqdm
-from laplace_flows.transforms import ScaleTransform, MaskedCoupling, Permute
-from laplace_flows.networks import AdditiveAffineNN, ConvNet2D
-from laplace_flows.experiments.utils import create_checkerboard_mask
+from veriflow.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform
+from veriflow.networks import AdditiveAffineNN, ConvNet2D
+from veriflow.experiments.utils import create_checkerboard_mask
+
 
 class Flow(torch.nn.Module):
 
@@ -37,6 +39,7 @@ class Flow(torch.nn.Module):
             shuffe: bool = True,
             gradient_clip: float = None,
             device: torch.device = None,
+            jitter: float = 1e-6,
             ) -> float:
         """
         Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other fitting parameters.
@@ -78,12 +81,17 @@ class Flow(torch.nn.Module):
             except:
                 continue
             optim.zero_grad()
+            if not self.is_feasible():
+                self.add_jitter(jitter)
             loss = -model.transform.log_prob(sample).mean()
             losses.append(float(loss.detach()))
             loss.backward()
             if gradient_clip is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
             optim.step()
+            if not self.is_feasible():
+                self.add_jitter(jitter)
+            
             model.transform.clear_cache()
         
         return sum(losses) / len(losses)
@@ -111,6 +119,12 @@ class Flow(torch.nn.Module):
         #self.layers = torch.nn.ModuleList([l.to(device) for l in self.layers])
         self.trainable_layers = torch.nn.ModuleList([l.to(device) for l in self.trainable_layers])
         return super().to(device)
+    
+    def is_feasible(self):
+        return True
+    
+    def add_jitter(self, jitter):
+        pass
 
 Permutation = Literal["random", "half"]
 
@@ -134,6 +148,9 @@ class NiceFlow(Flow):
         @param coupling_layers: number of coupling layers. All coupling layers share the same architecture but not the same weights.
         @param coupling_nn_layers: number of neurons in the hidden layers of the dense neural network that computes the coupling loc parameter.
         @param split_dim: split dimension for the coupling.
+        @param scale_every_coupling: if True, a scale transform is applied after every coupling layer. Otherwise, a single scale transform is applied after all coupling layers.
+        @param nonlinearity: nonlinearity of the coupling network.
+        @param permutation: permutation type. Can be "random" or "half".
         """
         input_dim = base_distribution.sample().shape[0]
         self.input_dim = input_dim
@@ -235,4 +252,45 @@ class NiceMaskedConvFlow(Flow):
 
         super().__init__(base_distribution, layers, *args, **kwargs)
         
+class LUFlow(Flow):
+    """Implementation of the NICE flow architecture using fully connected coupling layers and a checkerboard permutation"""
+    def __init__(
+            self,
+            base_distribution: dist.Distribution,
+            n_layers: int,
+            nonlinearity: Optional[torch.distributions.Transform] = None,
+            *args,
+            **kwargs
+        ) -> None:
+        """Initialization
+
+        :param: base_distribution: base distribution,
+        :param: n_layers: number of LU-layers. 
+        :param: nonlinearity: nonlinearity of the convolutional layers. 
+        """
+        
+        self.n_layers = n_layers
+
+        if nonlinearity is None:
+            nonlinearity = LeakyReLUTransform
+
+        layers = []
+
+        for i in range(n_layers):
+            layers.append(
+                LUTransform(
+                    base_distribution.sample().shape[0],
+                )
+            )
+            layers.append(nonlinearity())
+
+        super().__init__(base_distribution, layers, *args, **kwargs)
+    
+    def is_feasible(self):
+        return all([l.is_feasible() for l in self.layers if isinstance(l, LUTransform)])
+    
+    def add_jitter(self, jitter):
+        for layer in self.layers :
+            if isinstance(layer, LUTransform):
+                layer.add_jitter(jitter)
 

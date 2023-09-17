@@ -3,11 +3,11 @@ import torch
 from torch.utils.data import DataLoader
 from pyro.distributions.transforms import Permute, AffineCoupling
 from pyro import distributions as dist
-from laplace_flows.experiments.base import Experiment
-from laplace_flows.flows import NiceFlow
-from laplace_flows.transforms import ScaleTransform 
-from laplace_flows.networks import AdditiveAffineNN
-from laplace_flows.scripts.get_experiment_results import build_report
+from veriflow.experiments.base import Experiment
+from veriflow.flows import NiceFlow
+from veriflow.transforms import ScaleTransform 
+from veriflow.networks import AdditiveAffineNN
+from veriflow.scripts.get_experiment_results import build_report
 
 from matplotlib import pyplot as plt
 import logging

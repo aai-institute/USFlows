@@ -2,9 +2,9 @@ from sklearn.datasets import load_digits
 import torch
 from pyro.distributions.transforms import Permute, AffineCoupling
 from pyro import distributions as dist
-from laplace_flows.flows import Flow
-from laplace_flows.transforms import ScaleTransform 
-from laplace_flows.networks import AdditiveAffineNN
+from veriflow.flows import Flow
+from veriflow.transforms import ScaleTransform 
+from veriflow.networks import AdditiveAffineNN
 
 from matplotlib import pyplot as plt
 

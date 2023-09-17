@@ -1,7 +1,7 @@
 import click
 import os 
 import typing as T
-from laplace_flows.experiments.utils import read_config
+from veriflow.experiments.utils import read_config
 
 Pathable = T.Union[str, os.PathLike] # In principle one can cast it to os.path.Path
 
