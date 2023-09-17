@@ -267,26 +267,30 @@ def parse_raw_config(d: dict):
     Args:
         d: The raw config dictionary.
     """
-    d = apply_overwrite(d, recurse=False)
-        
-    # Depth-first recursion
-    for k, v in d.items():
-        if isinstance(v, Dict):
-            d[k] = parse_raw_config(v)
-        if isinstance(v, List):
-            d[k] = [parse_raw_config(x) for x in v]
+    if isinstance(d, dict):
+        d = apply_overwrite(d, recurse=False)
             
-    if "__object__" in d:
-        module, cls = d["__object__"].rsplit(".", 1)
-        C = getattr(import_module(module), cls)
-        d.pop("__object__")
-        return C(**d)
-    elif "__eval__" in d:
-        return eval(d["__eval__"])
-    elif "__class__" in d:
-        module, cls = d["__class__"].rsplit(".", 1)
-        C = getattr(import_module(module), cls)
-        return C
-    else:    
+        # Depth-first recursion
+        for k, v in d.items():
+            d[k] = parse_raw_config(v)
+        
+        if "__object__" in d:
+            module, cls = d["__object__"].rsplit(".", 1)
+            C = getattr(import_module(module), cls)
+            d.pop("__object__")
+            return C(**d)
+        elif "__eval__" in d:
+            return eval(d["__eval__"])
+        elif "__class__" in d:
+            module, cls = d["__class__"].rsplit(".", 1)
+            C = getattr(import_module(module), cls)
+            return C
+        else:    
+            return d
+    elif isinstance(d, list):
+        result = [parse_raw_config(x) for x in d]
+        return result
+    else:
         return d
+            
 
