@@ -2,7 +2,7 @@
 VeriFow provides a stable and convenient library of flow based density models with flexibile base distributions, 
 which are specifically tailored towards the use in neuro-symbolic verification procedures. The major goal is to
 provide models that can represent reference distribution which are suitable for verification, 
-abstract interpretation, and hypothesis testing.
+abstract interpretation, and hypothesis testing simultaneously.
 The implemented layer are carefully chosen to guarntee the following properties:
 
 - Efficient computation of exact densities as well as efficient sampling.
