@@ -1,0 +1,53 @@
+---
+__object__: laplace_flows.experiments.predefined.ExperimentCollection
+name: mnist_basedist_comparison
+experiments:
+    - &exp_laplace
+      __object__: laplace_flows.experiments.predefined.HyperoptExperiment
+      name: mnist_laplace
+      scheduler: &scheduler 
+        __object__: ray.tune.schedulers.ASHAScheduler
+        max_t: 10000
+        grace_period: 10000
+        reduction_factor: 2
+      num_hyperopt_samples: &num_hyperopt_samples 1
+      gpus_per_trial: &gpus_per_trial 0
+      cpus_per_trial: &cpus_per_trial 1
+      tuner_params: &tuner_params
+        metric: val_loss
+        mode: min
+      trial_config:
+        dataset: &dataset
+          __object__: laplace_flows.experiments.datasets.MnistSplit
+          digit: 0
+        epochs: &epochs 20000
+        patience: &patience 50
+        batch_size: &batch_size 
+          __eval__: tune.choice([32])
+        optim_cfg: &optim 
+          optimizer:
+            __class__: torch.optim.Adam 
+          params:
+            lr: 
+              __eval__: tune.loguniform(1e-2, 5e-4)
+            weight_decay: 0.0
+        
+        model_cfg: 
+          type:
+            __class__: &model laplace_flows.flows.NiceFlow
+          params:
+            coupling_layers: &coupling_layers 
+              __eval__: tune.choice([3])
+            coupling_nn_layers: &coupling_nn_layers 
+              __eval__: tune.choice([[100]*2])
+            nonlinearity: &nonlinearity 
+              __eval__: tune.choice([torch.nn.ReLU()])
+            split_dim: &split_dim 50
+            base_distribution: &distribution Laplace
+            permutation: &permutation half
+    - &exp_normal
+      __overwrites__: *exp_laplace
+      name: mnist_normal
+      model_cfg: 
+        params:
+          base_distribution: Normal
