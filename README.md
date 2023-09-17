@@ -6,7 +6,7 @@ abstract interpretation, and hypothesis testing simultaneously.
 The implemented layer are carefully designed to guarntee the following properties:
 
 - Efficient computation of exact densities as well as efficient sampling.
--  A piece-wise affine log-density function for all models with ReLU nonlinearity and Laplacian base distribution.
+-  A piece-wise affine log-density function for all models with (leaky-)ReLU nonlinearity and Laplacian base distribution.
 
 Additionally, UDL preserving layers map the upper density level sets of the data distribution to the upper density level sets
 of the base Distribution.
