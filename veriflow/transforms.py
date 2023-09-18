@@ -40,15 +40,15 @@ class ScaleTransform(dist.TransformModule):
     
     def init_params(self):
         """initialization of the parameters"""
-        fan_in = self.dim
-        bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+        dim = self.dim
+        bound = 1 / math.sqrt(dim) if dim > 0 else 0
         init.uniform_(self.scale, -bound, bound)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x * torch.exp(self.log_scale)
+        return x * self.scale
 
     def backward(self, x: torch.Tensor) -> torch.Tensor:
-        return x * torch.exp(-self.log_scale)
+        return x / self.scale 
     
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward(x)
@@ -57,14 +57,14 @@ class ScaleTransform(dist.TransformModule):
         return self.backward(x)
     
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor) -> float:
-        return self.scale.sum().abs().log()
+        return self.scale.abs().log().sum()
 
     def sign(self) -> int:
-        return self.log_scale.sum().sign() 
+        return self.prod().sign() 
     
     def is_feasible(self) -> bool:
         """Checks if the layer is feasible, i.e. if the diagonal elements of $\mathbf{U}$ are all positive"""
-        return (self.scale > 0).all()
+        return (self.scale != 0).all()
     
     def add_jitter(self, jitter: float = 1e-6) -> None:
         """Adds jitter to the diagonal elements of $\mathbf{U}$. This is useful to ensure that the transformation is invertible."""
@@ -150,6 +150,11 @@ class LUTransform(dist.TransformModule):
     *Note:* The implementation does not enforce the non-zero constraint of the diagonal elements of $\mathbf{U}$ during training.
     See :func:`add_jitter` and :func:`is_feasible` for a way to ensure that the transformation is invertible.
     """
+    bijective = True
+    volume_preserving = False
+    domain = dist.constraints.real_vector
+    codomain = dist.constraints.real_vector
+    
     def __init__(self, dim: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.L_raw = torch.nn.Parameter(torch.empty(dim, dim))
@@ -159,11 +164,7 @@ class LUTransform(dist.TransformModule):
         
         self.init_params()
         
-        
         self.input_shape = dim
-        self.bijective = True
-        self.domain = dist.constraints.real_vector
-        self.codomain = dist.constraints.real_vector
         
         self.L_mask = torch.tril(torch.ones(dim, dim), diagonal=1)
         self.U_mask = torch.triu(torch.ones(dim, dim), diagonal=0)
@@ -174,12 +175,14 @@ class LUTransform(dist.TransformModule):
     def init_params(self):
         # Adopted from pytorch's Linear layer parameter initialization.
 
-        init.kaiming_uniform_(self.L_raw, a=math.sqrt(self.dim))
+        init.kaiming_uniform_(self.L_raw, nonlinearity='relu')
         with torch.no_grad():
             self.L_raw.copy_(self.L_raw.tril().fill_diagonal_(1))
-        init.kaiming_uniform_(self.U_raw, a=math.sqrt(self.dim))
+        
+        init.kaiming_uniform_(self.U_raw, nonlinearity='relu')
         with torch.no_grad():
             self.U_raw.copy_(self.U_raw.triu())
+            
         if self.bias is not None:
             fan_in = self.dim
             bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
@@ -238,7 +241,7 @@ class LUTransform(dist.TransformModule):
     
     def is_feasible(self) -> bool:
         """Checks if the layer is feasible, i.e. if the diagonal elements of $\mathbf{U}$ are all positive"""
-        return (self.U_raw.diag() > 0).all()
+        return (self.U_raw.diag() != 0).all()
     
     def add_jitter(self, jitter: float = 1e-6) -> None:
         """Adds jitter to the diagonal elements of $\mathbf{U}$. This is useful to ensure that the transformation is invertible."""
