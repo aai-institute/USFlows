@@ -155,28 +155,33 @@ class LUTransform(dist.TransformModule):
         self.L_raw = torch.nn.Parameter(torch.empty(dim, dim))
         self.U_raw = torch.nn.Parameter(torch.empty(dim, dim))
         self.bias = torch.nn.Parameter(torch.empty(dim))
+        self.dim = dim
         
         self.init_params()
         
-        self.dim = dim
+        
         self.input_shape = dim
         self.bijective = True
         self.domain = dist.constraints.real_vector
         self.codomain = dist.constraints.real_vector
         
+        self.L_mask = torch.tril(torch.ones(dim, dim), diagonal=1)
+        self.U_mask = torch.triu(torch.ones(dim, dim), diagonal=0)
+        
+        self.L_raw.register_hook(lambda grad: grad * self.L_mask)
+        self.U_raw.register_hook(lambda grad: grad * self.U_mask)
+        
     def init_params(self):
         # Adopted from pytorch's Linear layer parameter initialization.
-        # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
-        # uniform(-1/sqrt(in_features), 1/sqrt(in_features)). For details, see
-        # https://github.com/pytorch/pytorch/issues/57109
-        init.kaiming_uniform_(self.L_raw, a=math.sqrt(5))
+
+        init.kaiming_uniform_(self.L_raw, a=math.sqrt(self.dim))
         with torch.no_grad():
             self.L_raw.copy_(self.L_raw.tril().fill_diagonal_(1))
-        init.kaiming_uniform_(self.U_raw, a=math.sqrt(5))
+        init.kaiming_uniform_(self.U_raw, a=math.sqrt(self.dim))
         with torch.no_grad():
             self.U_raw.copy_(self.U_raw.triu())
         if self.bias is not None:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            fan_in = self.dim
             bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
             init.uniform_(self.bias, -bound, bound)
     
@@ -187,7 +192,8 @@ class LUTransform(dist.TransformModule):
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
-        return torch.functional.F.linear(x, self.weight, self.bias)
+        M_inv = LA.inv(self.weight)
+        return torch.functional.F.linear(x, M_inv, self.bias)
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
         """Computes the inverse transform $(LU)^{-1}(y - \mathrm{bias})$ 
@@ -195,8 +201,7 @@ class LUTransform(dist.TransformModule):
         :param y: input tensor
         :type y: torch.Tensor
         :return: transformed tensor $(LU)^{-1}(y - \mathrm{bias})$"""
-        M_inv = LA.inv(self.weight)
-        return  F.linear(y - self.bias, M_inv)
+        return  F.linear(y - self.bias, self.weight)
     
     @property
     def L(self):
@@ -223,7 +228,7 @@ class LUTransform(dist.TransformModule):
         return LA.slogdet(self.weight)[1]
     
     def sign(self) -> int:
-        return LA.slogdet(self.weight)[0]
+        return -1 * LA.slogdet(self.weight)[0]
     
     def to(self, device) -> None:
         self.L_raw = self.L_raw.to(device)
