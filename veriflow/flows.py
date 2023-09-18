@@ -39,7 +39,7 @@ class Flow(torch.nn.Module):
             shuffe: bool = True,
             gradient_clip: float = None,
             device: torch.device = None,
-            jitter: float = 1e-6,
+            jitter: float = 1e-4,
             ) -> float:
         """
         Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other fitting parameters.
@@ -81,7 +81,7 @@ class Flow(torch.nn.Module):
             except:
                 continue
             optim.zero_grad()
-            if not self.is_feasible():
+            while not self.is_feasible():
                 self.add_jitter(jitter)
             loss = -model.transform.log_prob(sample).mean()
             losses.append(float(loss.detach()))
@@ -89,7 +89,7 @@ class Flow(torch.nn.Module):
             if gradient_clip is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
             optim.step()
-            if not self.is_feasible():
+            while not self.is_feasible():
                 self.add_jitter(jitter)
             
             model.transform.clear_cache()
@@ -126,7 +126,7 @@ class Flow(torch.nn.Module):
     def add_jitter(self, jitter):
         pass
 
-Permutation = Literal["random", "half"]
+Permutation = Literal["random", "half", "LU"]
 
 class NiceFlow(Flow):
     """Implementation of the NICE flow architecture by using fully connected coupling layers"""
@@ -190,7 +190,8 @@ class NiceFlow(Flow):
             else: # random permutation
                 perm = torch.randperm(self.input_dim, dtype=torch.long)
             return Permute(perm)
-            
+        elif permtype == "LU":
+            return LUTransform(self.input_dim)  
         else:
             raise ValueError(f"Unknown permutation type {permtype}")
 
@@ -282,7 +283,7 @@ class LUFlow(Flow):
                     base_distribution.sample().shape[0],
                 )
             )
-            layers.append(nonlinearity())
+            #layers.append(nonlinearity())
 
         super().__init__(base_distribution, layers, *args, **kwargs)
     
@@ -291,6 +292,6 @@ class LUFlow(Flow):
     
     def add_jitter(self, jitter):
         for layer in self.layers :
-            if isinstance(layer, LUTransform):
+            if isinstance(layer, LUTransform) and not layer.is_feasible():
                 layer.add_jitter(jitter)
 
