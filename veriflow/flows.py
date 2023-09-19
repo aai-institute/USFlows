@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 
 import pyro 
 from pyro import distributions as dist
-from pyro.distributions.transforms import LeakyReLUTransform
+from pyro.distributions.transforms import SoftplusTransform
 from pyro.nn import DenseNN
 from pyro.distributions.transforms import AffineCoupling, LowerCholeskyAffine
 from pyro.infer import SVI
@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from sklearn.datasets import load_digits
 from tqdm import tqdm
-from veriflow.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform
+from veriflow.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform, LeakyReLUTransform
 from veriflow.networks import AdditiveAffineNN, ConvNet2D
 from veriflow.experiments.utils import create_checkerboard_mask
 
@@ -283,11 +283,12 @@ class LUFlow(Flow):
                     base_distribution.sample().shape[0],
                 )
             )
-            #layers.append(nonlinearity())
+            layers.append(nonlinearity())
 
         super().__init__(base_distribution, layers, *args, **kwargs)
     
     def is_feasible(self):
+        """ Checks if all LU layers are feasible """ 
         return all([l.is_feasible() for l in self.layers if isinstance(l, LUTransform)])
     
     def add_jitter(self, jitter):
