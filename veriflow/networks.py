@@ -127,9 +127,6 @@ class ConvNet2D(nn.Module):
             ]
         self.nn = nn.Sequential(*layers)
 
-        #self.nn[-1].weight.data.zero_()
-        #self.nn[-1].bias.data.zero_()
-
     def forward(self, x):
         return self.nn(x)
     

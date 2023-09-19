@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "laplace-flows"
+name = "veriflow"
 version = "0.1.0"
 description = ""
 authors = ["Faried Abu Zaid <fariedaz@gmail.com>"]
 readme = "README.md"
-packages = [{include = "laplace_flows"}]
+packages = [{include = "veriflow"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -23,7 +23,6 @@ torchaudio = "^2.0.2"
 fsspec = "^2023.6.0"
 rise = "^5.7.1"
 
-
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 matplotlib = "^3.7.2"
@@ -32,6 +31,7 @@ jupyter = "^1.0.0"
 notebook = "6.4.8"
 spellchecker = "^0.4"
 tensorboard = "^2.14.0"
+tox = "^4.11.3"
 
 [build-system]
 requires = ["poetry-core"]
