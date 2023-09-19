@@ -173,7 +173,10 @@ class LUTransform(dist.TransformModule):
         self.U_raw.register_hook(lambda grad: grad * self.U_mask)
         
     def init_params(self):
-        # Adopted from pytorch's Linear layer parameter initialization.
+        """Parameter initialization 
+        Adopted from pytorch's Linear layer parameter initialization.
+        """
+        
 
         init.kaiming_uniform_(self.L_raw, nonlinearity='relu')
         with torch.no_grad():
@@ -195,8 +198,8 @@ class LUTransform(dist.TransformModule):
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
-        M_inv = LA.inv(self.weight)
-        return torch.functional.F.linear(x, M_inv, self.bias)
+        return  F.linear(y, self.weight, self.bias)
+        
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
         """Computes the inverse transform $(LU)^{-1}(y - \mathrm{bias})$ 
@@ -204,7 +207,8 @@ class LUTransform(dist.TransformModule):
         :param y: input tensor
         :type y: torch.Tensor
         :return: transformed tensor $(LU)^{-1}(y - \mathrm{bias})$"""
-        return  F.linear(y - self.bias, self.weight)
+        M_inv = LA.inv(self.weight)
+        return torch.functional.F.linear(x - self.bias, M_inv)
     
     @property
     def L(self):
@@ -231,7 +235,7 @@ class LUTransform(dist.TransformModule):
         return LA.slogdet(self.weight)[1]
     
     def sign(self) -> int:
-        return -1 * LA.slogdet(self.weight)[0]
+        return LA.slogdet(self.weight)[0]
     
     def to(self, device) -> None:
         self.L_raw = self.L_raw.to(device)
@@ -284,7 +288,7 @@ class MaskedCoupling(dist.TransformModule):
         return 0.
     
     def sign(self) -> int:
-        return 0.
+        return 1.
     
     def to(self, device):
         self.mask = self.mask.to(device)
@@ -294,16 +298,20 @@ class LeakyReLUTransform(dist.TransformModule):
     bijective = True
     domain = dist.constraints.real
     codomain = dist.constraints.real
+    sign = 1
     
-    
-    def __init__(self, *args, **kwargs):
+    def __init__(self, alpha: float = .01, *args, **kwargs):
+        if alpha == 0:
+            raise ValueError("alpha must be positive")
         super().__init__(*args, **kwargs)
+        self.alpha = alpha
+        
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return F.leaky_relu(x)
+        return F.leaky_relu(x, negative_slope=self.alpha)
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
-        return F.leaky_relu(y, negative_slope=100)
+        return F.leaky_relu(y, negative_slope=1/self.alpha)
     
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward(x)
@@ -312,8 +320,4 @@ class LeakyReLUTransform(dist.TransformModule):
         return self.backward(y)
     
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor) -> float:    
-        return ((x <= 0).float() * math.log(100)).sum()
-    
-    def sign(self) -> int:
-        sign = -1 if (x <= 0).int().sum() % 2 == 1 else 1
-        return sign
+        return ((x <= 0).float() * math.log(self.alpha)).sum()
