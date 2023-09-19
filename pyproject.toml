@@ -31,6 +31,7 @@ jupyter = "^1.0.0"
 notebook = "6.4.8"
 spellchecker = "^0.4"
 tensorboard = "^2.14.0"
+tox = "^4.11.3"
 
 [build-system]
 requires = ["poetry-core"]
