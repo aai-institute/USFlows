@@ -1,10 +1,10 @@
 ---
-__object__: laplace_flows.experiments.predefined.ExperimentCollection
+__object__: veriflow.experiments.predefined.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
-    - &exp_laplace
-      __object__: laplace_flows.experiments.predefined.HyperoptExperiment
-      name: mnist_laplace
+    - &exp_nice
+      __object__: veriflow.experiments.predefined.HyperoptExperiment
+      name: mnist_nice
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
         max_t: 10000
@@ -18,10 +18,10 @@ experiments:
         mode: min
       trial_config:
         dataset: &dataset
-          __object__: laplace_flows.experiments.datasets.MnistSplit
+          __object__: veriflow.experiments.datasets.MnistSplit
           digit: 0
-        epochs: &epochs 20000
-        patience: &patience 50
+        epochs: &epochs 20
+        patience: &patience 5
         batch_size: &batch_size 
           __eval__: tune.choice([32])
         optim_cfg: &optim 
@@ -34,7 +34,7 @@ experiments:
         
         model_cfg: 
           type:
-            __class__: &model laplace_flows.flows.NiceFlow
+            __class__: &model veriflow.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
               __eval__: tune.choice([3])
@@ -45,9 +45,20 @@ experiments:
             split_dim: &split_dim 50
             base_distribution: &distribution Laplace
             permutation: &permutation half
-    - &exp_normal
-      __overwrites__: *exp_laplace
-      name: mnist_normal
+    - &exp_lu
+      __overwrites__: *exp_nice
+      name: mnist_lu
       model_cfg: 
+          type:
+            __class__: veriflow.flows.LUFlow
+          params:
+            n_layers: 
+              __eval__: tune.choice([4])
+            base_distribution: Laplace
+    - &exp_lunice
+      __overwrites__: *exp_nice
+      model_cfg: 
+        name: mnist_lunice
         params:
-          base_distribution: Normal
+          permutation: LU
+

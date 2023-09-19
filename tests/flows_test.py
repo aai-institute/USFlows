@@ -3,11 +3,13 @@ import typing as T
 from veriflow.experiments.utils import read_config
 
 def test_mnist():
+    report_dir = "./reports"
+    storage_path = None
     sepline = "\n" + ("-" * 80) + "\n" + ("-" * 80) + "\n"
     print(
         f"{sepline}Parsing config file:{sepline}"
         )
-    config = os.path.abspath("./mnist.yaml")
+    config = os.path.abspath("./tests/mnist.yaml")
     experiment = read_config(config)
     print(
         f"{sepline}Done.{sepline}"
