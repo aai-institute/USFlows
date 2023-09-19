@@ -289,3 +289,31 @@ class MaskedCoupling(dist.TransformModule):
     def to(self, device):
         self.mask = self.mask.to(device)
         return super().to(device)
+    
+class LeakyReLUTransform(dist.TransformModule):
+    bijective = True
+    domain = dist.constraints.real
+    codomain = dist.constraints.real
+    
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return F.leaky_relu(x)
+
+    def backward(self, y: torch.Tensor) -> torch.Tensor:
+        return F.leaky_relu(y, negative_slope=100)
+    
+    def _call(self, x: torch.Tensor) -> torch.Tensor:
+        return self.forward(x)
+    
+    def _inverse(self, y: torch.Tensor) -> torch.Tensor:
+        return self.backward(y)
+    
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor) -> float:    
+        return ((x <= 0).float() * math.log(100)).sum()
+    
+    def sign(self) -> int:
+        sign = -1 if (x <= 0).int().sum() % 2 == 1 else 1
+        return sign
