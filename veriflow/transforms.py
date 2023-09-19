@@ -60,7 +60,7 @@ class ScaleTransform(dist.TransformModule):
         return self.scale.abs().log().sum()
 
     def sign(self) -> int:
-        return self.prod().sign() 
+        return 1 if (self.scale < 0).int().sum() % 2 == 0 else -1
     
     def is_feasible(self) -> bool:
         """Checks if the layer is feasible, i.e. if the diagonal elements of $\mathbf{U}$ are all positive"""
@@ -198,7 +198,7 @@ class LUTransform(dist.TransformModule):
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
-        return  F.linear(y, self.weight, self.bias)
+        return  F.linear(x, self.weight, self.bias)
         
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
@@ -207,8 +207,7 @@ class LUTransform(dist.TransformModule):
         :param y: input tensor
         :type y: torch.Tensor
         :return: transformed tensor $(LU)^{-1}(y - \mathrm{bias})$"""
-        M_inv = LA.inv(self.weight)
-        return torch.functional.F.linear(x - self.bias, M_inv)
+        return torch.functional.F.linear(y - self.bias, self.inv_weight)
     
     @property
     def L(self):
@@ -221,9 +220,15 @@ class LUTransform(dist.TransformModule):
         return self.U_raw.triu()
     
     @property
+    def inv_weight(self):
+        """Inverse weight matrix of the affine transform"""
+        return LA.matmul(self.L, self.U)
+    
+    @property
     def weight(self):
         """Weight matrix of the affine transform"""
-        return LA.matmul(self.L, self.U)
+        return LA.inv(LA.matmul(self.L, self.U))
+    
     
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward(x)
