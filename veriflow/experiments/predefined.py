@@ -177,6 +177,7 @@ class HyperoptExperiment(Experiment):
         if storage_path is not None:
             tuner_config = {"run_config": RunConfig(storage_path=storage_path)}
         else:
+            storage_path = os.path.expanduser("~/ray_results")
             tuner_config = {}
             
         exptime = str(datetime.now())
