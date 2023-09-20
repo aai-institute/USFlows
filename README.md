@@ -1,7 +1,7 @@
 # Veriflow: Generative Flow Based Density Estimators for Neuro-Symbolic Verification
 VeriFow provides a stable and convenient library of flow based general purpose density models with flexibile base distributions, 
 which are specifically tailored towards the use in neuro-symbolic verification procedures. The major goal is to
-provide models that can represent reference distribution which are suitable for verification, 
+provide models that can represent reference distributions which are suitable for verification, 
 abstract interpretation, and hypothesis testing simultaneously.
 The implemented layer are carefully designed to guarntee the following properties:
 
