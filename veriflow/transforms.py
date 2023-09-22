@@ -180,7 +180,7 @@ class LUTransform(dist.TransformModule):
 
         init.kaiming_uniform_(self.L_raw, nonlinearity='relu')
         with torch.no_grad():
-            self.L_raw.copy_(self.L_raw.tril().fill_diagonal_(1))
+            self.L_raw.copy_(self.L_raw.tril(diagonal=1).fill_diagonal_(1))
         
         init.kaiming_uniform_(self.U_raw, nonlinearity='relu')
         with torch.no_grad():
