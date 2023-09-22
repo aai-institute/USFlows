@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 
 from sklearn.datasets import load_digits
 from tqdm import tqdm
-from src.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform, LeakyReLUTransform
-from src.networks import AdditiveAffineNN, ConvNet2D
+from src.veriflow.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform, LeakyReLUTransform
+from src.veriflow.networks import AdditiveAffineNN, ConvNet2D
 
 
 class Flow(torch.nn.Module):

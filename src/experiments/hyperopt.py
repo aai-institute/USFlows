@@ -15,9 +15,9 @@ from ray.air import RunConfig, session
 from torch.utils.data import DataLoader
 
 from src.experiments.base import Experiment
-from src.flows import NiceFlow
-from src.networks import AdditiveAffineNN
-from src.transforms import ScaleTransform
+from src.veriflow.flows import NiceFlow
+from src.veriflow.networks import AdditiveAffineNN
+from src.veriflow.transforms import ScaleTransform
 
 HyperParams = Literal["train", "test", "coupling_layers", "coupling_nn_layers", "split_dim", "epochs", "iters", "batch_size", 
                       "optim", "optim_params", "base_dist"]

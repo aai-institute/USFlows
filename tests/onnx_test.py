@@ -1,7 +1,7 @@
 import torch
 from pyro.distributions import Normal
 
-from src.flows import NiceFlow
+from src.veriflow.flows import NiceFlow
 
 
 def test_onnx():
