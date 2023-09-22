@@ -1,7 +1,7 @@
 import os
 import typing as T
 
-from veriflow.experiments.config_parser import read_config
+from src.experiments.config_parser import read_config
 
 
 def test_mnist():

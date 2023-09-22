@@ -34,7 +34,7 @@ experiments:
         
         model_cfg: 
           type:
-            __class__: &model veriflow.flows.NiceFlow
+            __class__: &model src.veriflow.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
               __eval__: tune.choice([3])
@@ -50,7 +50,7 @@ experiments:
       name: mnist_lu
       model_cfg: 
           type:
-            __class__: veriflow.flows.LUFlow
+            __class__: src.veriflow.flows.LUFlow
           params:
             n_layers: 
               __eval__: tune.choice([4])

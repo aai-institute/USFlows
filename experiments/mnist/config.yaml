@@ -1,9 +1,9 @@
 ---
-__object__: veriflow.experiments.base.ExperimentCollection
+__object__: src.experiments.base.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
     - &exp_laplace
-      __object__: veriflow.experiments.hyperopt.HyperoptExperiment
+      __object__: src.experiments.hyperopt.HyperoptExperiment
       name: mnist_laplace
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
@@ -18,7 +18,7 @@ experiments:
         mode: min
       trial_config:
         dataset: &dataset
-          __object__: veriflow.experiments.datasets.MnistSplit
+          __object__: src.veriflow.experiments.datasets.MnistSplit
           digit: 0
         epochs: &epochs 20000
         patience: &patience 50
@@ -34,7 +34,7 @@ experiments:
         
         model_cfg: 
           type:
-            __class__: &model veriflow.flows.NiceFlow
+            __class__: &model src.veriflow.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
               __eval__: tune.choice([ 2, 3, 4, 5])
