@@ -1,11 +1,11 @@
 ---
 experiment:
-  __class__experiment_type: laplace_flows.experiments.predefined.ExperimentCollection
+  __class__experiment_type: laplace_flows.experiments.base.ExperimentCollection
   experiment_params:
     name: cfair_basedist_comparison
     experiments:
       - experiment:
-          __class__experiment_type: laplace_flows.experiments.predefined.HyperoptExperiment
+          __class__experiment_type: laplace_flows.experiments.hyperopt.HyperoptExperiment
           experiment_params:
             name: normal
             __class__scheduler: &scheduler ray.tune.schedulers.ASHAScheduler
@@ -38,7 +38,7 @@ experiment:
                 __tune__nonlinearity: &nonlinearity choice([torch.nn.ReLU(), torch.nn.Softplus(), torch.nn.Sigmoid()])
                 base_distribution: Normal
       - experiment:
-          __class__experiment_type: laplace_flows.experiments.predefined.HyperoptExperiment
+          __class__experiment_type: laplace_flows.experiments.hyperopt.HyperoptExperiment
           experiment_params:
             name: laplace
             __class__scheduler: *scheduler

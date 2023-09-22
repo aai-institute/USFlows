@@ -16,7 +16,6 @@ from sklearn.datasets import load_digits
 from tqdm import tqdm
 from veriflow.transforms import ScaleTransform, MaskedCoupling, Permute, LUTransform, LeakyReLUTransform
 from veriflow.networks import AdditiveAffineNN, ConvNet2D
-from veriflow.experiments.utils import create_checkerboard_mask
 
 
 class Flow(torch.nn.Module):
@@ -252,7 +251,7 @@ class NiceMaskedConvFlow(Flow):
             nonlinearity = torch.nn.ReLU()
 
         c, h, w = base_distribution.sample().shape
-        mask = create_checkerboard_mask(h, w)
+        mask = NiceMaskedConvFlow.create_checkerboard_mask(h, w)
         
         layers = []
         self.masks = []
@@ -276,6 +275,24 @@ class NiceMaskedConvFlow(Flow):
         layers.append(ScaleTransform(mask.shape))
 
         super().__init__(base_distribution, layers, *args, **kwargs)
+        
+    @classmethod
+    def create_checkerboard_mask(cls, h: int, w: int, invert: bool=False) -> torch.Tensor:
+        """Creates a checkerboard mask of size $(h,w)$.
+
+        :param h (_type_): height
+        :param w (_type_): width
+        :param invert (bool, optional): If True, inverts the mask. Defaults to False.
+        :returns: Checkerboard mask of height $h$ and width $w$.
+        """
+        x, y = torch.arange(h, dtype=torch.int32), torch.arange(w, dtype=torch.int32)
+        xx, yy = torch.meshgrid(x, y, indexing='ij')
+        mask = torch.fmod(xx + yy, 2)
+        mask = mask.to(torch.float32).view(1, 1, h, w)
+        if invert:
+            mask = 1 - mask
+        return mask
+
         
 class LUFlow(Flow):
     """Implementation of the NICE flow architecture using fully connected coupling layers and a checkerboard permutation"""

@@ -1,6 +1,8 @@
-from veriflow.flows import NiceFlow
-from pyro.distributions import Normal
 import torch
+from pyro.distributions import Normal
+
+from veriflow.flows import NiceFlow
+
 
 def test_onnx():
     loc = torch.zeros(2)

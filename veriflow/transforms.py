@@ -1,25 +1,22 @@
 import math
-import numpy as np
-import pyro 
-from pyro import distributions as dist
-from pyro.nn import DenseNN
-from pyro.distributions.transforms import AffineCoupling, Permute, LowerCholeskyAffine
-from pyro.infer import SVI
 from typing import List
-import torch
 
+import numpy as np
+import pyro
+import torch
+from pyro import distributions as dist
+from pyro.distributions import constraints
+from pyro.distributions.transforms import (AffineCoupling, LowerCholeskyAffine,
+                                           Permute)
+from pyro.infer import SVI
+from pyro.nn import DenseNN
 from sklearn.datasets import load_digits
-from tqdm import tqdm
-
-import torch
+from torch import linalg as LA
 from torch.distributions.transforms import Transform
 from torch.distributions.utils import lazy_property
 from torch.functional import F
-from torch import linalg as LA
 from torch.nn import init
-
-from pyro.distributions import constraints
-
+from tqdm import tqdm
 
 
 class ScaleTransform(dist.TransformModule):

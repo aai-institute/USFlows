@@ -1,9 +1,9 @@
 ---
-__object__: laplace_flows.experiments.predefined.ExperimentCollection
+__object__: laplace_flows.experiments.base.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
     - &main
-      __object__:  laplace_flows.experiments.predefined.HyperoptExperiment
+      __object__:  laplace_flows.experiments.hyperopt.HyperoptExperiment
       name: normal_moons
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
