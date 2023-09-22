@@ -20,7 +20,21 @@ from veriflow.experiments.utils import create_checkerboard_mask
 
 
 class Flow(torch.nn.Module):
-
+    """Base implementation of a flow model"""
+    # Export mode determines whether the log_prob or the sample function is exported to onnx
+    export_modes = Literal["log_prob", "sample"]
+    export = "log_prob"
+    
+    def forward(self, x: torch.Tensor):
+        """Dummy implementation of forward method for onnx export. The self.export attribute
+        determines whether the log_prob or the sample function is exported to onnx"""
+        if self.export == "log_prob":
+            return self.log_prob(x)
+        elif self.export == "sample":
+            return self.sample()
+        else:
+            raise ValueError(f"Unknown export mode {self.export}")
+    
     def __init__(self, base_distribution, layers, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
@@ -96,6 +110,16 @@ class Flow(torch.nn.Module):
         
         return sum(losses) / len(losses)
     
+    def to_onnx(self, path: str, export_mode: export_modes = "log_prob") -> None:
+        """Saves the model as onnx file
+        
+        :param path: path to save the model.
+        :param export_mode: export mode. Can be "log_prob" or "sample".
+        """
+        self.export = export_mode
+        dummy_input = self.base_distribution.sample()
+        torch.onnx.export(self, dummy_input, path, verbose=True)
+    
     def log_prob(self, x: torch.Tensor):
         """Returns the models log-densities for the given samples
 
@@ -159,7 +183,7 @@ class NiceFlow(Flow):
         self.split_dim = split_dim
 
         if nonlinearity is None:
-            nonlinearity = torch.nn.ReLU
+            nonlinearity = torch.nn.ReLU()
 
         rdim = input_dim - split_dim
         layers = []

@@ -1,4 +1,5 @@
 *.csv
+*.onnx
 #
 .idea
 config_local.json
