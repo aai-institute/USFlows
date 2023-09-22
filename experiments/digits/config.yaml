@@ -1,11 +1,11 @@
 ---
 experiment:
-  __class__experiment_type: laplace_flows.experiments.base.ExperimentCollection
+  __class__experiment_type: src.experiments.base.ExperimentCollection
   experiment_params:
     name: digits_basedist_comparison
     experiments:
       - experiment:
-          __class__experiment_type: laplace_flows.experiments.hyperopt.HyperoptExperiment
+          __class__experiment_type: src.experiments.hyperopt.HyperoptExperiment
           experiment_params:
             name: digits_laplace
             __class__scheduler: &scheduler ray.tune.schedulers.ASHAScheduler
@@ -30,7 +30,7 @@ experiment:
                 __tune__lr: loguniform(1e-5, 5e-4)
                 weight_decay: 0.0
               
-              __class__model: laplace_flows.flows.NiceFlow
+              __class__model: src.veriflow.flows.NiceFlow
               model_params:
                 __tune__coupling_layers: &coupling_layers choice([2, 3, 4])
                 __tune__coupling_nn_layers: &coupling_nn_layers choice([[128], [32], [64], [128, 128], [32, 32], [64, 64], [32, 128], [64, 32], [32, 64], [128, 32], [64, 128], [128, 64]])
@@ -38,7 +38,7 @@ experiment:
                 __tune__nonlinearity: &nonlinearity choice([torch.nn.ReLU(), torch.nn.Softplus(), torch.nn.Sigmoid()])
                 base_distribution: Laplace
       - experiment:
-          __class__experiment_type: laplace_flows.experiments.hyperopt.HyperoptExperiment
+          __class__experiment_type: src.experiments.hyperopt.HyperoptExperiment
           experiment_params:
             name: digits_normal
             __class__scheduler: *scheduler
@@ -56,7 +56,7 @@ experiment:
               __class__optim: *optim
               optim_params: *optim_params
               
-              __class__model: laplace_flows.flows.NiceFlow
+              __class__model: src.veriflow.flows.NiceFlow
               model_params:
                 __tune__coupling_layers: *coupling_layers
                 __tune__coupling_nn_layers: *coupling_nn_layers

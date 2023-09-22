@@ -14,10 +14,10 @@ from ray import tune
 from ray.air import RunConfig, session
 from torch.utils.data import DataLoader
 
-from veriflow.experiments.base import Experiment
-from veriflow.flows import NiceFlow
-from veriflow.networks import AdditiveAffineNN
-from veriflow.transforms import ScaleTransform
+from src.experiments.base import Experiment
+from src.veriflow.flows import NiceFlow
+from src.veriflow.networks import AdditiveAffineNN
+from src.veriflow.transforms import ScaleTransform
 
 HyperParams = Literal["train", "test", "coupling_layers", "coupling_nn_layers", "split_dim", "epochs", "iters", "batch_size", 
                       "optim", "optim_params", "base_dist"]

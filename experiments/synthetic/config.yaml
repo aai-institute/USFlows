@@ -40,7 +40,7 @@ experiments:
         
         model_cfg: 
           type:
-            __class__: &model laplace_flows.flows.NiceFlow
+            __class__: &model src.veriflow.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
               __eval__: tune.choice([2**i for i in range(1, 5)])

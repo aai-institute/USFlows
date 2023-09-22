@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Faried Abu Zaid <fariedaz@gmail.com>"]
 readme = "README.md"
-packages = [{include = "veriflow"}, {include = "scripts"}]
+packages = [{include = "src"}, {include = "scripts"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
