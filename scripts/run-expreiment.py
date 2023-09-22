@@ -1,7 +1,9 @@
-import click
-import os 
+import os
 import typing as T
-from veriflow.experiments.utils import read_config
+
+import click
+
+from veriflow.experiments.config_parser import read_config
 
 Pathable = T.Union[str, os.PathLike] # In principle one can cast it to os.path.Path
 

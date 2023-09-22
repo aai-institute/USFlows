@@ -1,6 +1,8 @@
-import os 
+import os
 import typing as T
-from veriflow.experiments.utils import read_config
+
+from veriflow.experiments.config_parser import read_config
+
 
 def test_mnist():
     report_dir = "./reports"

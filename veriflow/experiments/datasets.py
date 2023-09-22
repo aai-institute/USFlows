@@ -1,16 +1,17 @@
-from abc import abstractmethod
-import torch
-from torch import Tensor
-from torchvision.datasets import FashionMNIST, MNIST
-import torchvision.transforms as transforms
 import os
-import pandas as pd
-import numpy as np
 import typing as T
+from abc import abstractmethod
 
 import idx2numpy
+import numpy as np
+import pandas as pd
+import torch
+import torchvision.transforms as transforms
+from sklearn.datasets import (make_blobs, make_checkerboard, make_circles,
+                              make_moons)
+from torch import Tensor
+from torchvision.datasets import MNIST, FashionMNIST
 
-from sklearn.datasets import make_moons, make_blobs, make_checkerboard, make_circles
 
 class DequantizedDataset(torch.utils.data.Dataset):
     """

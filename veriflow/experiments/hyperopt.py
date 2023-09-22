@@ -1,57 +1,23 @@
-from sklearn.datasets import load_digits
+import json
+import logging
+import os
+import typing as T
+from datetime import datetime
+from typing import Any, Dict, Iterable, Literal
+
+import pandas as pd
 import torch
-from torch.utils.data import DataLoader
-from pyro.distributions.transforms import Permute, AffineCoupling
+from matplotlib import pyplot as plt
 from pyro import distributions as dist
+from pyro.distributions.transforms import AffineCoupling, Permute
+from ray import tune
+from ray.air import RunConfig, session
+from torch.utils.data import DataLoader
+
 from veriflow.experiments.base import Experiment
 from veriflow.flows import NiceFlow
-from veriflow.transforms import ScaleTransform 
 from veriflow.networks import AdditiveAffineNN
-from veriflow.scripts.get_experiment_results import build_report
-
-from matplotlib import pyplot as plt
-import logging
-
-from typing import Literal, Any, Dict
-import typing as T
-import pandas as pd
-import os
-from datetime import datetime
-
-import ray
-from ray import tune
-from ray.air import session, RunConfig
-from ray.air.checkpoint import Checkpoint
-from copy import deepcopy
-
-
-class ExperimentCollection(Experiment):
-    """ Implements an experiment that consists of several jointly conducted but independent experiments.
-    """
-    def __init__(self, experiments: T.Iterable[Experiment], *args, **kwargs) -> None:
-        """
-        The function initializes an object with a list of experiments based on a given configuration.
-        
-        :param experiments: The "experiments" parameter is an iterable object that contains a list of
-        experiments. Each experiment is represented by a configuration object
-        :type experiments: Iterable *args
-        """
-        super().__init__(*args, **kwargs)
-        self.experiments = experiments
-    
-    @classmethod
-    def from_dict(cls, config: T.Dict[str, T.Any]) -> "ExperimentCollection":
-        config = deepcopy(config)
-        for i, exp_cfg in enumerate(config["experiment_params"]["experiments"]):
-            config["experiment_params"]["experiments"][i] = Experiment.from_dict(exp_cfg)   
-        
-        return Experiment.from_dict(config)
-        
-    
-    def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
-        for i, exp in enumerate(self.experiments):
-            exp.conduct(os.path.join(report_dir, f"{i}_{exp.name}"), storage_path=storage_path)
-    
+from veriflow.transforms import ScaleTransform
 
 HyperParams = Literal["train", "test", "coupling_layers", "coupling_nn_layers", "split_dim", "epochs", "iters", "batch_size", 
                       "optim", "optim_params", "base_dist"]
@@ -199,7 +165,8 @@ class HyperoptExperiment(Experiment):
         
         # TODO: hacky way to dertmine the last experiment
         exppath = storage_path + ["/" + f for f in sorted(os.listdir(storage_path)) if f.startswith("_trial")][-1]
-        build_report(exppath, report_file=os.path.join(report_dir, f"report_{self.name}_" + exptime + ".csv"))
+        report_file = os.path.join(report_dir, f"report_{self.name}_" + exptime + ".csv")
+        self._build_report(exppath, report_file=report_file)
         #best_result = results.get_best_result("val_loss", "min")
 
         #print("Best trial config: {}".format(best_result.config))
@@ -207,3 +174,38 @@ class HyperoptExperiment(Experiment):
         #    best_result.metrics["val_loss"]))
         
         #test_best_model(best_result)
+
+
+    def _build_report(self, expdir: str, report_file: str, config_prefix: str = ""):
+        """Builds a report of the hyperopt experiment.
+        
+        :param expdir: The expdir parameter is the path to the experiment directory (ray results folder).
+        :type expdir: str
+        :param report_file: The report_file parameter is the path to the report file.
+        :type report_file: str
+        :param config_prefix: The config_prefix parameter is the prefix for the config items.
+        """
+        report = None
+        print(os.listdir(expdir))
+        for d in os.listdir(expdir):
+            if os.path.isdir(expdir + "/" + d):
+                try:
+                    with open(expdir + "/" + d + "/result.json", "r") as f:
+                        result = json.loads("{\"test_" + f.read().split("{\"test_")[-1])
+                except:
+                    print(f"error at {expdir + '/' + d}")
+                    continue
+                
+                config = result["config"]
+                for k in config.keys():
+                    result[config_prefix + k] = config[k] if not isinstance(config[k], Iterable) else str(config[k])
+                result.pop("config")
+
+                if report is None:
+                    report = pd.DataFrame(result, index=[0])
+                else:
+                    report = pd.concat([report, pd.DataFrame(result, index=[0])], ignore_index=True)
+        
+        os.makedirs(os.path.dirname(report_file), exist_ok=True)
+        report.to_csv(report_file, index=False)
+

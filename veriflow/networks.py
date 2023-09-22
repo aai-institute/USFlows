@@ -1,9 +1,9 @@
-from typing import List, Optional, Tuple, Union
 from math import ceil
-import torch
-from torch import nn 
-from pyro.nn import DenseNN
+from typing import List, Optional, Tuple, Union
 
+import torch
+from pyro.nn import DenseNN
+from torch import nn
 
 
 class AdditiveAffineNN(torch.nn.Module):

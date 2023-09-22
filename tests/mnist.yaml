@@ -1,9 +1,9 @@
 ---
-__object__: veriflow.experiments.predefined.ExperimentCollection
+__object__: veriflow.experiments.base.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
     - &exp_nice
-      __object__: veriflow.experiments.predefined.HyperoptExperiment
+      __object__: veriflow.experiments.hyperopt.HyperoptExperiment
       name: mnist_nice
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
