@@ -163,7 +163,7 @@ class Flow(torch.nn.Module):
     def is_feasible(self) -> bool:
         """Checks is the model parameters meet all constraints"""
         return all(
-            [l.is_feasible() for l in self.layers if isinstance(l, torch.nn.Module)]
+            [l.is_feasible() for l in self.layers if isinstance(l, BaseTransform)]
         )
 
     def add_jitter(self, jitter: float = 1e-6) -> None:

@@ -118,7 +118,7 @@ class ScaleTransform(BaseTransform):
         self.U_raw = self.scale + perturbation
 
 
-class Permute(pyro.distributions.TransformModule):
+class Permute(BaseTransform):
     """Permutation transform."""
 
     bijective = True
@@ -198,6 +198,8 @@ class Permute(pyro.distributions.TransformModule):
         return Permute(self.permutation, cache_size=cache_size)
 
 
+
+
 class LUTransform(BaseTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = \mathbf{L}\mathbf{U}x$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. Bijectivity is guaranteed by
@@ -270,7 +272,7 @@ class LUTransform(BaseTransform):
         return torch.functional.F.linear(y - self.bias, self.inv_weight)
 
     @property
-    def L(self) -> torch.:
+    def L(self) -> torch.Tensor:
         """The lower triangular matrix $\mathbf{L}$ of the layers LU decomposition"""
         return self.L_raw.tril().fill_diagonal_(1)
 
