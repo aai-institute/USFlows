@@ -128,9 +128,12 @@ class Flow(torch.nn.Module):
             path: path to save the model.
             export_mode: export mode. Can be "log_prob" or "sample".
         """
+        mode_cache = self.export
         self.export = export_mode
         dummy_input = self.base_distribution.sample()
         torch.onnx.export(self, dummy_input, path, verbose=True)
+        self.export = mode_cache
+        
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Returns the models log-densities for the given samples
