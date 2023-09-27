@@ -1,5 +1,5 @@
-from abc import abstractmethod
 import math
+from abc import abstractmethod
 from typing import List
 
 import numpy as np
@@ -7,7 +7,8 @@ import pyro
 import torch
 from pyro import distributions as dist
 from pyro.distributions import constraints
-from pyro.distributions.transforms import AffineCoupling, LowerCholeskyAffine, Permute
+from pyro.distributions.transforms import (AffineCoupling, LowerCholeskyAffine,
+                                           Permute)
 from pyro.infer import SVI
 from pyro.nn import DenseNN
 from sklearn.datasets import load_digits
@@ -17,6 +18,8 @@ from torch.distributions.utils import lazy_property
 from torch.functional import F
 from torch.nn import init
 from tqdm import tqdm
+
+from src.veriflow.linalg import solve_triangular
 
 
 class BaseTransform(dist.TransformModule):
@@ -180,9 +183,9 @@ class Permute(BaseTransform):
 
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor):
         """
-        Calculates the elementwise determinant of the log Jacobian, i.e.
+        Calculates the element-wise determinant of the log Jacobian, i.e.
         log(abs([dy_0/dx_0, ..., dy_{N-1}/dx_{N-1}])). Note that this type of
-        transform is not autoregressive, so the log Jacobian is not the sum of the
+        transform is not auto-regressive, so the log Jacobian is not the sum of the
         previous expression. However, it turns out it's always 0 (since the
         determinant is -1 or +1), and so returning a vector of zeros works.
         """
@@ -201,7 +204,7 @@ class Permute(BaseTransform):
 
 
 class LUTransform(BaseTransform):
-    """Implementation of a linear bijection transform. Applies a transform $y = \mathbf{L}\mathbf{U}x$, where $\mathbf{L}$ is a
+    """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. Bijectivity is guaranteed by
     requiring that the diagonal elements of $\mathbf{U}$ are positive and the diagonal elements of  $\mathbf{L}$ are all $1$.
 
@@ -255,16 +258,23 @@ class LUTransform(BaseTransform):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Computes the affine transform $(LU)x + \mathrm{bias}$
-
+        """Computes the affine transform $y = (LU)^{-1}x + \mathrm{bias}$.
+        The value $y$ is computed by solving the linear equation system
+        \begin{align*}
+            Ly_0 &= x + LU\textrm{bias} \\
+            Uy &= y_0  
+        \end{align*}
+        
         :param x: input tensor
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
-        return F.linear(x, self.weight, self.bias)
+        x0 = x + torch.functional.F.linear(self.bias, self.inv_weight)
+        y0 = solve_triangular(self.L, x0)
+        return solve_triangular(self.U, y0)
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
-        """Computes the inverse transform $(LU)^{-1}(y - \mathrm{bias})$
+        """Computes the inverse transform $(LU)(y - \mathrm{bias})$
 
         :param y: input tensor
         :type y: torch.Tensor
@@ -285,11 +295,6 @@ class LUTransform(BaseTransform):
     def inv_weight(self) -> torch.Tensor:
         """Inverse weight matrix of the affine transform"""
         return LA.matmul(self.L, self.U)
-
-    @property
-    def weight(self) -> torch.Tensor:
-        """Weight matrix of the affine transform"""
-        return LA.inv(LA.matmul(self.L, self.U))
 
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         """ Alias for :func:`forward`"""
@@ -349,6 +354,7 @@ class LUTransform(BaseTransform):
                 self.U_raw
                 + perturbation * torch.eye(self.dim, device=self.U_raw.device)
             )
+            
 
 
 class MaskedCoupling(BaseTransform):
@@ -438,7 +444,8 @@ class MaskedCoupling(BaseTransform):
         """
         self.mask = self.mask.to(device)
         return super().to(device)
-
+    
+    
 
 class LeakyReLUTransform(BaseTransform):
     bijective = True
