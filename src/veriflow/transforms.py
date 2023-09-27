@@ -115,8 +115,7 @@ class ScaleTransform(BaseTransform):
         return (self.scale != 0).all()
 
     def add_jitter(self, jitter: float = 1e-6) -> None:
-        """Adds jitter to the diagonal elements of $\mathbf{U}$. This is useful to ensure that the transformation 
-        is invertible."""
+        """Adds jitter to the diagonal elements of $\mathbf{U}$."""
         perturbation = torch.randn(self.dim, device=self.U_raw.device) * jitter
         self.U_raw = self.scale + perturbation
 
@@ -201,8 +200,6 @@ class Permute(BaseTransform):
         return Permute(self.permutation, cache_size=cache_size)
 
 
-
-
 class LUTransform(BaseTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. Bijectivity is guaranteed by
@@ -233,7 +230,7 @@ class LUTransform(BaseTransform):
 
         self.input_shape = dim
 
-        self.L_mask = torch.tril(torch.ones(dim, dim), diagonal=1)
+        self.L_mask = torch.tril(torch.ones(dim, dim), diagonal=-1)
         self.U_mask = torch.triu(torch.ones(dim, dim), diagonal=0)
 
         self.L_raw.register_hook(lambda grad: grad * self.L_mask)
@@ -246,7 +243,7 @@ class LUTransform(BaseTransform):
 
         init.kaiming_uniform_(self.L_raw, nonlinearity="relu")
         with torch.no_grad():
-            self.L_raw.copy_(self.L_raw.tril(diagonal=1).fill_diagonal_(1))
+            self.L_raw.copy_(self.L_raw.tril(diagonal=-1).fill_diagonal_(1))
 
         init.kaiming_uniform_(self.U_raw, nonlinearity="relu")
         with torch.no_grad():
@@ -264,7 +261,7 @@ class LUTransform(BaseTransform):
             Ly_0 &= x + LU\textrm{bias} \\
             Uy &= y_0  
         \end{align*}
-        
+
         :param x: input tensor
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
@@ -284,7 +281,7 @@ class LUTransform(BaseTransform):
     @property
     def L(self) -> torch.Tensor:
         """The lower triangular matrix $\mathbf{L}$ of the layers LU decomposition"""
-        return self.L_raw.tril().fill_diagonal_(1)
+        return self.L_raw.tril(-1)  + torch.eye(self.dim)
 
     @property
     def U(self) -> torch.Tensor:
@@ -309,11 +306,14 @@ class LUTransform(BaseTransform):
         
         Args:
             x (torch.Tensor): input tensor
+            y (torch.Tensor): transformed tensor
             
         Returns:
             float: log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
         """
-        return LA.slogdet(self.weight)[1]
+        U = self.U
+        dU = U - U.triu(1)
+        return dU.abs().log().sum()
 
     def sign(self) -> int:
         """ Computes the sign of the determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$.
@@ -324,7 +324,7 @@ class LUTransform(BaseTransform):
         Returns:
             float: sign of the determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
         """
-        return LA.slogdet(self.weight)[0]
+        return self.L.diag().prod().sign() *  self.U.diag().prod().sign()
 
     def to(self, device) -> None:
         """ Moves the layer to a given device
@@ -445,8 +445,6 @@ class MaskedCoupling(BaseTransform):
         self.mask = self.mask.to(device)
         return super().to(device)
     
-    
-
 class LeakyReLUTransform(BaseTransform):
     bijective = True
     domain = dist.constraints.real
@@ -504,4 +502,4 @@ class LeakyReLUTransform(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform
         """
-        return ((x <= 0).float() * math.log(self.alpha)).sum()
+        return math.log(y/x).sum()

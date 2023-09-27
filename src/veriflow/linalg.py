@@ -16,11 +16,16 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
     Returns:
         (torch.Tensor): Solution of the system $Mx=y$
     """
+    
+    dim = M.size(0)
+    if dim == 1:
+        return y / M
+    
     if pivot is None:
         # Determine orientation of Matrix
-        if all([M[i, j] == 0 for i in range(M.size[0]) for j in range(i, M.size[1])]):
+        if all([M[i, j] == 0. for i in range(dim) for j in range(i+1, dim)]):
             pivot = 0
-        elif all([M[i, j] == 0 for i in range(M.size[0]) for j in range(0, i+1)]):
+        elif all([M[i, j] == 0. for i in range(dim) for j in range(0, i)]):
             pivot = -1
         else:
             raise ValueError("M needs to be triangular.")
@@ -31,15 +36,15 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
     x = torch.zeros_like(y)
     x[pivot] = y[pivot] / M[pivot, pivot]
     
-    y_next = (y - x[pivot] * L[:, pivot])
+    y_next = (y - x[pivot] * M[:, pivot])
     if pivot == 0:
         y_next = y_next[1:] 
         M_next = M[1:, 1:]
-        x[1:] = solve_triangular(y_next, M_next) 
+        x[1:] = solve_triangular(M_next, y_next, pivot=pivot) 
     else:
         y_next = y_next[:-1] 
-        LMnext = M[:-1, :-1]
-        x[:-1] = solve_triangular(y_next, M_next) 
+        M_next = M[:-1, :-1]
+        x[:-1] = solve_triangular(M_next, y_next, pivot=pivot) 
     
     return x
            
