@@ -43,7 +43,12 @@ experiments:
             nonlinearity: &nonlinearity 
               __eval__: tune.choice([torch.nn.ReLU()])
             split_dim: &split_dim 50
-            base_distribution: &distribution Laplace
+            base_distribution: 
+              __object__: pyro.distributions.Laplace
+              loc: 
+                __eval__: torch.zeros(100)
+              scale: 
+                __eval__: torch.ones(100)
             permutation: &permutation half
     - &exp_lu
       __overwrites__: *exp_nice
@@ -54,7 +59,12 @@ experiments:
           params:
             n_layers: 
               __eval__: tune.choice([4])
-            base_distribution: Laplace
+            base_distribution: 
+              __object__: pyro.distributions.Normal
+              loc: 
+                __eval__: torch.zeros(100)
+              scale: 
+                __eval__: torch.ones(100)
     - &exp_lunice
       __overwrites__: *exp_nice
       model_cfg: 

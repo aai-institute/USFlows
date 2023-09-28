@@ -49,14 +49,24 @@ experiments:
             nonlinearity: &nonlinearity 
               __eval__: tune.choice([torch.nn.ReLU()])
             split_dim: &split_dim 1
-            base_distribution: &distribution Normal
+            base_distribution:
+            __object__: pyro.distributions.Normal
+            loc: 
+              __eval__: torch.zeros(100)
+            scale: 
+              __eval__: torch.ones(100)
             permutation: &permutation half 
     - __overwrites__: *main
       name: laplace_moons
       trial_config:
         model_cfg: 
           params:
-            base_distribution: Laplace
+            base_distribution:
+            __object__: pyro.distributions.Laplace
+            loc: 
+              __eval__: torch.zeros(100)
+            scale: 
+              __eval__: torch.ones(100)
     - &blobs
       __overwrites__: *main
       name: normal_blobs
@@ -68,7 +78,12 @@ experiments:
       trial_config:
         model_cfg: 
           params:
-            base_distribution: Laplace
+            base_distribution:
+            __object__: pyro.distributions.Laplace
+            loc: 
+              __eval__: torch.zeros(100)
+            scale: 
+              __eval__: torch.ones(100)
     - &checkers
       __overwrites__: *main
       name: normal_checkers
@@ -83,5 +98,10 @@ experiments:
       trial_config:
         model_cfg: 
           params:
-            base_distribution: Laplace
+            base_distribution:
+            __object__: pyro.distributions.Laplace
+            loc: 
+              __eval__: torch.zeros(100)
+            scale: 
+              __eval__: torch.ones(100)
     

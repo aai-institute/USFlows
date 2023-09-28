@@ -39,6 +39,11 @@ experiments:
             nonlinearity: &nonlinearity 
               __eval__: tune.choice([torch.nn.ReLU()])
             split_dim: &split_dim 50
-            base_distribution: &distribution Normal
+            base_distribution:
+            __object__: pyro.distributions.Normal
+            loc: 
+              __eval__: torch.zeros(100)
+            scale: 
+              __eval__: torch.ones(100)
             permutation: &permutation half
     
