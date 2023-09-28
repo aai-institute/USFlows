@@ -32,8 +32,6 @@ HyperParams = Literal[
     "optim_params",
     "base_dist",
 ]
-BaseDisbributions = Literal["Laplace", "Normal"]
-
 
 class HyperoptExperiment(Experiment):
     """Hyperparameter optimization experiment."""
@@ -89,22 +87,9 @@ class HyperoptExperiment(Experiment):
         data_test = dataset.get_test()
         data_val = dataset.get_val()
 
-        dim = data_train[0][0].shape
-        base_dist = config["model_cfg"]["params"]["base_distribution"]
-        zeros, ones = torch.zeros(dim).to(device), torch.ones(dim).to(device)
-        if base_dist == "Laplace":
-            base_dist = torch.distributions.Laplace(zeros, ones)
-        elif base_dist == "Normal":
-            base_dist = torch.distributions.Normal(zeros, ones)
-        else:
-            raise ValueError("Unknown base distribution")
-
-        config["model_cfg"]["params"]["base_distribution"] = base_dist
-
         flow = config["model_cfg"]["type"](**(config["model_cfg"]["params"]))
-
         flow.to(device)
-
+        
         best_loss = float("inf")
         strikes = 0
         for _ in range(config["epochs"]):
@@ -141,7 +126,6 @@ class HyperoptExperiment(Experiment):
                 strikes += 1
                 if strikes >= config["patience"]:
                     break
-        # torch.mps.empty_cache()
 
         return {
             "test_loss_best": test_loss,
@@ -181,7 +165,7 @@ class HyperoptExperiment(Experiment):
         )
         results = tuner.fit()
 
-        # TODO: hacky way to dertmine the last experiment
+        # TODO: hacky way to determine the last experiment
         exppath = (
             storage_path
             + [
