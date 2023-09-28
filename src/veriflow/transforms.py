@@ -311,9 +311,14 @@ class LUTransform(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
         """
+        # log |Det(LU)| =  sum(log(|diag(U)|)) 
+        # (as L is lower triangular with all 1s on the diag, i.e. log|Det(L)| = 0, and U is upper triangular)
+        # However, since onnx export of diag() is currently not supported, we have use
+        # a reformulation. Note dU keeps the quadratic structure but replace all values  
+        # outside the diagonal with 1. Then sum(log(|diag(U)|)) = sum(log(|U|))
         U = self.U
-        dU = U - U.triu(1)
-        return dU.abs().prod().log()
+        dU = U - U.triu(1) + (torch.ones_like(U) - torch.eye(self.dim))
+        return dU.abs().log().sum()
 
     def sign(self) -> int:
         """ Computes the sign of the determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$.
