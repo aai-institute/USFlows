@@ -234,8 +234,19 @@ class LUTransform(dist.TransformModule):
         return self.backward(y)
     
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor) -> float:
-        return LA.slogdet(self.weight)[1]
-    
+        """ Computes the log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$.
+        
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): transformed tensor
+            
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
+        """
+        U = self.U
+        dU = U - U.triu(1)
+        return dU.abs().prod().log()
+
     def sign(self) -> int:
         return LA.slogdet(self.weight)[0]
     
