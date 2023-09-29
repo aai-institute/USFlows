@@ -2,6 +2,7 @@ from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Dict, List, Union
+from pickle import load
 
 import yaml
 
@@ -113,17 +114,29 @@ def read_config(yaml_path: Union[str, Path]) -> dict:
     additional functionality:
 
     Special keys:
-    __class__: The value of this key is interpreted as the class name of the object.
-    The class is imported and stored in the result dictionary under the key <key>.
+    __class__: The value is interpreted as a class name and the corresponding class is imported.
+    __object__: The value is interpreted as a class, all other keys are interpreted as constructor arguments.
+        The key indicates that this (sub-)dictionary is interpreted as on object specification.
+    __eval__: The value is evaluated. All other keys in the (sub-)dictionary are ignored.
+        The keywords supports the core python languages. Additionally, tune and torch are already imported for convenience.
     Example:
-        entry in yaml: __class__model: laplace_flows.flows.NiceFlow)
-        entry in result: model: __import__("laplace_flows.flows.NiceFlow")
-    __tune__<key>: The value of this key is interpreted as a dictionary that contains the
-    configuration for the hyperparameter optimization using tune sample methods.
-    the directive is evaluated and the result in the result dictionary under the key <key>.
-    Example:
-        entry in yaml: __tune__lr: loguniform(1e-4, 1e-1)
-        entry in result: lr: eval("tune.loguniform(1e-4, 1e-1)")
+        ---
+        entry in yaml: 
+        model: 
+            __class__: src.verfiflow.flows.NiceFlow
+        entry in result: model: <src.verfiflow.flows.NiceFlow>
+        ---
+        entry in yaml: 
+        model: 
+            __object__: src.verfiflow.flows.NiceFlow
+            p1: 1
+            p2: 2
+        entry in result: model: <src.verfiflow.flows.NiceFlow(p1=1, p2=2)>
+        ---
+        entry in yaml: 
+        lr: 
+            __eval__: tune.loguniform(1e-4, 1e-1)
+        entry in result: lr: <tune.loguniform(1e-4, 1e-1)>
 
     :param yaml_path: Path to the yaml file.
     """
@@ -137,7 +150,7 @@ def read_config(yaml_path: Union[str, Path]) -> dict:
     return config
 
 
-def parse_raw_config(d: dict):
+def parse_raw_config(d: dict) -> Any:
     """Parses an unfolded raw config dictionary and returns the corresponding dictionary.
     Parsing includes the following steps:
     - Overwrites are applied (see apply_overwrite)
@@ -145,7 +158,10 @@ def parse_raw_config(d: dict):
     - The "__eval__" key is evaluated.
     - The "__class__" key is interpreted as a class name and the corresponding class is imported.
 
-    :param d: The raw config dictionary.
+    Args:
+        d: The raw config dictionary.
+    Returns:
+        The result after all semantics have been applied.
     """
     if isinstance(d, dict):
         d = apply_overwrite(d, recurse=False)
@@ -172,3 +188,22 @@ def parse_raw_config(d: dict):
         return result
     else:
         return d
+
+def from_checkpoint(params: str, state_dict: str) -> Any:
+    """Loads a model from a checkpoint.
+
+    Args:
+        params: Path to the file containing the model specification.
+        state_dict: Path to the file containing the state dict.
+    Returns:
+        The loaded model.
+    """
+    spec = load(open(params, "rb"))["model_cfg"]
+    model = spec["type"](**spec["params"])
+    
+    state_dict = torch.load(state_dict)
+    model.load_state_dict(state_dict)
+    
+    return model
+    
+    

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 import typing as T
 from datetime import datetime
 from typing import Any, Dict, Iterable, Literal
@@ -15,6 +16,7 @@ from ray.air import RunConfig, session
 from torch.utils.data import DataLoader
 
 from src.explib.base import Experiment
+from src.explib.config_parser import from_checkpoint
 from src.veriflow.flows import NiceFlow
 from src.veriflow.networks import AdditiveAffineNN
 from src.veriflow.transforms import ScaleTransform
@@ -67,11 +69,14 @@ class HyperoptExperiment(Experiment):
         self.tuner_params = tuner_params
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu"):
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
-
-        Raises:
-            ValueError: _description_
+        
+        Args:
+            config (T.Dict[str, T.Any]): configuration
+            device (torch.device, optional): device. Defaults to "cpu".
+        Returns:
+            Dict[str, float]: trial performance metrics
         """
         if device is None:
             if torch.backends.mps.is_available():
@@ -99,7 +104,7 @@ class HyperoptExperiment(Experiment):
                 config["optim_cfg"]["params"],
                 batch_size=config["batch_size"],
                 device=device,
-            )
+            )[-1]
 
             val_loss = 0
             for i in range(0, len(data_val), config["batch_size"]):
@@ -108,27 +113,19 @@ class HyperoptExperiment(Experiment):
             val_loss /= len(data_val)
 
             session.report(
-                {"test_loss": "?", "train_loss": train_loss, "val_loss": val_loss},
+                {"train_loss": train_loss, "val_loss": val_loss},
                 checkpoint=None,
             )
             if val_loss < best_loss:
                 strikes = 0
                 best_loss = val_loss
                 torch.save(flow.state_dict(), "./checkpoint.pt")
-                test_loss = 0
-                for i in range(0, len(data_test), config["batch_size"]):
-                    j = min([len(data_test), i + config["batch_size"]])
-                    test_loss += float(
-                        -flow.log_prob(data_test[i:j][0].to(device)).sum()
-                    )
-                test_loss /= len(data_test)
             else:
                 strikes += 1
                 if strikes >= config["patience"]:
                     break
 
         return {
-            "test_loss_best": test_loss,
             "val_loss_best": best_loss,
             "val_loss": val_loss,
         }
@@ -177,23 +174,53 @@ class HyperoptExperiment(Experiment):
         report_file = os.path.join(
             report_dir, f"report_{self.name}_" + exptime + ".csv"
         )
-        self._build_report(exppath, report_file=report_file)
-        # best_result = results.get_best_result("val_loss", "min")
+        results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
+        best_result = results.iloc[results["val_loss_best"].argmax()]
 
-        # print("Best trial config: {}".format(best_result.config))
-        # print("Best trial final validation loss: {}".format(
-        #    best_result.metrics["val_loss"]))
-
-        # test_best_model(best_result)
-
-    def _build_report(self, expdir: str, report_file: str, config_prefix: str = ""):
+        self._test_best_model(best_result, exppath, report_dir)
+    
+    def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu") -> pd.Series:
+        trial_id = best_result.trial_id
+        for d in os.listdir(expdir):
+            if trial_id in d:
+                shutil.copyfile(
+                    os.path.join(expdir, d, "checkpoint.pt"), 
+                    os.path.join(report_dir, f"{self.name}_best_model.pt")
+                )
+                shutil.copyfile(
+                    os.path.join(expdir, d, "params.pkl"), 
+                    os.path.join(report_dir, f"{self.name}_best_config.pkl")
+                )
+                break
+        
+        best_model = from_checkpoint(
+            os.path.join(report_dir, f"{self.name}_best_config.pkl"),
+            os.path.join(report_dir, f"{self.name}_best_model.pt")
+        )
+        
+        data_test = self.trial_config["dataset"].get_test()
+        test_loss = 0
+        for i in range(0, len(data_test), 100):
+            j = min([len(data_test), i + 100])
+            test_loss += float(
+                -best_model.log_prob(data_test[i:j][0].to(device)).sum()
+            )
+        test_loss /= len(data_test)
+        
+        best_result["test_loss"] = test_loss
+        best_result.to_csv(
+            os.path.join(report_dir, f"{self.name}_best_result.csv")
+        )
+        
+        return best_result
+        
+    def _build_report(self, expdir: str, report_file: str, config_prefix: str = "") -> pd.DataFrame:
         """Builds a report of the hyperopt experiment.
 
-        :param expdir: The expdir parameter is the path to the experiment directory (ray results folder).
-        :type expdir: str
-        :param report_file: The report_file parameter is the path to the report file.
-        :type report_file: str
-        :param config_prefix: The config_prefix parameter is the prefix for the config items.
+        Args:
+            expdir (str): The expdir parameter is the path to the experiment directory (ray results folder).
+            report_file (str): The report_file parameter is the path to the report file.
+            config_prefix: The config_prefix parameter is the prefix for the config items.
         """
         report = None
         print(os.listdir(expdir))
@@ -201,7 +228,7 @@ class HyperoptExperiment(Experiment):
             if os.path.isdir(expdir + "/" + d):
                 try:
                     with open(expdir + "/" + d + "/result.json", "r") as f:
-                        result = json.loads('{"test_' + f.read().split('{"test_')[-1])
+                        result = json.loads('{"val_loss_best' + f.read().split('{"val_loss_best')[-1])
                 except:
                     print(f"error at {expdir + '/' + d}")
                     continue
@@ -224,3 +251,4 @@ class HyperoptExperiment(Experiment):
 
         os.makedirs(os.path.dirname(report_file), exist_ok=True)
         report.to_csv(report_file, index=False)
+        return report
