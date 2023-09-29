@@ -52,11 +52,9 @@ jobs:
       #  -----  install & configure poetry  -----
       #----------------------------------------------
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: dschep/install-poetry-action@v1.3
         with:
-          version: 1.1.12
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          preview: true
       #----------------------------------------------
       #       load cached venv if cache exists
       #----------------------------------------------
