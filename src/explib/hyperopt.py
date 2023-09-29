@@ -14,7 +14,7 @@ from ray import tune
 from ray.air import RunConfig, session
 from torch.utils.data import DataLoader
 
-from src.experiments.base import Experiment
+from src.explib.base import Experiment
 from src.veriflow.flows import NiceFlow
 from src.veriflow.networks import AdditiveAffineNN
 from src.veriflow.transforms import ScaleTransform

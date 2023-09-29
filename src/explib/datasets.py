@@ -253,7 +253,6 @@ class MnistDequantized(DequantizedDataset):
         x = self.transform(x)
         return x, 0
 
-
 class DataSplitFromCSV(DataSplit):
     def __init__(self, train: os.PathLike, test: os.PathLike, val: os.PathLike):
         self.train = train
