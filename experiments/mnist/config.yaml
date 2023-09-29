@@ -1,16 +1,16 @@
 ---
-__object__: src.experiments.base.ExperimentCollection
+__object__: src.explib.base.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
-    - &exp_laplace
-      __object__: src.experiments.hyperopt.HyperoptExperiment
-      name: mnist_laplace
+    - &exp_nice_lu_laplace
+      __object__: src.explib.hyperopt.HyperoptExperiment
+      name: mnist_nice_lu_laplace
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
-        max_t: 10000
-        grace_period: 10000
+        max_t: 1000000
+        grace_period: 1000000
         reduction_factor: 2
-      num_hyperopt_samples: &num_hyperopt_samples 25
+      num_hyperopt_samples: &num_hyperopt_samples 50
       gpus_per_trial: &gpus_per_trial 0
       cpus_per_trial: &cpus_per_trial 1
       tuner_params: &tuner_params
@@ -18,18 +18,18 @@ experiments:
         mode: min
       trial_config:
         dataset: &dataset
-          __object__: src.veriflow.experiments.datasets.MnistSplit
+          __object__: src.explib.datasets.MnistSplit
           digit: 0
-        epochs: &epochs 20000
+        epochs: &epochs 200000
         patience: &patience 50
         batch_size: &batch_size 
-          __eval__: tune.choice([8, 16, 32, 64])
+          __eval__: tune.choice([32])
         optim_cfg: &optim 
           optimizer:
             __class__: torch.optim.Adam 
           params:
             lr: 
-              __eval__: tune.loguniform(1e-2, 5e-4)
+              __eval__: tune.loguniform(1e-4, 1e-2)
             weight_decay: 0.0
         
         model_cfg: 
@@ -37,12 +37,13 @@ experiments:
             __class__: &model src.veriflow.flows.NiceFlow
           params:
             coupling_layers: &coupling_layers 
-              __eval__: tune.choice([ 2, 3, 4, 5])
+              __eval__: tune.choice([2, 3, 4, 5, 6, 7, 8, 9, 10])
             coupling_nn_layers: &coupling_nn_layers 
-              __eval__: tune.choice([[w]*l for w in [50, 100] for l in range(1, 3)])
+              __eval__: tune.choice([[w]*l for l in [1, 2, 3, 4] for w in [10, 20, 50, 100, 200]])
             nonlinearity: &nonlinearity 
               __eval__: tune.choice([torch.nn.ReLU()])
-            split_dim: &split_dim 50
+            split_dim: 
+              __eval__: tune.choice([i for i in range(1, 51)])
             base_distribution: 
               __object__: pyro.distributions.Laplace
               loc: 
@@ -50,14 +51,33 @@ experiments:
               scale: 
                 __eval__: torch.ones(100)
             permutation: &permutation LU
-    - &exp_normal
-      __overwrites__: *exp_laplace
-      name: mnist_normal
+    - &exp_nice_lu_normal
+      __overwrites__: *exp_nice_lu_laplace
+      name: mnist_nice_lu_normal
+      model_cfg: 
+          params:
+            base_distribution: 
+              __object__: pyro.distributions.Normal
+              loc: 
+                __eval__: torch.zeros(100)
+              scale: 
+                __eval__: torch.ones(100)
+    - &exp_nice_rand_laplace
+      __overwrites__: *exp_nice_lu_laplace
+      name: mnist_nice_rand_laplace
       model_cfg: 
         params:
-          base_distribution:
-            __object__: pyro.distributions.Normal
-            loc: 
-              __eval__: torch.zeros(100)
-            scale: 
-              __eval__: torch.ones(100)
+          permutation: random
+    - &exp_nice_rand_normal
+      __overwrites__: *exp_nice_lu_laplace
+      name: mnist_nice_rand_normal
+      model_cfg: 
+        params:
+          permutation: random
+          base_distribution: 
+              __object__: pyro.distributions.Normal
+              loc: 
+                __eval__: torch.zeros(100)
+              scale: 
+                __eval__: torch.ones(100)
+

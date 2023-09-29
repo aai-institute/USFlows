@@ -1,5 +1,7 @@
 *.csv
 *.onnx
+*.pkl
+*.pt
 #
 .idea
 config_local.json

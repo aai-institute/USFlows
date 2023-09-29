@@ -1,9 +1,9 @@
 ---
-__object__: src.experiments.base.ExperimentCollection
+__object__: src.explib.base.ExperimentCollection
 name: fashion_basedist_comparison
 experiments:
     - &exp_laplace
-      __object__: src.experiments.hyperopt.HyperoptExperiment
+      __object__: src.explib.hyperopt.HyperoptExperiment
       name: mnist_laplace
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
@@ -18,7 +18,7 @@ experiments:
         mode: min
       trial_config:
         dataset: &dataset
-          __object__: src.experiments.datasets.FashionMnistSplit
+          __object__: src.explib.datasets.FashionMnistSplit
           label: 0
         epochs: &epochs 10000
         patience: &patience 500

@@ -1,9 +1,9 @@
 ---
-__object__: laplace_flows.experiments.base.ExperimentCollection
+__object__: src.explib.base.ExperimentCollection
 name: mnist_basedist_comparison
 experiments:
     - &main
-      __object__:  laplace_flows.experiments.hyperopt.HyperoptExperiment
+      __object__:  src.explib.hyperopt.HyperoptExperiment
       name: normal_moons
       scheduler: &scheduler 
         __object__: ray.tune.schedulers.ASHAScheduler
@@ -18,7 +18,7 @@ experiments:
         mode: min
       trial_config:
         dataset: &dataset
-          __object__: laplace_flows.experiments.datasets.SyntheticSplit
+          __object__: src.explib.datasets.SyntheticSplit
           generator: make_moons
           params_train: &params_train
             n_samples: 100000

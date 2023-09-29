@@ -62,7 +62,8 @@ class Flow(torch.nn.Module):
         shuffe: bool = True,
         gradient_clip: float = None,
         device: torch.device = None,
-        jitter: float = 1e-4,
+        jitter: float = 1e-6,
+        epochs: int = 1
     ) -> float:
         """
         Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other
@@ -73,6 +74,8 @@ class Flow(torch.nn.Module):
             batch_size: number of samples per optimization step.
             optim: optimizer class.
             optimizer_params: optimizer parameter dictionary.
+            jitter: Determines the amount of jitter that is added if the optimization leaves the feasible region.
+            epochs: number of epochs.
 
         Returns:
             Loss curve (negative log-likelihood).
@@ -93,33 +96,36 @@ class Flow(torch.nn.Module):
             optim = optim(model.trainable_layers.parameters())
 
         N = len(data_train)
-        losses = []
+        
+        epoch_losses = []
+        for _ in range(epochs):
+            losses = []
+            if shuffe:
+                perm = np.random.choice(N, N, replace=False)
+                data_train = data_train[perm]
 
-        if shuffe:
-            perm = np.random.choice(N, N, replace=False)
-            data_train = data_train[perm]
+            for idx in range(0, N, batch_size):
+                idx_end = min(idx + batch_size, N)
+                try:
+                    sample = torch.Tensor(data_train[idx:idx_end][0]).to(device)
+                except:
+                    continue
+                optim.zero_grad()
+                while not self.is_feasible():
+                    self.add_jitter(jitter)
+                loss = -model.transform.log_prob(sample).mean()
+                losses.append(float(loss.detach()))
+                loss.backward()
+                if gradient_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
+                optim.step()
+                while not self.is_feasible():
+                    self.add_jitter(jitter)
 
-        for idx in range(0, N, batch_size):
-            idx_end = min(idx + batch_size, N)
-            try:
-                sample = torch.Tensor(data_train[idx:idx_end][0]).to(device)
-            except:
-                continue
-            optim.zero_grad()
-            while not self.is_feasible():
-                self.add_jitter(jitter)
-            loss = -model.transform.log_prob(sample).mean()
-            losses.append(float(loss.detach()))
-            loss.backward()
-            if gradient_clip is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
-            optim.step()
-            while not self.is_feasible():
-                self.add_jitter(jitter)
-
-            model.transform.clear_cache()
-
-        return sum(losses) / len(losses)
+                model.transform.clear_cache()
+            epoch_losses.append(np.mean(losses))
+            
+        return epoch_losses
 
     def to_onnx(self, path: str, export_mode: export_modes = "log_prob") -> None:
         """Saves the model as onnx file
@@ -189,7 +195,7 @@ class NiceFlow(Flow):
         split_dim: int,
         scale_every_coupling=False,
         nonlinearity: Optional[torch.nn.Module] = None,
-        permutation: Permutation = "random",
+        permutation: Permutation = "LU",
         *args,
         **kwargs,
     ) -> None:
@@ -199,7 +205,7 @@ class NiceFlow(Flow):
             base_distribution: base distribution,
             coupling_layers: number of coupling layers. All coupling layers share the same architecture but not the same weights.
             coupling_nn_layers: number of neurons in the hidden layers of the dense neural network that computes the coupling loc parameter.
-            split_dim: split dimension for the coupling.
+            split_dim: split dimension for the coupling, i.e. input dimension of the conditioner.
             scale_every_coupling: if True, a scale transform is applied after every coupling layer. Otherwise, a single scale transform is applied after all coupling layers.
             nonlinearity: nonlinearity of the coupling network.
             permutation: permutation type. Can be "random" or "half".
