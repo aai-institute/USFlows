@@ -1,4 +1,4 @@
-name: check
+name: Run tests
 on:
   push:
   pull_request:
@@ -17,6 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         py:
+          - "3.8"
+          - "3.9"
+          - "3.10"
           - "3.11"
         os:
           - ubuntu-latest
@@ -34,3 +37,12 @@ jobs:
         run: tox -vv --notest
       - name: Run test suite
         run: tox --skip-pkg-install
+      - name: Run pytest
+          uses: pavelzw/pytest-action@v2
+          with:
+            verbose: true
+            emoji: true
+            job-summary: true
+            custom-arguments: '-q'
+            click-to-expand: true
+            report-title: 'Test Report'
