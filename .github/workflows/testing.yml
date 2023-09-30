@@ -52,9 +52,9 @@ jobs:
       #  -----  install & configure poetry  -----
       #----------------------------------------------
       - name: Install Poetry
-        uses: dschep/install-poetry-action@v1.3
-        with:
-          preview: true
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          source $HOME/.poetry/env
       #----------------------------------------------
       #       load cached venv if cache exists
       #----------------------------------------------
