@@ -63,7 +63,8 @@ jobs:
       #----------------------------------------------
       # install your root project, if required
       #----------------------------------------------
-
+      - name: Install project
+        run: pip install -e .
       #----------------------------------------------
       #    add matrix specifics and run test suite
       #----------------------------------------------
