@@ -9,7 +9,7 @@ def test_mnist():
     storage_path = None
     sepline = "\n" + ("-" * 80) + "\n" + ("-" * 80) + "\n"
     print(f"{sepline}Parsing config file:{sepline}")
-    config = os.path.abspath("./tests/mnist.yaml")
+    config = os.path.abspath("./tests/explib/mnist.yaml")
     experiment = read_config(config)
     print(f"{sepline}Done.{sepline}")
     print(f"{sepline}Conducting experiment{sepline}")

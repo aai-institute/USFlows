@@ -126,7 +126,7 @@ class Permute(BaseTransform):
     bijective = True
     volume_preserving = True
 
-    def __init__(self, permutation, *, dim=-1, cache_size=1) -> None:
+    def __init__(self, permutation: torch.tensor, *, dim: int = -1, cache_size: int = 1) -> None:
         """ Initializes the permutation transform.
         
         Args:
@@ -507,4 +507,4 @@ class LeakyReLUTransform(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform
         """
-        return math.log(y/x).sum()
+        return torch.log(y/x).sum()
