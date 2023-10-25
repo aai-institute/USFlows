@@ -20,7 +20,7 @@ git clone git@github.com:aai-institute/VeriFlow.git
 ```bash
 curl -sSL https://install.python-poetry.org | python3 -
 ```
-3) within the veriflow project directory:
+3) Finally,within the veriflow project directory:
 ```bash
 poetry install
 ```
