@@ -10,6 +10,21 @@ import yaml
 from ray import tune
 import torch
 
+def update_nested_dict(d: Dict[str, Any], u: Dict[str, Any]) -> Dict[str, Any]:
+    """Updates the dictionary d with the dictionary u.
+    The update is performed recursively, i.e. if d[k] and u[k] are both dictionaries,
+    d[k] is updated with u[k] recursively.
+
+    :param d: The dictionary to update.
+    :param u: The dictionary to update with.
+    """
+    for k, v in u.items():
+        if isinstance(v, dict):
+            d[k] = update_nested_dict(d.get(k, {}), v)
+        else:
+            d[k] = v
+
+    return d
 
 def unfold_raw_config(d: Dict[str, Any]):
     """Unfolds an ordered DAG given as a dictionary into a tree given as dictionary.
@@ -41,19 +56,15 @@ def push_overwrites(item: Any, attributes: Dict[str, Any]) -> Any:
     :param item: The item to push the overwrites to.
     :param overwrites: The overwrites to push.
     """
-    try:
+    if isinstance(item, dict):
         if "__exact__" in attributes:
             return deepcopy(attributes["__exact__"])
-    except:
-        pass
-
-    if isinstance(item, dict):
-        if "__overwrites__" not in item:
+        elif "__overwrites__" not in item:
             result = deepcopy(attributes)
             result["__overwrites__"] = item
         else:
             result = item
-            result["__overwrites__"].update(attributes)
+            result = update_nested_dict(result, attributes)
     elif isinstance(item, list):
         result = [push_overwrites(x, attributes) for x in item]
     else:
@@ -86,12 +97,10 @@ def apply_overwrite(d: Dict[str, Any], recurse: bool = True):
     :pram recurse: If True, the overwrites are applied recursively. Defaults to True.
             Can be useful for efficient combination of this method with other parsing methods.
     """
-
     # Apply top-level overwrite
     if "__overwrites__" in d:
         overwritten_attr = d
         d = overwritten_attr.pop("__overwrites__")
-
         for k, v in overwritten_attr.items():
             if k not in d:
                 d[k] = v
@@ -145,6 +154,7 @@ def read_config(yaml_path: Union[str, Path]) -> dict:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     config = unfold_raw_config(config)
+    config = apply_overwrite(config, recurse=True)
     config = parse_raw_config(config)
 
     return config
@@ -164,8 +174,6 @@ def parse_raw_config(d: dict) -> Any:
         The result after all semantics have been applied.
     """
     if isinstance(d, dict):
-        d = apply_overwrite(d, recurse=False)
-
         # Depth-first recursion
         for k, v in d.items():
             d[k] = parse_raw_config(v)
@@ -174,6 +182,7 @@ def parse_raw_config(d: dict) -> Any:
             module, cls = d["__object__"].rsplit(".", 1)
             C = getattr(import_module(module), cls)
             d.pop("__object__")
+            d = parse_raw_config(d)
             return C(**d)
         elif "__eval__" in d:
             return eval(d["__eval__"])
