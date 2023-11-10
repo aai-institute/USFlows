@@ -48,6 +48,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+      - name: install distutils
+        run: sudo apt install python${{ matrix.python-version }}-distutils
       - name: Build requirments.txt
         uses: divideprojects/poetry-export-requirements-action@v1
         with:
