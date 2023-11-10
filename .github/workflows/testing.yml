@@ -44,6 +44,8 @@ jobs:
       - name: setup ubuntu
         run: 
           sudo add-apt-repository ppa:deadsnakes/ppa
+      - name: update apt
+        run:
           sudo apt-get update
       - name: install distutils
         run: sudo apt install python${{ matrix.python-version }}-distutils
