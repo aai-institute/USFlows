@@ -43,7 +43,7 @@ jobs:
       #----------------------------------------------
       - name: update apt
         run:
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ] then
             sudo apt-get update
           fi
       - name: install distutils
