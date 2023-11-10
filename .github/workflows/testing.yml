@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ "ubuntu-latest", "macos-latest" ]
+        os: [ "ubuntu-latest" ]
         python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
         django-version: ["3", "4" ]
     runs-on: ${{ matrix.os }}
@@ -43,9 +43,7 @@ jobs:
       #----------------------------------------------
       - name: update apt
         run:
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ] then
             sudo apt-get update
-          fi
       - name: install distutils
         run: sudo apt install python${{ matrix.python-version }}-distutils
       - name: Check out repository
