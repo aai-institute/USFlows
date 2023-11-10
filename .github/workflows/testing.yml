@@ -43,7 +43,9 @@ jobs:
       #----------------------------------------------
       - name: update apt
         run:
-          sudo apt-get update
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo apt-get update
+          fi
       - name: install distutils
         run: sudo apt install python${{ matrix.python-version }}-distutils
       - name: Check out repository
