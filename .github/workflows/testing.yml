@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: install distutils
-        run: sudo apt install python3-distutils
+        run: sudo apt install --reinstall python3-distutils
       - name: Build requirments.txt
         uses: divideprojects/poetry-export-requirements-action@v1
         with:
