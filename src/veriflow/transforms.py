@@ -375,7 +375,7 @@ class MaskedCoupling(BaseTransform):
         
         Args:
             mask (torch.Tensor): binary mask
-            conditioner (torch.nn.Module): bijective function $\mathrm{transform}$
+            conditioner (torch.nn.Module): NN with same (input/output) shape as mask$
         """
         super().__init__(*args, **kwargs)
         self.mask = mask
