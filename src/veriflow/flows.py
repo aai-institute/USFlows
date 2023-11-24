@@ -220,14 +220,19 @@ class NiceFlow(Flow):
             nonlinearity = torch.nn.ReLU()
 
         rdim = input_dim - split_dim
+        mask = torch.zeros(input_dim)
+        mask[:split_dim] = 1
         layers = []
         for i in range(coupling_layers):
             layers.append(self._get_permutation(permutation, i))
             layers.append(
-                AffineCoupling(
-                    split_dim,
-                    AdditiveAffineNN(
-                        split_dim, coupling_nn_layers, rdim, nonlinearity=nonlinearity
+                MaskedCoupling(
+                    mask,
+                    DenseNN(
+                        input_dim,
+                        coupling_nn_layers,
+                        [input_dim],
+                        nonlinearity=nonlinearity,
                     ),
                 )
             )
