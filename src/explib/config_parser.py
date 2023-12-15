@@ -33,16 +33,15 @@ def unfold_raw_config(d: Dict[str, Any]):
 
     :param d: The dictionary to unfold
     """
-    du = dict()
-    for k, v in d.items():
-        if isinstance(v, dict):
+    if isinstance(d, dict):
+        du = dict()
+        for k, v in d.items():
             du[k] = unfold_raw_config(v)
-        elif isinstance(v, list):
-            du[k] = [unfold_raw_config(x) for x in v]
-        else:
-            du[k] = deepcopy(v)
-
-    return du
+        return du
+    elif isinstance(d, list):
+        return [unfold_raw_config(x) for x in d]
+    else:
+        return deepcopy(d)
 
 
 def push_overwrites(item: Any, attributes: Dict[str, Any]) -> Any:
