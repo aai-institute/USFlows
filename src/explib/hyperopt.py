@@ -175,7 +175,7 @@ class HyperoptExperiment(Experiment):
             report_dir, f"report_{self.name}_" + exptime + ".csv"
         )
         results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
-        best_result = results.iloc[results["val_loss_best"].argmin()]
+        best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
         self._test_best_model(best_result, exppath, report_dir)
     

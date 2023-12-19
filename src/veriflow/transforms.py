@@ -247,6 +247,9 @@ class LUTransform(BaseTransform):
 
         init.kaiming_uniform_(self.U_raw, nonlinearity="relu")
         with torch.no_grad():
+            self.U_raw.fill_diagonal_(0) 
+            self.U_raw += torch.eye(self.dim)
+            #self.U_raw += torch.normal(torch.zeros(self.dim), torch.ones(self.dim)).exp().diag()
             self.U_raw.copy_(self.U_raw.triu())
 
         if self.bias is not None:
@@ -268,7 +271,8 @@ class LUTransform(BaseTransform):
         """
         x0 = x + torch.functional.F.linear(self.bias, self.inv_weight)
         y0 = solve_triangular(self.L, x0)
-        return solve_triangular(self.U, y0)
+        y = solve_triangular(self.U, y0)
+        return y
 
     def backward(self, y: torch.Tensor) -> torch.Tensor:
         """Computes the inverse transform $(LU)(y - \mathrm{bias})$

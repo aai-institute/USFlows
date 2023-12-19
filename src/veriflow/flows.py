@@ -30,7 +30,7 @@ class Flow(torch.nn.Module):
 
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
-    export = "log_prob"
+    export: export_modes = "log_prob"
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -53,6 +53,14 @@ class Flow(torch.nn.Module):
 
         self.transform = dist.TransformedDistribution(base_distribution, layers)
 
+    def log_prior(self) -> torch.Tensor:
+        """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
+        $$argmax_{\\theta} \log p_{\\theta}(D) + \log p_{prior}(\\theta)$$ By default, this ia the constant zero, which amounts
+        to maximum likelihood training (improper uniform prior).
+        """
+        return 0
+        
+    
     def fit(
         self,
         data_train: Dataset,
@@ -63,7 +71,7 @@ class Flow(torch.nn.Module):
         gradient_clip: float = None,
         device: torch.device = None,
         jitter: float = 1e-6,
-        epochs: int = 1
+        epochs: int = 10
     ) -> float:
         """
         Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other
@@ -78,7 +86,7 @@ class Flow(torch.nn.Module):
             epochs: number of epochs.
 
         Returns:
-            Loss curve (negative log-likelihood).
+            Loss curve .
         """
         if device is None:
             if torch.backends.mps.is_available():
@@ -102,18 +110,18 @@ class Flow(torch.nn.Module):
             losses = []
             if shuffe:
                 perm = np.random.choice(N, N, replace=False)
-                data_train = data_train[perm]
+                data_train_shuffle = data_train[perm]
 
             for idx in range(0, N, batch_size):
                 idx_end = min(idx + batch_size, N)
                 try:
-                    sample = torch.Tensor(data_train[idx:idx_end][0]).to(device)
+                    sample = torch.Tensor(data_train_shuffle[idx:idx_end][0]).to(device)
                 except:
                     continue
                 optim.zero_grad()
                 while not self.is_feasible():
                     self.add_jitter(jitter)
-                loss = -model.transform.log_prob(sample).mean()
+                loss = -model.transform.log_prob(sample).mean() - model.log_prior()
                 losses.append(float(loss.detach()))
                 loss.backward()
                 if gradient_clip is not None:
@@ -196,6 +204,7 @@ class NiceFlow(Flow):
         scale_every_coupling=False,
         nonlinearity: Optional[torch.nn.Module] = None,
         permutation: Permutation = "LU",
+        prior_scale: float = 1.0,
         *args,
         **kwargs,
     ) -> None:
@@ -215,6 +224,8 @@ class NiceFlow(Flow):
         self.coupling_layers = coupling_layers
         self.coupling_nn_layers = coupling_nn_layers
         self.split_dim = split_dim
+        self.perm_type = permutation
+        self.prior_scale = torch.tensor(prior_scale)
 
         if nonlinearity is None:
             nonlinearity = torch.nn.ReLU()
@@ -223,8 +234,10 @@ class NiceFlow(Flow):
         mask = torch.zeros(input_dim)
         mask[:split_dim] = 1
         layers = []
+        self.permutations = []
         for i in range(coupling_layers):
             layers.append(self._get_permutation(permutation, i))
+            self.permutations.append(layers[-1])
             layers.append(
                 MaskedCoupling(
                     mask,
@@ -264,6 +277,27 @@ class NiceFlow(Flow):
         else:
             raise ValueError(f"Unknown permutation type {permtype}")
 
+    def log_prior(self) -> torch.Tensor:
+        """Returns the log prior of the model parameters. If LU layers are used, 
+        we directly regularize the determinant flows Jacobian by putting an 
+        independent mirrored log-normal 
+        prior on the diagonal elements of $U$ matrices. The normal has 
+        mean $0$ and standard deviation $\sqrt{d}\sigma$, where $d$ is the data dimension.
+        That means that we put a log-normal prior on the determinant of the Jacobian.
+        
+        Any additive constant is dropped in the optimization procedure.
+        """
+
+        if self.perm_type == "LU" and self.prior_scale is not None:
+            log_prior = 0
+            for p in self.permutations:
+                # log-density of Normal in log-space
+                log_prior += -((p.U.diag().log()**2) / (self.prior_scale**2 / self.input_dim)).sum() 
+                # Change of variables to input space
+                log_prior += -p.U.diag().log().sum()
+            return log_prior
+        else:
+            return 0
 
 class NiceMaskedConvFlow(Flow):
     """Implementation of the NICE flow architecture using fully connected coupling layers
