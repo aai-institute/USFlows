@@ -4,9 +4,11 @@ import os
 import shutil
 import typing as T
 from datetime import datetime
-from typing import Any, Dict, Iterable, Literal
+from typing import Any, Dict, Iterable, Literal, Optional
 
 import pandas as pd
+from pickle import dump
+from PIL import Image
 import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist
@@ -119,7 +121,20 @@ class HyperoptExperiment(Experiment):
             if val_loss < best_loss:
                 strikes = 0
                 best_loss = val_loss
+                
+                # Create checkpoint
                 torch.save(flow.state_dict(), "./checkpoint.pt")
+                
+                # Advanced logging
+                cfg_log = config["logging"]
+                if cfg_log["images"]:
+                    img_sample(
+                        flow, 
+                        "./sample.png", 
+                        reshape=cfg_log["image_shape"], 
+                        device=device
+                    )
+                
             else:
                 strikes += 1
                 if strikes >= config["patience"]:
@@ -177,20 +192,27 @@ class HyperoptExperiment(Experiment):
         results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
         best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
-        self._test_best_model(best_result, exppath, report_dir)
+        self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
     
-    def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu") -> pd.Series:
+    def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
         trial_id = best_result.trial_id
+        id = f"exp_{exp_id}_{trial_id}"
         for d in os.listdir(expdir):
             if trial_id in d:
                 shutil.copyfile(
-                    os.path.join(expdir, d, "checkpoint.pt"), 
-                    os.path.join(report_dir, f"{self.name}_best_model.pt")
+                    os.path.join(expdir, d, f"checkpoint.pt"), 
+                    os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
                 )
                 shutil.copyfile(
                     os.path.join(expdir, d, "params.pkl"), 
-                    os.path.join(report_dir, f"{self.name}_best_config.pkl")
+                    os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
                 )
+                
+                if self.trial_config["logging"]["images"]:
+                    shutil.copyfile(
+                        os.path.join(expdir, d, "sample.png"), 
+                        os.path.join(report_dir, f"{self.name}_{id}_sample.png")
+                    )
                 break
         
         best_model = from_checkpoint(
@@ -252,3 +274,24 @@ class HyperoptExperiment(Experiment):
         os.makedirs(os.path.dirname(report_file), exist_ok=True)
         report.to_csv(report_file, index=False)
         return report
+
+
+def img_sample(model, path = "./sample.png", reshape: Optional[Iterable[int]] = None, n=2, device="cpu"):
+    """Sample images from a model.
+    
+    Args:
+        model: model to sample from
+        path: path to save the image
+        reshape: reshape the image
+        n: number of samples
+        device: device to sample from
+
+    """
+    with torch.no_grad():
+        sample = model.sample(torch.tensor([n, n])).numpy()
+        
+    if reshape is not None:
+        reshape = [n, n] + reshape
+        sample = sample.reshape(reshape)
+        
+    Image.fromarray(sample.reshape(-1, n * reshape[-1]), mode="L").save(path, dpi=(300, 300))
