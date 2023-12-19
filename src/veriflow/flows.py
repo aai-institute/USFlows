@@ -50,8 +50,17 @@ class Flow(torch.nn.Module):
             [l for l in layers if isinstance(l, torch.nn.Module)]
         )
         self.base_distribution = base_distribution
+        
+        # Redeclare all batch dimensions to event dimensions
+        # This is a sanitary measure to avoid pyro from creating a batch of transforms
+        # rather than a single transform.
+        batch_shape = self.base_distribution.batch_shape
+        if len(batch_shape) > 0:
+            self.base_distribution = dist.Independent(
+                self.base_distribution, len(batch_shape)
+            )
 
-        self.transform = dist.TransformedDistribution(base_distribution, layers)
+        self.transform = dist.TransformedDistribution(self.base_distribution, layers)
 
     def log_prior(self) -> torch.Tensor:
         """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
