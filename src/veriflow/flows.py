@@ -200,7 +200,7 @@ class Flow(torch.nn.Module):
 
 
 class NiceFlow(Flow):
-    Permutation = Literal["random", "half", "LU"]
+    mask = Literal["random", "half", "alternate"]
 
     """Implementation of the NICE flow architecture by using fully connected coupling layers"""
 
@@ -210,9 +210,9 @@ class NiceFlow(Flow):
         coupling_layers: int,
         coupling_nn_layers: List[int],
         split_dim: int,
-        scale_every_coupling=False,
         nonlinearity: Optional[torch.nn.Module] = None,
-        permutation: Permutation = "LU",
+        masktype: mask = "half",
+        use_lu: bool = True,
         prior_scale: float = 1.0,
         *args,
         **kwargs,
@@ -233,20 +233,21 @@ class NiceFlow(Flow):
         self.coupling_layers = coupling_layers
         self.coupling_nn_layers = coupling_nn_layers
         self.split_dim = split_dim
-        self.perm_type = permutation
+        self.perm_type = masktype
         self.prior_scale = torch.tensor(prior_scale)
+        self.use_lu = use_lu
 
         if nonlinearity is None:
             nonlinearity = torch.nn.ReLU()
 
         rdim = input_dim - split_dim
-        mask = torch.zeros(input_dim)
-        mask[:split_dim] = 1
         layers = []
-        self.permutations = []
+        self.lu_layers = []
         for i in range(coupling_layers):
-            layers.append(self._get_permutation(permutation, i))
-            self.permutations.append(layers[-1])
+            if self.use_lu:
+                layers.append(LUTransform(input_dim))
+                self.lu_layers.append(layers[-1])
+            mask = self._get_mask(masktype, i)
             layers.append(
                 MaskedCoupling(
                     mask,
@@ -258,33 +259,35 @@ class NiceFlow(Flow):
                     ),
                 )
             )
-
-            if scale_every_coupling:
-                layers.append(ScaleTransform(input_dim))
-
-        if not scale_every_coupling:
-            layers.append(ScaleTransform(input_dim))
+            
+        
+        layers.append(ScaleTransform(input_dim))
 
         super().__init__(base_distribution, layers, *args, **kwargs)
 
-    def _get_permutation(self, permtype: Permutation, i=0):
-        """Returns a permutation layer"""
-        if permtype == "random":
-            return Permute(torch.randperm(self.input_dim, dtype=torch.long))
-        elif permtype == "half":
-            if i % 2 == 0:  # every 2nd pixel
-                perm = torch.arange(self.input_dim, dtype=torch.long)
-                perm = perm.reshape(-1, 2).moveaxis(0, 1).reshape(-1)
-            elif i % 2 == 1:  # interchange conditioning variables and output variables
-                perm = torch.arange(self.input_dim, dtype=torch.long)
-                perm = perm.reshape(2, -1).flip(0).reshape(-1)
-            else:  # random permutation
-                perm = torch.randperm(self.input_dim, dtype=torch.long)
-            return Permute(perm)
-        elif permtype == "LU":
-            return LUTransform(self.input_dim)
+    def _get_mask(self, masktype: mask, i=0):
+        """Returns a mask for the i-th coupling
+        """
+        if masktype == "random":
+            mask = torch.bernoulli(torch.tensor([self.split_dim/self.input_dim] * self.input_dim))
+            return mask
+        elif masktype == "half":
+            mask = torch.zeros(self.input_dim)
+            mask[:self.split_dim] = 1
+            if i % 2 == 1: 
+                mask =  1 - mask
+            return mask
+        elif masktype == "alternate":
+            mask = [0, 1] * (self.input_dim // 2)
+            if self.input_dim % 2 == 1:
+                mask += [0]
+            mask = torch.tensor(mask)
+            
+            if i % 2 == 1:  # every 2nd pixel
+                mask =  1 - mask
+            return mask
         else:
-            raise ValueError(f"Unknown permutation type {permtype}")
+            raise ValueError(f"Unknown permutation type {masktype}")
 
     def log_prior(self) -> torch.Tensor:
         """Returns the log prior of the model parameters. If LU layers are used, 
@@ -297,9 +300,9 @@ class NiceFlow(Flow):
         Any additive constant is dropped in the optimization procedure.
         """
 
-        if self.perm_type == "LU" and self.prior_scale is not None:
+        if self.use_lu and self.prior_scale is not None:
             log_prior = 0
-            for p in self.permutations:
+            for p in self.lu_layers:
                 # log-density of Normal in log-space
                 log_prior += -((p.U.diag().log()**2) / (self.prior_scale**2 / self.input_dim)).sum() 
                 # Change of variables to input space

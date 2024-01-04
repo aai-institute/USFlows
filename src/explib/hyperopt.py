@@ -6,6 +6,7 @@ import typing as T
 from datetime import datetime
 from typing import Any, Dict, Iterable, Literal, Optional
 
+import numpy as np
 import pandas as pd
 from pickle import dump
 from PIL import Image
@@ -216,8 +217,8 @@ class HyperoptExperiment(Experiment):
                 break
         
         best_model = from_checkpoint(
-            os.path.join(report_dir, f"{self.name}_best_config.pkl"),
-            os.path.join(report_dir, f"{self.name}_best_model.pt")
+            os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
+            os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
         )
         
         data_test = self.trial_config["dataset"].get_test()
@@ -288,10 +289,11 @@ def img_sample(model, path = "./sample.png", reshape: Optional[Iterable[int]] = 
 
     """
     with torch.no_grad():
-        sample = model.sample(torch.tensor([n, n])).numpy()
+        sample = np.uint8(np.clip(model.sample(torch.tensor([n, n])).numpy(), 0, 1) * 255)
         
     if reshape is not None:
         reshape = [n, n] + reshape
         sample = sample.reshape(reshape)
         
-    Image.fromarray(sample.reshape(-1, n * reshape[-1]), mode="L").save(path, dpi=(300, 300))
+    Image.fromarray(sample.reshape(n * reshape[-2], n * reshape[-1]), mode="L").save(path, dpi=(300, 300))
+

@@ -17,6 +17,9 @@ experiments:
         metric: val_loss
         mode: min
       trial_config:
+        logging:
+              images: true
+              image_shape: [10, 10]
         dataset: &dataset
           __object__: src.explib.datasets.MnistSplit
           digit: 0
@@ -36,6 +39,7 @@ experiments:
           type:
             __class__: &model src.veriflow.flows.NiceFlow
           params:
+            use_lu: false
             coupling_layers: &coupling_layers 
               __eval__: tune.choice([3])
             coupling_nn_layers: &coupling_nn_layers 
@@ -49,7 +53,7 @@ experiments:
                 __eval__: torch.zeros(100)
               scale: 
                 __eval__: torch.ones(100)
-            permutation: &permutation half
+            masktype: &permutation half
     - &exp_lu
       __overwrites__: *exp_nice
       name: mnist_lu
@@ -70,5 +74,6 @@ experiments:
       model_cfg: 
         name: mnist_lunice
         params:
-          permutation: LU
+          use_lu: true
+
 
