@@ -25,6 +25,7 @@ rise = "^5.7.1"
 onnx = "^1.14.1"
 matplotlib = "^3.8.0"
 sphinxcontrib-napoleon = "^0.7"
+jupyter-server = "^2.10.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
