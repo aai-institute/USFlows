@@ -1,15 +1,20 @@
 import torch
 from src.veriflow.linalg import solve_triangular
 
+test_size = 10
+tol = 1e-6
+
 def test_solve_triangular():
     M_base = torch.ones(10, 10)
-    y = torch.arange(10) + 1
-    x = torch.ones(10)
+    x = torch.stack([torch.rand(10) for _ in range(test_size)])
     
     M_lower = torch.tril(M_base)
-    x_lower = solve_triangular(M_lower, y)
-    assert (x_lower == x).all()
+    y_lower = torch.stack([M_lower @ x_i for x_i in x])
+    x_lower = solve_triangular(M_lower, y_lower)
+
+    assert  ((x_lower - x).abs() < tol).all()
     
     M_upper = torch.triu(M_base)
-    x_upper = solve_triangular(M_upper, y.flip(0))
-    assert (x_upper == x).all()
+    y_upper = torch.stack([M_upper @ x_i for x_i in x])
+    x_upper = solve_triangular(M_upper, y_upper)
+    assert ((x_upper - x).abs() < tol).all()
