@@ -96,13 +96,31 @@ class SimpleSplit(DataSplit):
     def get_val(self) -> torch.utils.data.Dataset:
         return self.val
 
+def make_transformed_uniform(dim: int, num_samples: int, transform: Tensor = None) -> Tensor:
+    """Create uniform dataset
 
-GENERATORS = {
-    "make_moons": make_moons,
-    "make_blobs": make_blobs,
-    "make_checkerboard": make_checkerboard,
-    "make_circles": make_circles,
-}
+    Args:
+        dim (int): dimensionality of dataset
+        num_samples (int): number of samples
+        transform (Tensor, optional): transformation matrix. Defaults to None which applies no transformation.
+
+    Returns:
+        np.ndarray: dataset
+    """
+    sample = torch.distributions.Laplace(torch.zeros(dim), torch.ones(dim)).sample([num_samples])
+    
+    if transform is not None:
+        inconsistent = len(transform.shape) != 2
+        inconsistent = inconsistent or (transform.shape[0] != transform.shape[1])
+        inconsistent = inconsistent or (transform.shape[0] != dim)
+        if inconsistent:
+            raise ValueError(f"transform must be {dim}X{dim} got {transform.shape}.")
+
+        sample = (transform @ sample.T).T
+    
+    return sample  
+    
+    
 
 class FlattenedDataset(torch.utils.data.Dataset):
     """
@@ -138,6 +156,15 @@ class DataSplitFromCSV(DataSplit):
 
 # Synthetic datasets
 
+
+GENERATORS = {
+    "moons": make_moons,
+    "blobs": make_blobs,
+    "checkerboard": make_checkerboard,
+    "circles": make_circles,
+    "transformed_uniform": make_transformed_uniform,
+}
+
 class SyntheticDataset(torch.utils.data.Dataset):
     """
     Dataset from generator function
@@ -154,7 +181,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
 
         Args:
             generator (function): generator function
-            params: ]dict]: parameters for generator function
+            params: [dict]: parameters for generator function
         """
         super().__init__(*args, **kwargs)
         if isinstance(generator, str):
