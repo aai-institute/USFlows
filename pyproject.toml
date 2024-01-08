@@ -26,6 +26,9 @@ onnx = "^1.14.1"
 matplotlib = "^3.8.0"
 sphinxcontrib-napoleon = "^0.7"
 jupyter-server = "^2.10.1"
+plotly = "^5.18.0"
+kaleido = "0.2.1"
+bayesian-optimization = "^1.4.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
