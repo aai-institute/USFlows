@@ -346,7 +346,7 @@ class NiceFlow(Flow):
             return super().log_prob(x, context)
             
     def sample(
-        self, sample_shape: Iterable[int] = None, context: Any | None = None
+        self, sample_shape: Iterable[int] = None, context: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         if context is not None:
             return super().sample(sample_shape, context)
