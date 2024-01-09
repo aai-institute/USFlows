@@ -336,7 +336,7 @@ class NiceFlow(Flow):
             **kwargs,
         )
 
-    def log_prob(self, x: torch.Tensor, context: Any | None = None) -> torch.Tensor:
+    def log_prob(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
         if context is not None:
             return super().log_prob(x, context)
         else:
