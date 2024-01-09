@@ -12,15 +12,13 @@ import pandas as pd
 from pickle import dump
 from PIL import Image
 import torch
+from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
 import plotly.express as px
 from pyro import distributions as dist
 from pyro.distributions.transforms import AffineCoupling, Permute
 from ray import tune
 from ray.air import RunConfig, session
-from ray.tune.search import ConcurrencyLimiter
-from ray.tune.search.bayesopt import BayesOptSearch
-from torch.utils.data import DataLoader
 
 from src.explib.base import Experiment
 from src.explib.config_parser import from_checkpoint
@@ -74,6 +72,8 @@ class HyperoptExperiment(Experiment):
         self.gpus_per_trial = gpus_per_trial
         self.cpus_per_trial = cpus_per_trial
         self.tuner_params = tuner_params
+        
+        
 
     @classmethod
     def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
@@ -85,6 +85,7 @@ class HyperoptExperiment(Experiment):
         Returns:
             Dict[str, float]: trial performance metrics
         """
+        writer = SummaryWriter()
         # warnings.simplefilter("error")
         torch.autograd.set_detect_anomaly(True)
         if device is None:
@@ -101,7 +102,8 @@ class HyperoptExperiment(Experiment):
         data_test = dataset.get_test()
         data_val = dataset.get_val()
 
-        flow = config["model_cfg"]["type"](**(config["model_cfg"]["params"]))
+        model_hparams = config["model_cfg"]["params"]
+        flow = config["model_cfg"]["type"](**model_hparams)
         flow.to(device)
         
         best_loss = float("inf")
@@ -148,7 +150,7 @@ class HyperoptExperiment(Experiment):
                         device=device
                     )
                     
-                    density_contour_sample(flow, "./density_contour.png", device=device)
+                    density_contour_sample(flow, "./density_contour.png", writer=writer, device=device)
                 
             else:
                 strikes += 1

@@ -147,7 +147,7 @@ class Flow(torch.nn.Module):
 
                 loss = -model.log_prob(
                     sample, context=noise
-                ).mean() - model.log_prior().to(device)
+                ).mean() - model.log_prior()
                 loss.backward()
                 losses.append(float(loss.detach()))
                 if gradient_clip is not None:
@@ -185,9 +185,14 @@ class Flow(torch.nn.Module):
 
         log_det = torch.zeros(x.shape[0]).to(x.device)
         for layer in reversed(self.layers):
-            y = layer.backward(x, context=context)
-            log_det = log_det - layer.log_abs_det_jacobian(y, x, context=context)
-            x = y
+            if context is not None:
+                y = layer.backward(x, context=context)
+                log_det = log_det - layer.log_abs_det_jacobian(y, x, context=context)
+                x = y
+            else:
+                y = layer.backward(x)
+                log_det = log_det - layer.log_abs_det_jacobian(y, x)
+                x = y
 
         return self.base_distribution.log_prob(y) + log_det
 
@@ -204,7 +209,10 @@ class Flow(torch.nn.Module):
 
         y = self.base_distribution.sample(sample_shape)
         for layer in self.layers:
-            y = layer.forward(y, context=context)
+            if context is not None:
+                y = layer.forward(y, context=context)
+            else:
+                y = layer.forward(y)
 
         return y
 
@@ -343,9 +351,14 @@ class NiceFlow(Flow):
         if context is not None:
             return super().sample(sample_shape, context)
         else:
-            return super().sample(
-                sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1)
-            )
+            if self.soft_training:
+                return super().sample(
+                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1)
+                )
+            else:
+                return super().sample(
+                    sample_shape
+                )
 
     def _get_mask(self, masktype: mask, i=0):
         """Returns a mask for the i-th coupling"""
