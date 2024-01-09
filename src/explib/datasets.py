@@ -301,6 +301,7 @@ class MnistDequantized(DequantizedDataset):
         train: bool = True,
         digit: T.Optional[int] = None,
         flatten=True,
+        scale: bool = False,
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -310,8 +311,9 @@ class MnistDequantized(DequantizedDataset):
         if not os.path.exists(path):
             MNIST(dataloc, train=train, download=True)
 
-        # TODO: remove hardcoding of 3x3 downsampling
-        dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
+        if scale:
+            # TODO: remove hardcoding of 3x3 downsampling
+            dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
         if digit is not None:
@@ -335,11 +337,12 @@ class MnistSplit(DataSplit):
         dataloc: os.PathLike = None,
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
+        scale: bool = False,
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = MnistDequantized(self.dataloc, train=True, digit=digit)
+        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -347,7 +350,7 @@ class MnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = MnistDequantized(self.dataloc, train=False, digit=digit)
+        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
