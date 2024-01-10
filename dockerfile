@@ -20,5 +20,5 @@ RUN poetry install
 # Expose port for TensorBoard
 EXPOSE 6006
 
-CMD ["./start.sh"]
+CMD ["./start_test.sh"]
 #CMD ["poetry", "run", "python", "scripts/run-eperiment.py", "--config", "experiments/mnist/mnist.yaml"]
