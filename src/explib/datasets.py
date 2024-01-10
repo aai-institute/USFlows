@@ -299,6 +299,46 @@ class FashionMnistSplit(DataSplit):
         return self.val
 
 
+# MNIST
+class MnistDequantized(DequantizedDataset):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        train: bool = True,
+        digit: T.Optional[int] = None,
+        flatten=True,
+        scale: bool = False,
+    ):
+        if train:
+            rel_path = "MNIST/raw/train-images-idx3-ubyte"
+        else:
+            rel_path = "MNIST/raw/t10k-images-idx3-ubyte"
+        path = os.path.join(dataloc, rel_path)
+        if not os.path.exists(path):
+            MNIST(dataloc, train=train, download=True)
+
+        dataset = idx2numpy.convert_from_file(path)
+
+        if scale:
+            # TODO: remove hardcoding of 3x3 downsampling
+            dataset = dataset[:, ::3, ::3]
+        if flatten:
+            dataset = dataset.reshape(dataset.shape[0], -1)
+        if digit is not None:
+            if train:
+                rel_path = "MNIST/raw/train-labels-idx1-ubyte"
+            else:
+                rel_path = "MNIST/raw/t10k-labels-idx1-ubyte"
+            path = os.path.join(dataloc, rel_path)
+            labels = idx2numpy.convert_from_file(path)
+            dataset = dataset[labels == digit]
+        super().__init__(dataset, num_bits=8)
+
+    def __getitem__(self, index: int):
+        x = Tensor(self.dataset[index].copy())
+        x = self.transform(x)
+        return x, 0
+
 class MnistSplit(DataSplit):
     def __init__(
         self,
