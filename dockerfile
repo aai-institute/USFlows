@@ -14,11 +14,14 @@ RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 RUN git clone https://github.com/aai-institute/VeriFlow.git
 
 WORKDIR /VeriFlow
+# TODO delete before merging!
+RUN git checkout dockerize-experiments
 
 RUN poetry install
 
 # Expose port for TensorBoard
 EXPOSE 6006
 
+# TODO: change to start.sh
 CMD ["./start_test.sh"]
 #CMD ["poetry", "run", "python", "scripts/run-eperiment.py", "--config", "experiments/mnist/mnist.yaml"]
