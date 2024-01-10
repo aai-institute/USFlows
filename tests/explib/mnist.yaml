@@ -55,21 +55,6 @@ experiments:
               scale: 
                 __eval__: torch.ones(100)
             masktype: &permutation half
-    - &exp_lu
-      __overwrites__: *exp_nice
-      name: mnist_lu
-      model_cfg: 
-          type:
-            __class__: src.veriflow.flows.LUFlow
-          params:
-            n_layers: 
-              __eval__: tune.choice([4])
-            base_distribution: 
-              __object__: pyro.distributions.Normal
-              loc: 
-                __eval__: torch.zeros(100)
-              scale: 
-                __eval__: torch.ones(100)
     - &exp_lunice
       __overwrites__: *exp_nice
       model_cfg: 
