@@ -17,5 +17,8 @@ WORKDIR /VeriFlow
 
 RUN poetry install
 
-CMD ["ls/scri"]
+# Expose port for TensorBoard
+EXPOSE 6006
+
+CMD ["./start.sh"]
 #CMD ["poetry", "run", "python", "scripts/run-eperiment.py", "--config", "experiments/mnist/mnist.yaml"]
