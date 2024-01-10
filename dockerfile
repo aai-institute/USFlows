@@ -16,3 +16,6 @@ RUN git clone https://github.com/aai-institute/VeriFlow.git
 WORKDIR /VeriFlow
 
 RUN poetry install
+
+CMD ["ls/scri"]
+#CMD ["poetry", "run", "python", "scripts/run-eperiment.py", "--config", "experiments/mnist/mnist.yaml"]

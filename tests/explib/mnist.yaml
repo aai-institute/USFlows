@@ -22,6 +22,7 @@ experiments:
               image_shape: [10, 10]
         dataset: &dataset
           __object__: src.explib.datasets.MnistSplit
+          scale: true
           digit: 0
         epochs: &epochs 20
         patience: &patience 5
@@ -54,26 +55,10 @@ experiments:
               scale: 
                 __eval__: torch.ones(100)
             masktype: &permutation half
-    - &exp_lu
-      __overwrites__: *exp_nice
-      name: mnist_lu
-      model_cfg: 
-          type:
-            __class__: src.veriflow.flows.LUFlow
-          params:
-            n_layers: 
-              __eval__: tune.choice([4])
-            base_distribution: 
-              __object__: pyro.distributions.Normal
-              loc: 
-                __eval__: torch.zeros(100)
-              scale: 
-                __eval__: torch.ones(100)
     - &exp_lunice
       __overwrites__: *exp_nice
       model_cfg: 
         name: mnist_lunice
         params:
-          use_lu: true
-
+          soft_training: true
 

@@ -96,13 +96,31 @@ class SimpleSplit(DataSplit):
     def get_val(self) -> torch.utils.data.Dataset:
         return self.val
 
+def make_transformed_uniform(dim: int, num_samples: int, transform: Tensor = None) -> Tensor:
+    """Create uniform dataset
 
-GENERATORS = {
-    "make_moons": make_moons,
-    "make_blobs": make_blobs,
-    "make_checkerboard": make_checkerboard,
-    "make_circles": make_circles,
-}
+    Args:
+        dim (int): dimensionality of dataset
+        num_samples (int): number of samples
+        transform (Tensor, optional): transformation matrix. Defaults to None which applies no transformation.
+
+    Returns:
+        np.ndarray: dataset
+    """
+    sample = torch.distributions.Laplace(torch.zeros(dim), torch.ones(dim)).sample([num_samples])
+    
+    if transform is not None:
+        inconsistent = len(transform.shape) != 2
+        inconsistent = inconsistent or (transform.shape[0] != transform.shape[1])
+        inconsistent = inconsistent or (transform.shape[0] != dim)
+        if inconsistent:
+            raise ValueError(f"transform must be {dim}X{dim} got {transform.shape}.")
+
+        sample = (transform @ sample.T).T
+    
+    return sample  
+    
+    
 
 class FlattenedDataset(torch.utils.data.Dataset):
     """
@@ -138,6 +156,15 @@ class DataSplitFromCSV(DataSplit):
 
 # Synthetic datasets
 
+
+GENERATORS = {
+    "moons": make_moons,
+    "blobs": make_blobs,
+    "checkerboard": make_checkerboard,
+    "circles": make_circles,
+    "transformed_uniform": make_transformed_uniform,
+}
+
 class SyntheticDataset(torch.utils.data.Dataset):
     """
     Dataset from generator function
@@ -154,7 +181,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
 
         Args:
             generator (function): generator function
-            params: ]dict]: parameters for generator function
+            params: [dict]: parameters for generator function
         """
         super().__init__(*args, **kwargs)
         if isinstance(generator, str):
@@ -274,6 +301,7 @@ class MnistDequantized(DequantizedDataset):
         train: bool = True,
         digit: T.Optional[int] = None,
         flatten=True,
+        scale: bool = False,
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -283,8 +311,9 @@ class MnistDequantized(DequantizedDataset):
         if not os.path.exists(path):
             MNIST(dataloc, train=train, download=True)
 
-        # TODO: remove hardcoding of 3x3 downsampling
-        dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
+        if scale:
+            # TODO: remove hardcoding of 3x3 downsampling
+            dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
         if digit is not None:
@@ -308,11 +337,12 @@ class MnistSplit(DataSplit):
         dataloc: os.PathLike = None,
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
+        scale: bool = False,
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = MnistDequantized(self.dataloc, train=True, digit=digit)
+        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -320,7 +350,7 @@ class MnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = MnistDequantized(self.dataloc, train=False, digit=digit)
+        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
