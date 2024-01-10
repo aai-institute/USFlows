@@ -311,9 +311,10 @@ class MnistDequantized(DequantizedDataset):
         if not os.path.exists(path):
             MNIST(dataloc, train=train, download=True)
 
+        dataset = idx2numpy.convert_from_file(path)
         if scale:
-            # TODO: remove hardcoding of 3x3 downsampling
-            dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
+            
+            dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
         if digit is not None:
