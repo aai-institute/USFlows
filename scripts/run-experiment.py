@@ -6,7 +6,8 @@ import click
 from src.explib.config_parser import read_config
 
 Pathable = T.Union[str, os.PathLike]  # In principle one can cast it to os.path.Path
-
+import torch 
+torch.autograd.set_detect_anomaly(True)
 
 @click.command()
 @click.option("--report_dir", default="./reports", help="Report file")

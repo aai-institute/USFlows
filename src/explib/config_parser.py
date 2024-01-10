@@ -33,16 +33,15 @@ def unfold_raw_config(d: Dict[str, Any]):
 
     :param d: The dictionary to unfold
     """
-    du = dict()
-    for k, v in d.items():
-        if isinstance(v, dict):
+    if isinstance(d, dict):
+        du = dict()
+        for k, v in d.items():
             du[k] = unfold_raw_config(v)
-        elif isinstance(v, list):
-            du[k] = [unfold_raw_config(x) for x in v]
-        else:
-            du[k] = deepcopy(v)
-
-    return du
+        return du
+    elif isinstance(d, list):
+        return [unfold_raw_config(x) for x in d]
+    else:
+        return deepcopy(d)
 
 
 def push_overwrites(item: Any, attributes: Dict[str, Any]) -> Any:
@@ -97,24 +96,29 @@ def apply_overwrite(d: Dict[str, Any], recurse: bool = True):
     :pram recurse: If True, the overwrites are applied recursively. Defaults to True.
             Can be useful for efficient combination of this method with other parsing methods.
     """
-    # Apply top-level overwrite
-    if "__overwrites__" in d:
-        overwritten_attr = d
-        d = overwritten_attr.pop("__overwrites__")
-        for k, v in overwritten_attr.items():
-            if k not in d:
-                d[k] = v
-            else:
-                d[k] = push_overwrites(d[k], v)
+    if isinstance(d, dict):
+        # Apply top-level overwrite
+        if "__overwrites__" in d:
+            overwritten_attr = d
+            d = overwritten_attr.pop("__overwrites__")
+            for k, v in overwritten_attr.items():
+                if k not in d:
+                    d[k] = v
+                else:
+                    d[k] = push_overwrites(d[k], v)
 
-    if recurse:
-        for k, v in d.items():
-            if isinstance(v, dict):
-                d[k] = apply_overwrite(v)
-            elif isinstance(v, list):
-                d[k] = [apply_overwrite(x) for x in v]
+        if recurse:
+            for k, v in d.items():
+                d[k] = apply_overwrite(v, recurse=recurse)
 
-    return d
+        return d
+    if isinstance(d, list):
+        if recurse:
+            return [apply_overwrite(x, recurse=recurse) for x in d]
+        else:
+            return d
+    else:
+        return d
 
 
 def read_config(yaml_path: Union[str, Path]) -> dict:

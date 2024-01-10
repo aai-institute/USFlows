@@ -2,27 +2,18 @@ import numpy as np
 
 from torch.utils.data import Dataset
 
-import pyro
 from pyro import distributions as dist
-from pyro.distributions.transforms import SoftplusTransform
 from pyro.nn import DenseNN
-from pyro.distributions.transforms import AffineCoupling, LowerCholeskyAffine
-from pyro.infer import SVI
 from typing import List, Dict, Literal, Any, Iterable, Optional, Union, Tuple
 import torch
-from torch.utils.data import DataLoader
 
-from sklearn.datasets import load_digits
-from tqdm import tqdm
 from src.veriflow.transforms import (
     ScaleTransform,
     MaskedCoupling,
-    Permute,
     LUTransform,
-    LeakyReLUTransform,
     BaseTransform,
 )
-from src.veriflow.networks import AdditiveAffineNN, ConvNet2D
+from src.veriflow.networks import ConvNet2D, ConditionalDenseNN
 
 
 class Flow(torch.nn.Module):
@@ -30,7 +21,7 @@ class Flow(torch.nn.Module):
 
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
-    export = "log_prob"
+    export: export_modes = "log_prob"
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -42,16 +33,42 @@ class Flow(torch.nn.Module):
         else:
             raise ValueError(f"Unknown export mode {self.export}")
 
-    def __init__(self, base_distribution, layers, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        base_distribution,
+        layers,
+        soft_training: bool = False,
+        training_noise_prior=dist.Laplace(0, 1e-6),
+        *args,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
 
+        self.soft_training = soft_training
+        self.training_noise_prior = training_noise_prior
         self.layers = layers
         self.trainable_layers = torch.nn.ModuleList(
             [l for l in layers if isinstance(l, torch.nn.Module)]
         )
         self.base_distribution = base_distribution
 
-        self.transform = dist.TransformedDistribution(base_distribution, layers)
+        # Redeclare all batch dimensions to event dimensions
+        # This is a sanitary measure to avoid pyro from creating a batch of transforms
+        # rather than a single transform.
+        batch_shape = self.base_distribution.batch_shape
+        if len(batch_shape) > 0:
+            self.base_distribution = dist.Independent(
+                self.base_distribution, len(batch_shape)
+            )
+
+        self.transform = dist.TransformedDistribution(self.base_distribution, layers)
+
+    def log_prior(self) -> torch.Tensor:
+        """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
+        $$argmax_{\\theta} \log p_{\\theta}(D) + \log p_{prior}(\\theta)$$ By default, this ia the constant zero, which amounts
+        to maximum likelihood training (improper uniform prior).
+        """
+        return 0
 
     def fit(
         self,
@@ -59,11 +76,10 @@ class Flow(torch.nn.Module):
         optim: torch.optim.Optimizer = torch.optim.Adam,
         optim_params: Dict[str, Any] = None,
         batch_size: int = 32,
-        shuffe: bool = True,
+        shuffle: bool = True,
         gradient_clip: float = None,
         device: torch.device = None,
-        jitter: float = 1e-6,
-        epochs: int = 1
+        epochs: int = 1,
     ) -> float:
         """
         Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other
@@ -78,7 +94,7 @@ class Flow(torch.nn.Module):
             epochs: number of epochs.
 
         Returns:
-            Loss curve (negative log-likelihood).
+            Loss curve .
         """
         if device is None:
             if torch.backends.mps.is_available():
@@ -96,35 +112,53 @@ class Flow(torch.nn.Module):
             optim = optim(model.trainable_layers.parameters())
 
         N = len(data_train)
-        
+
         epoch_losses = []
         for _ in range(epochs):
             losses = []
-            if shuffe:
+            if shuffle:
                 perm = np.random.choice(N, N, replace=False)
-                data_train = data_train[perm]
+                data_train_shuffle = data_train[perm][0]
 
             for idx in range(0, N, batch_size):
-                idx_end = min(idx + batch_size, N)
+                end = min(idx + batch_size, N)
                 try:
-                    sample = torch.Tensor(data_train[idx:idx_end][0]).to(device)
+                    sample = torch.Tensor(data_train_shuffle[idx:end]).to(device)
                 except:
                     continue
+
+                if self.soft_training:
+                    noise = self.training_noise_prior.sample([sample.shape[0]]).abs()
+
+                    # Repeat noise for all data dimensions
+                    sigma = noise
+                    r = torch.Tensor(list(sample.shape[1:])).prod().int()
+                    sigma = sigma.repeat_interleave(r)
+                    sigma = sigma.reshape(sample.shape)
+
+                    e = torch.normal(torch.zeros_like(sigma), sigma).to(device)
+                    sample = sample + e
+                    noise = noise.unsqueeze(-1)
+                    noise = noise.detach().to(device)
+                else:
+                    noise = None
+
                 optim.zero_grad()
-                while not self.is_feasible():
-                    self.add_jitter(jitter)
-                loss = -model.transform.log_prob(sample).mean()
-                losses.append(float(loss.detach()))
+
+                loss = -model.log_prob(
+                    sample, context=noise
+                ).mean() - model.log_prior()
                 loss.backward()
+                losses.append(float(loss.detach()))
                 if gradient_clip is not None:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
                 optim.step()
-                while not self.is_feasible():
-                    self.add_jitter(jitter)
+                if not self.is_feasible():
+                    raise RuntimeError("Model is not invertible")
 
                 model.transform.clear_cache()
             epoch_losses.append(np.mean(losses))
-            
+
         return epoch_losses
 
     def to_onnx(self, path: str, export_mode: export_modes = "log_prob") -> None:
@@ -139,17 +173,32 @@ class Flow(torch.nn.Module):
         dummy_input = self.base_distribution.sample()
         torch.onnx.export(self, dummy_input, path, verbose=True)
         self.export = mode_cache
-        
 
-    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+    def log_prob(
+        self, x: torch.Tensor, context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """Returns the models log-densities for the given samples
 
         Args:
             x: sample tensor.
         """
-        return self.transform.log_prob(x)
 
-    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
+        log_det = torch.zeros(x.shape[0]).to(x.device)
+        for layer in reversed(self.layers):
+            if context is not None:
+                y = layer.backward(x, context=context)
+                log_det = log_det - layer.log_abs_det_jacobian(y, x, context=context)
+                x = y
+            else:
+                y = layer.backward(x)
+                log_det = log_det - layer.log_abs_det_jacobian(y, x)
+                x = y
+
+        return self.base_distribution.log_prob(y) + log_det
+
+    def sample(
+        self, sample_shape: Iterable[int] = None, context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """Returns n_sample samples from the distribution
 
         Args:
@@ -158,7 +207,14 @@ class Flow(torch.nn.Module):
         if sample_shape is None:
             sample_shape = [1]
 
-        return self.transform.sample(sample_shape)
+        y = self.base_distribution.sample(sample_shape)
+        for layer in self.layers:
+            if context is not None:
+                y = layer.forward(y, context=context)
+            else:
+                y = layer.forward(y)
+
+        return y
 
     def to(self, device) -> None:
         """Moves the model to the given device"""
@@ -167,6 +223,7 @@ class Flow(torch.nn.Module):
         self.trainable_layers = torch.nn.ModuleList(
             [l.to(device) for l in self.trainable_layers]
         )
+        self._disrtibution_to(device)
         return super().to(device)
 
     def is_feasible(self) -> bool:
@@ -181,9 +238,13 @@ class Flow(torch.nn.Module):
             if isinstance(l, BaseTransform) and not l.is_feasible():
                 l.add_jitter(jitter)
 
+    def _disrtibution_to(self, device: str) -> None:
+        """Moves the base distribution to the given device"""
+        pass
+
 
 class NiceFlow(Flow):
-    Permutation = Literal["random", "half", "LU"]
+    mask = Literal["random", "half", "alternate"]
 
     """Implementation of the NICE flow architecture by using fully connected coupling layers"""
 
@@ -193,9 +254,11 @@ class NiceFlow(Flow):
         coupling_layers: int,
         coupling_nn_layers: List[int],
         split_dim: int,
-        scale_every_coupling=False,
         nonlinearity: Optional[torch.nn.Module] = None,
-        permutation: Permutation = "LU",
+        masktype: mask = "half",
+        use_lu: bool = True,
+        prior_scale: float = 1.0,
+        soft_training: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -215,49 +278,152 @@ class NiceFlow(Flow):
         self.coupling_layers = coupling_layers
         self.coupling_nn_layers = coupling_nn_layers
         self.split_dim = split_dim
+        self.perm_type = masktype
+        self.prior_scale = (
+            torch.tensor(prior_scale) if prior_scale is not None else None
+        )
+        self.use_lu = use_lu
 
         if nonlinearity is None:
             nonlinearity = torch.nn.ReLU()
 
-        rdim = input_dim - split_dim
         layers = []
+        self.lu_layers = []
+        layer_scale = (
+            self.prior_scale**2 / coupling_layers
+            if self.prior_scale is not None
+            else None
+        )
         for i in range(coupling_layers):
-            layers.append(self._get_permutation(permutation, i))
-            layers.append(
-                AffineCoupling(
-                    split_dim,
-                    AdditiveAffineNN(
-                        split_dim, coupling_nn_layers, rdim, nonlinearity=nonlinearity
-                    ),
+            if self.use_lu:
+                layers.append(LUTransform(input_dim, prior_scale=layer_scale))
+                self.lu_layers.append(layers[-1])
+            mask = self._get_mask(masktype, i)
+            
+            if soft_training:
+                layers.append(
+                    MaskedCoupling(
+                        mask,
+                        ConditionalDenseNN(
+                            input_dim,
+                            1,
+                            coupling_nn_layers,
+                            input_dim,
+                            nonlinearity=nonlinearity,
+                        ),
+                    )
                 )
-            )
+            else:
+                layers.append(
+                    MaskedCoupling(
+                        mask,
+                        DenseNN(
+                            input_dim,
+                            coupling_nn_layers,
+                            [input_dim],
+                            nonlinearity=nonlinearity,
+                        ),
+                    )
+                )
 
-            if scale_every_coupling:
-                layers.append(ScaleTransform(input_dim))
+        layers.append(ScaleTransform(input_dim))
 
-        if not scale_every_coupling:
-            layers.append(ScaleTransform(input_dim))
+        super().__init__(
+            base_distribution,
+            layers,
+            soft_training=soft_training,
+            *args,
+            **kwargs,
+        )
 
-        super().__init__(base_distribution, layers, *args, **kwargs)
-
-    def _get_permutation(self, permtype: Permutation, i=0):
-        """Returns a permutation layer"""
-        if permtype == "random":
-            return Permute(torch.randperm(self.input_dim, dtype=torch.long))
-        elif permtype == "half":
-            if i % 2 == 0:  # every 2nd pixel
-                perm = torch.arange(self.input_dim, dtype=torch.long)
-                perm = perm.reshape(-1, 2).moveaxis(0, 1).reshape(-1)
-            elif i % 2 == 1:  # interchange conditioning variables and output variables
-                perm = torch.arange(self.input_dim, dtype=torch.long)
-                perm = perm.reshape(2, -1).flip(0).reshape(-1)
-            else:  # random permutation
-                perm = torch.randperm(self.input_dim, dtype=torch.long)
-            return Permute(perm)
-        elif permtype == "LU":
-            return LUTransform(self.input_dim)
+    def log_prob(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
+        if context is not None:
+            return super().log_prob(x, context)
         else:
-            raise ValueError(f"Unknown permutation type {permtype}")
+            if self.soft_training:
+                # implicit conditioning with noise scale 0
+                context = torch.zeros(x.shape[0]).unsqueeze(-1)
+            return super().log_prob(x, context)
+            
+    def sample(
+        self, sample_shape: Iterable[int] = None, context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        if context is not None:
+            return super().sample(sample_shape, context)
+        else:
+            if self.soft_training:
+                return super().sample(
+                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1)
+                )
+            else:
+                return super().sample(
+                    sample_shape
+                )
+
+    def _get_mask(self, masktype: mask, i=0):
+        """Returns a mask for the i-th coupling"""
+        if masktype == "random":
+            mask = torch.bernoulli(
+                torch.tensor([self.split_dim / self.input_dim] * self.input_dim)
+            )
+            return mask
+        elif masktype == "half":
+            mask = torch.zeros(self.input_dim)
+            mask[: self.split_dim] = 1
+            if i % 2 == 1:
+                mask = 1 - mask
+            return mask
+        elif masktype == "alternate":
+            mask = [0, 1] * (self.input_dim // 2)
+            if self.input_dim % 2 == 1:
+                mask += [0]
+            mask = torch.tensor(mask)
+
+            if i % 2 == 1:  # every 2nd pixel
+                mask = 1 - mask
+            return mask
+        else:
+            raise ValueError(f"Unknown permutation type {masktype}")
+
+    def log_prior(self, correlated: bool = False) -> torch.Tensor:
+        """Returns the log prior of the model parameters. If LU layers are used,
+        we directly regularize the Jacobean determinant of the flow by putting an
+        independent mirrored log-normal
+        prior on the diagonal elements of $U$ matrices. The normal has
+        mean $0$ and standard deviation $\sqrt{d\cdot #layers}\sigma$, where $d$ is the data dimension.
+        That means that we put a log-normal prior on the determinant of the Jacobian.
+
+        Any additive constant is dropped in the optimization procedure.
+        """
+
+        if self.use_lu and self.prior_scale is not None:
+            log_prior = 0
+            n_layers = self.input_dim * len(self.lu_layers)
+            for p in self.lu_layers:
+                precision = None
+                d = self.input_dim
+                if correlated:
+                    # Pairwise negative correlation of 1/d
+                    covariance = -1 / d * torch.ones(d, d) + (1 + 1 / d) * torch.diag(
+                        torch.ones(d)
+                    )
+                    # Scaling
+                    covariance = covariance * (self.prior_scale**2 / n_layers)
+                else:
+                    covariance = torch.eye(d)
+                    # Scaling
+                    covariance = covariance * (self.prior_scale**2 / (n_layers * d))
+
+                precision = torch.linalg.inv(covariance).to(self.device)
+
+                # log-density of Normal in log-space
+                x = p.U.diag().abs().log()
+                log_prior += -(x * (precision @ x)).sum()
+                # Change of variables to input space
+                log_prior += -x.sum()
+            return log_prior
+        else:
+            return 0
 
 
 class NiceMaskedConvFlow(Flow):
@@ -340,50 +506,3 @@ class NiceMaskedConvFlow(Flow):
             mask = 1 - mask
         return mask
 
-
-class LUFlow(Flow):
-    """Implementation of the NICE flow architecture using fully connected coupling layers
-    and a checkerboard permutation
-    """
-
-    def __init__(
-        self,
-        base_distribution: dist.Distribution,
-        n_layers: int,
-        nonlinearity: Optional[torch.distributions.Transform] = None,
-        *args,
-        **kwargs,
-    ) -> None:
-        """Initialization
-
-        Args:
-            base_distribution: base distribution,
-            n_layers: number of LU-layers.
-            nonlinearity: nonlinearity of the convolutional layers.
-        """
-
-        self.n_layers = n_layers
-
-        if nonlinearity is None:
-            nonlinearity = LeakyReLUTransform
-
-        layers = []
-
-        for i in range(n_layers):
-            layers.append(
-                LUTransform(
-                    base_distribution.sample().shape[0],
-                )
-            )
-            layers.append(nonlinearity())
-
-        super().__init__(base_distribution, layers, *args, **kwargs)
-
-    def is_feasible(self):
-        """Checks if all LU layers are feasible"""
-        return all([l.is_feasible() for l in self.layers if isinstance(l, LUTransform)])
-
-    def add_jitter(self, jitter: float = 1e-6) -> None:
-        for layer in self.layers:
-            if isinstance(layer, LUTransform) and not layer.is_feasible():
-                layer.add_jitter(jitter)

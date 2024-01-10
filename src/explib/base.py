@@ -67,5 +67,5 @@ class ExperimentCollection(Experiment):
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         for i, exp in enumerate(self.experiments):
             exp.conduct(
-                os.path.join(report_dir, f"{i}_{exp.name}"), storage_path=storage_path
+                os.path.join(report_dir, f"{self.name}/{i}_{exp.name}"), storage_path=storage_path
             )

@@ -32,7 +32,7 @@ Additionally, we define several benchmarking experiments.
 ## Run an experiment
 Within the projects script folder you'll find a a script called **run_experiment.py**. You can use it to conduct an experiment from the a config file.
 ```bash
-poetry run python run_experiment.py --config <config file> --log_dir <log dir>
+poetry run python run_experiment.py --config <config file> --report_dir <log dir>
 ```
  
 
