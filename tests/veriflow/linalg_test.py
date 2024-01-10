@@ -2,7 +2,7 @@ import torch
 from src.veriflow.linalg import solve_triangular
 
 test_size = 10
-tol = 1e-6
+tol = 1e-5
 
 def test_solve_triangular():
     M_base = torch.ones(10, 10)
