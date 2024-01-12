@@ -23,5 +23,6 @@ RUN poetry install
 EXPOSE 6006
 
 # TODO: change to start.sh
+RUN chmod a+rwx start_test.sh
 CMD ["./start_test.sh"]
 #CMD ["poetry", "run", "python", "scripts/run-eperiment.py", "--config", "experiments/mnist/mnist.yaml"]
