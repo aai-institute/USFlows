@@ -9,7 +9,7 @@ RUN apt-get update && \
     nvidia-cuda-toolkit-gcc \
     gnupg2 \
     curl \
-    ca-certificates && \
+    ca-certificates \
     ssh && \
     rm -rf /var/lib/apt/lists/*
 
