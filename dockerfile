@@ -3,22 +3,18 @@ FROM ubuntu:latest
 RUN apt clean
 
 # Update aptitude with new repo
-RUN apt-get update
-
-# Install software 
-RUN apt-get install -y git python3 python3-pip
+RUN apt-get update && \
+    apt-get install -y git python3 python3-pip nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
 
 RUN pip install --upgrade pip && pip install poetry
 
-RUN mkdir /root/.ssh/
-RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
-
-RUN git clone https://github.com/aai-institute/VeriFlow.git
+RUN mkdir /root/.ssh/ && \
+    ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+    git clone https://github.com/aai-institute/VeriFlow.git
 
 WORKDIR /VeriFlow
 # TODO delete before merging!
 RUN git checkout dockerize-experiments
-
 RUN poetry install
 
 # Expose port for TensorBoard
