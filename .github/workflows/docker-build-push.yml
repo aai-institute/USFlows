@@ -1,9 +1,15 @@
 name: Build and Push Docker
 
+
 on:
-  push:
-    branches:
-      - main  # or any other branch you want to trigger the build
+    push:
+        branches:
+        - dockerize-experiments 
+    pull_request:
+        branches:
+        - main
+        types: [closed]
+
 
 jobs:
   build-and-push:
