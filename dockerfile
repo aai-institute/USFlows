@@ -4,7 +4,23 @@ RUN apt clean
 
 # Update aptitude with new repo
 RUN apt-get update && \
-    apt-get install -y git python3 python3-pip nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
+    apt-get install -y --no-install-recommends \
+    git python3 python3-pip nvidia-cuda-toolkit \
+    nvidia-cuda-toolkit-gcc \
+    gnupg2 \
+    curl \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add the NVIDIA package repositories
+RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/ /" > /etc/apt/sources.list.d/nvidia-ml.list
+
+# Install libcudnn8
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libcudnn8 && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip && pip install poetry
 
