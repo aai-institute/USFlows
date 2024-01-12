@@ -76,7 +76,7 @@ class HyperoptExperiment(Experiment):
         
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = None) -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
         
         Args:
