@@ -10,6 +10,7 @@ RUN apt-get update && \
     gnupg2 \
     curl \
     ca-certificates && \
+    ssh && \
     rm -rf /var/lib/apt/lists/*
 
 # Add the NVIDIA package repositories
