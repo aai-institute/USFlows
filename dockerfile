@@ -1,5 +1,7 @@
 FROM ubuntu:latest
 
+RUN apt clean
+
 # Update aptitude with new repo
 RUN apt-get update
 
