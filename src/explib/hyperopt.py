@@ -81,7 +81,7 @@ class HyperoptExperiment(Experiment):
         
         Args:
             config (T.Dict[str, T.Any]): configuration
-            device (torch.device, optional): device. Defaults to "cpu".
+            device (torch.device, optional): device. Defaults to None.
         Returns:
             Dict[str, float]: trial performance metrics
         """
@@ -108,7 +108,7 @@ class HyperoptExperiment(Experiment):
         
         best_loss = float("inf")
         strikes = 0
-        for _ in range(config["epochs"]):
+        for epoch in range(config["epochs"]):
             train_loss = flow.fit(
                 data_train,
                 config["optim_cfg"]["optimizer"],
@@ -139,18 +139,26 @@ class HyperoptExperiment(Experiment):
                 if "images" in cfg_log and cfg_log["images"]:
                     img_sample(
                         flow, 
-                        "./sample.png", 
+                        f"sample",
+                        step=epoch, 
                         reshape=cfg_log["image_shape"], 
                         device=device
                     )
                 if "scatter" in cfg_log and cfg_log["scatter"]:
                     scatter_sample(
                         flow, 
-                        "./scatter.png", 
+                        f"scatter",
+                        step=epoch, 
                         device=device
                     )
                     
-                    density_contour_sample(flow, "./density_contour.png", writer=writer, device=device)
+                    density_contour_sample(
+                        flow,
+                        f"density_contour",
+                        step=epoch,
+                        writer=writer,
+                        device=device
+                    )
                 
             else:
                 strikes += 1
@@ -179,8 +187,6 @@ class HyperoptExperiment(Experiment):
 
         exptime = str(datetime.now())
 
-        #search_alg = BayesOptSearch(utility_kwargs={"kind": "ucb", "kappa": 2.5, "xi": 0.0})
-        #search_alg = ConcurrencyLimiter(search_alg, max_concurrent=100)
         tuner = tune.Tuner(
             tune.with_resources(
                 tune.with_parameters(HyperoptExperiment._trial),
@@ -296,7 +302,7 @@ class HyperoptExperiment(Experiment):
         return report
 
 
-def img_sample(model, path = "./sample.png", reshape: Optional[Iterable[int]] = None, n=2, device="cpu"):
+def img_sample(model, name = "sample", step=0, reshape: Optional[Iterable[int]] = None, n=2, device="cpu"):
     """Sample images from a model.
     
     Args:
@@ -307,19 +313,22 @@ def img_sample(model, path = "./sample.png", reshape: Optional[Iterable[int]] = 
         device: device to sample from
 
     """
+    writer = SummaryWriter("./")
     with torch.no_grad():
-        sample = np.uint8(np.clip(model.sample(torch.tensor([n, n])).numpy(), 0, 1) * 255)
+        sample = torch.clip(model.sample(torch.tensor([n, n])), 0, 1) * 255
         
     if reshape is not None:
         reshape = [n, n] + reshape
         sample = sample.reshape(reshape)
     
-    sample = np.concatenate(sample, axis=-1)
-    sample = np.concatenate(sample, axis=0)
-        
-    Image.fromarray(sample, mode="L").save(path, dpi=(300, 300))
+    sample = torch.cat([x for x in sample], dim=-1)
+    sample = torch.cat([x for x in sample], dim=0)
+    
+    writer.add_image(name, sample, global_step=step, dataformats="HW")
+    writer.flush()
+    writer.close()
 
-def scatter_sample(model, path = "./sample.png", n=1000, device="cpu"):
+def scatter_sample(model, name = "sample", step=0, n=1000, device="cpu"):
     """Sample images from a model.
     
     Args:
@@ -329,13 +338,22 @@ def scatter_sample(model, path = "./sample.png", n=1000, device="cpu"):
         device: device to sample from
 
     """
+    writer = SummaryWriter("./")
     with torch.no_grad():
-        sample = model.sample(torch.tensor([n])).numpy()
+        sample = model.sample(torch.tensor([n]))
         
     fig = px.scatter(x=sample[:, 0], y=sample[:, 1])
-    fig.write_image(path, width=800, height=800)
+    fig.canvas.draw()
 
-def density_contour_sample(model, path="./density_contour.png", n=1000, device="cpu"):
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    sample = torch.Tensor(data)
+    
+    writer.add_image(name, sample, global_step=step, dataformats="HWC")
+    writer.flush()
+    writer.close()
+
+def density_contour_sample(model, name = "sample", step=0, n=1000, device="cpu"):
     """Generate a density contour plot from samples of a model and save it as an image.
 
     Args:
@@ -345,6 +363,7 @@ def density_contour_sample(model, path="./density_contour.png", n=1000, device="
         device: device to generate samples from.
 
     """
+    writer = SummaryWriter("./")
     with torch.no_grad():
         # Sample from the model
         sample = model.sample(torch.tensor([n])).to(device).numpy()
@@ -352,5 +371,10 @@ def density_contour_sample(model, path="./density_contour.png", n=1000, device="
     # Create a density contour plot
     fig = px.density_contour(x=sample[:, 0], y=sample[:, 1])
 
-    # Save the plot as an image
-    fig.write_image(path, width=800, height=800)
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    sample = torch.Tensor(data)
+    
+    writer.add_image(name, sample, global_step=step, dataformats="HWC")
+    writer.flush()
+    writer.close()

@@ -342,7 +342,7 @@ class NiceFlow(Flow):
         else:
             if self.soft_training:
                 # implicit conditioning with noise scale 0
-                context = torch.zeros(x.shape[0]).unsqueeze(-1)
+                context = torch.zeros(x.shape[0]).unsqueeze(-1).to(self.device)
             return super().log_prob(x, context)
             
     def sample(
@@ -353,7 +353,7 @@ class NiceFlow(Flow):
         else:
             if self.soft_training:
                 return super().sample(
-                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1)
+                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1).to(self.device)
                 )
             else:
                 return super().sample(
