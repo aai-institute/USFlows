@@ -19,7 +19,7 @@ experiments:
     trial_config:
       logging:
         images: true
-        "image_shape": [10, 10]
+        "image_shape": [28, 28]
       dataset: &dataset
         __object__: src.explib.datasets.MnistSplit
       epochs: &epochs 200000
@@ -55,9 +55,9 @@ experiments:
           base_distribution: 
             __object__: pyro.distributions.Laplace
             loc: 
-              __eval__: torch.zeros(784)
+              __eval__: torch.zeros(784).to("cuda:0")
             scale: 
-              __eval__: torch.ones(784)
+              __eval__: torch.ones(784).to("cuda:0")
           use_lu: true
   - &exp_nice_lu_normal
     __overwrites__: *exp_nice_lu_laplace
