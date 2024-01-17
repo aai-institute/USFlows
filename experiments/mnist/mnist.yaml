@@ -55,9 +55,9 @@ experiments:
           base_distribution: 
             __object__: pyro.distributions.Laplace
             loc: 
-              __eval__: torch.zeros(784).to("cuda:0")
+              __eval__: torch.zeros(784)
             scale: 
-              __eval__: torch.ones(784).to("cuda:0")
+              __eval__: torch.ones(784)
           use_lu: true
   - &exp_nice_lu_normal
     __overwrites__: *exp_nice_lu_laplace
