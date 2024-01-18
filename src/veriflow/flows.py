@@ -30,6 +30,14 @@ class Flow(torch.nn.Module):
             return self.log_prob(x)
         elif self.export == "sample":
             return self.sample()
+        elif self.export == "forward":
+            for layer in self.layers:
+                x = layer.forward(x)
+            return x
+        elif self.export == "backward":
+            for layer in reversed(self.layers):
+                x = layer.backward(x)
+            return x
         else:
             raise ValueError(f"Unknown export mode {self.export}")
 
