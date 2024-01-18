@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 import plotly.express as px
 from pyro import distributions as dist
 from pyro.distributions.transforms import AffineCoupling, Permute
+import ray
 from ray import tune
 from ray.air import RunConfig, session
 
@@ -76,7 +77,7 @@ class HyperoptExperiment(Experiment):
         
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = None) -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
         
         Args:
@@ -178,9 +179,11 @@ class HyperoptExperiment(Experiment):
             storage_path (os.PathLike, optional): Ray logging path. Defaults to None.
         """
         home = os.path.expanduser("~")
+        
+        ray.init(_temp_dir=storage_path)
 
         if storage_path is not None:
-            tuner_config = {"run_config": RunConfig(storage_path=storage_path)}
+            tuner_config = {"run_config": RunConfig(local_dir=storage_path)}
         else:
             storage_path = os.path.expanduser("~/ray_results")
             tuner_config = {}
