@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -135,30 +136,35 @@ class HyperoptExperiment(Experiment):
                 torch.save(flow.state_dict(), "./checkpoint.pt")
                 
                 # Advanced logging
-                cfg_log = config["logging"]
-                if "images" in cfg_log and cfg_log["images"]:
-                    img_sample(
-                        flow, 
-                        f"sample",
-                        step=epoch, 
-                        reshape=cfg_log["image_shape"], 
-                        device=device
-                    )
-                if "scatter" in cfg_log and cfg_log["scatter"]:
-                    scatter_sample(
-                        flow, 
-                        f"scatter",
-                        step=epoch, 
-                        device=device
-                    )
-                    
-                    density_contour_sample(
-                        flow,
-                        f"density_contour",
-                        step=epoch,
-                        writer=writer,
-                        device=device
-                    )
+                try:
+                    cfg_log = config["logging"]
+                    if "images" in cfg_log and cfg_log["images"]:
+                        img_sample(
+                            flow, 
+                            f"sample",
+                            step=epoch, 
+                            reshape=cfg_log["image_shape"], 
+                            device=device,
+                            writer=writer
+                        )
+                    if "scatter" in cfg_log and cfg_log["scatter"]:
+                        scatter_sample(
+                            flow, 
+                            f"scatter",
+                            step=epoch, 
+                            device=device,
+                            writer=writer
+                        )
+                        
+                        density_contour_sample(
+                            flow,
+                            f"density_contour",
+                            step=epoch,
+                            writer=writer,
+                            device=device
+                        )
+                except KeyError:
+                    pass
                 
             else:
                 strikes += 1
@@ -302,7 +308,15 @@ class HyperoptExperiment(Experiment):
         return report
 
 
-def img_sample(model, name = "sample", step=0, reshape: Optional[Iterable[int]] = None, n=2, device="cpu"):
+def img_sample(
+    model, 
+    name = "sample", 
+    step=0, 
+    reshape: Optional[Iterable[int]] = None, 
+    n=2, 
+    writer: SummaryWriter = None, 
+    device="cpu"
+    ):
     """Sample images from a model.
     
     Args:
@@ -313,7 +327,8 @@ def img_sample(model, name = "sample", step=0, reshape: Optional[Iterable[int]] 
         device: device to sample from
 
     """
-    writer = SummaryWriter("./")
+    if writer is None:
+        writer = SummaryWriter("./")
     with torch.no_grad():
         sample = torch.clip(model.sample(torch.tensor([n, n])), 0, 1) * 255
         
@@ -328,7 +343,14 @@ def img_sample(model, name = "sample", step=0, reshape: Optional[Iterable[int]] 
     writer.flush()
     writer.close()
 
-def scatter_sample(model, name = "sample", step=0, n=1000, device="cpu"):
+def scatter_sample(
+    model, 
+    name = "sample", 
+    step=0, 
+    n=1000, 
+    writer: SummaryWriter = None,
+    device="cpu"
+    ):
     """Sample images from a model.
     
     Args:
@@ -338,22 +360,36 @@ def scatter_sample(model, name = "sample", step=0, n=1000, device="cpu"):
         device: device to sample from
 
     """
-    writer = SummaryWriter("./")
+    if writer is None:
+        writer = SummaryWriter("./")
     with torch.no_grad():
         sample = model.sample(torch.tensor([n]))
         
     fig = px.scatter(x=sample[:, 0], y=sample[:, 1])
-    fig.canvas.draw()
+    fig_bytes = fig.to_image(format="png")
 
-    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    sample = torch.Tensor(data)
+    # Load image into PIL
+    image = Image.open(io.BytesIO(fig_bytes))
+
+    # Convert PIL Image to NumPy array
+    image_np = np.array(image)
+
+    # Convert NumPy array to PyTorch Tensor
+    tensor = torch.from_numpy(image_np)
     
-    writer.add_image(name, sample, global_step=step, dataformats="HWC")
+    writer.add_image(name, tensor, global_step=step, dataformats="HWC")
     writer.flush()
     writer.close()
 
-def density_contour_sample(model, name = "sample", step=0, n=1000, device="cpu"):
+def density_contour_sample(
+    model, 
+    name = "sample", 
+    step=0, 
+    n=1000, 
+    device="cpu",
+    writer: SummaryWriter = None
+    
+    ):
     """Generate a density contour plot from samples of a model and save it as an image.
 
     Args:
@@ -363,18 +399,22 @@ def density_contour_sample(model, name = "sample", step=0, n=1000, device="cpu")
         device: device to generate samples from.
 
     """
-    writer = SummaryWriter("./")
+    if writer is None:
+        writer = SummaryWriter("./")
     with torch.no_grad():
         # Sample from the model
         sample = model.sample(torch.tensor([n])).to(device).numpy()
 
     # Create a density contour plot
     fig = px.density_contour(x=sample[:, 0], y=sample[:, 1])
-
-    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    sample = torch.Tensor(data)
+    fig_bytes = fig.to_image(format="png")
+    # Load image into PIL
+    image = Image.open(io.BytesIO(fig_bytes))
+    # Convert PIL Image to NumPy array
+    image_np = np.array(image)
+    # Convert NumPy array to PyTorch Tensor
+    tensor = torch.from_numpy(image_np)
     
-    writer.add_image(name, sample, global_step=step, dataformats="HWC")
+    writer.add_image(name, tensor, global_step=step, dataformats="HWC")
     writer.flush()
     writer.close()
