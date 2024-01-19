@@ -54,7 +54,7 @@ experiments:
               training_noise_prior:
                 __object__: pyro.distributions.Laplace
                 loc: 0.0
-                scale: 0.000001
+                scale: 0.0001
               prior_scale: 1.0
               use_lu: true
               coupling_layers: &coupling_layers 
