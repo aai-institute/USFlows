@@ -100,7 +100,7 @@ class Flow(torch.nn.Module):
             if torch.backends.mps.is_available():
                 device = torch.device("mps")
             elif torch.cuda.is_available():
-                device = torch.device("cuda")
+                device = torch.device("cuda:0")
             else:
                 device = torch.device("cpu")
 
@@ -301,6 +301,7 @@ class NiceFlow(Flow):
             mask = self._get_mask(masktype, i)
             
             if soft_training:
+                # conditioning on noise scale 
                 layers.append(
                     MaskedCoupling(
                         mask,
