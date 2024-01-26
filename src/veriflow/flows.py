@@ -128,7 +128,7 @@ class Flow(torch.nn.Module):
                     continue
 
                 if self.soft_training:
-                    noise = self.training_noise_prior.sample([sample.shape[0]]).abs()
+                    noise = self.training_noise_prior.sample([sample.shape[0]]) 
 
                     # Repeat noise for all data dimensions
                     sigma = noise
@@ -140,6 +140,8 @@ class Flow(torch.nn.Module):
                     sample = sample + e
                     noise = noise.unsqueeze(-1)
                     noise = noise.detach().to(device)
+                    # scaling of noise for the conditioning recommended by SoftFlow paper
+                    noise = noise * 2/self.training_noise_prior.high
                 else:
                     noise = None
 
@@ -343,7 +345,7 @@ class NiceFlow(Flow):
         else:
             if self.soft_training:
                 # implicit conditioning with noise scale 0
-                context = torch.zeros(x.shape[0]).unsqueeze(-1).to(self.device)
+                context = torch.zeros(x.shape[0]).unsqueeze(-1).to(x.device)
             return super().log_prob(x, context)
             
     def sample(
@@ -484,7 +486,7 @@ class NiceMaskedConvFlow(Flow):
 
         layers.append(ScaleTransform(mask.shape))
 
-        super().__init__(base_distribution, layers, *args, **kwargs)
+        super().__init__(base_distribution, layers, soft_training=False, *args, **kwargs)
 
     @classmethod
     def create_checkerboard_mask(
