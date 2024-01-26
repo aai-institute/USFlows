@@ -67,6 +67,7 @@ def push_overwrites(item: Any, attributes: Dict[str, Any]) -> Any:
     elif isinstance(item, list):
         if isinstance(attributes, list):
             result = [push_overwrites(x, y) for x, y in zip(item, attributes)]
+            result += item[len(attributes) :]
         else:
             result = [push_overwrites(x, attributes) for x in item]
     else:

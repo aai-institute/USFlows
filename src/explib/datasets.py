@@ -190,8 +190,10 @@ class SyntheticDataset(torch.utils.data.Dataset):
         self.dataset = generator(**params)[0]
 
     def __getitem__(self, index: int):
-        x = self.dataset[index]
-        x = Tensor(x)
+        if isinstance(self.dataset, np.ndarray):
+            x = self.dataset[index].copy()
+        if not isinstance(x, Tensor):
+            x = Tensor(x)
         return x, torch.zeros_like(x)
 
     def __len__(self):

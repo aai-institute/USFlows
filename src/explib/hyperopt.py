@@ -239,13 +239,6 @@ class HyperoptExperiment(Experiment):
                     os.path.join(expdir, d, "params.pkl"), 
                     os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
                 )
-                
-                if self.trial_config["logging"]["images"]:
-                    shutil.copyfile(
-                        os.path.join(expdir, d, "sample.png"), 
-                        os.path.join(report_dir, f"{self.name}_{id}_sample.png")
-                    )
-                break
         
         best_model = from_checkpoint(
             os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
