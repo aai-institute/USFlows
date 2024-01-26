@@ -13,18 +13,6 @@ RUN apt-get update && \
     ssh && \
     rm -rf /var/lib/apt/lists/*
 
-# Add the NVIDIA package repositories
-# Add the GPG key for the NVIDIA repository
-RUN curl -fsSL https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/7fa2af80.pub | apt-key add - && \
-    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/ /" > /etc/apt/sources.list.d/nvidia-ml.list
-
-# Install libcudnn8
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libcudnn8 && \
-    rm -rf /var/lib/apt/lists/*
-
 RUN pip install --upgrade pip && pip install poetry
 
 RUN mkdir /root/.ssh/ && \
