@@ -435,6 +435,16 @@ class NiceFlow(Flow):
             return log_prior
         else:
             return 0
+    
+    def simplify() -> Flow:
+        """Simplifies the flow by removing LU layers and replacing them with a BijectiveLinear layer"""
+        layers = []
+        for l in self.layers:
+            if isinstance(l, LUTransform):
+                layers.append(l.to_linear())
+            else:
+                layers.append(l)
+        return Flow(self.base_distribution, layers)
 
 
 class NiceMaskedConvFlow(Flow):
