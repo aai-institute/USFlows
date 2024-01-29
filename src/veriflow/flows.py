@@ -436,7 +436,7 @@ class NiceFlow(Flow):
         else:
             return 0
     
-    def simplify() -> Flow:
+    def simplify(self) -> Flow:
         """Simplifies the flow by removing LU layers and replacing them with a BijectiveLinear layer"""
         layers = []
         for l in self.layers:

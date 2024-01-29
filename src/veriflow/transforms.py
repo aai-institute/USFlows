@@ -211,7 +211,15 @@ class Permute(BaseTransform):
 class BijectiveLinearTransform(BaseTransform):
     """Simple implementation of a bijective linear transform. Applies a transform $y = \mathbf{W}x + \mathbf{b}$, where $\mathbf{W}$ is a
     learnable parameter matrix and $\mathbf{b}$ is a learnable bias vector.
+    Note: This is a dummy implementation that does not enforce bijectivity nor is it intended to be trained.
+    It acts as a simplification of the LU transform for verification purposes.
     """
+    
+    bijective = True
+    volume_preserving = False
+    domain = dist.constraints.real_vector
+    codomain = dist.constraints.real_vector
+    
     def __init__(self, dim: int, m: torch.Tensor, bias: torch.Tensor, m_inv: torch.Tensor = None, *args, **kwargs):
         """ Initializes the linear transform.
         Args:
@@ -220,44 +228,51 @@ class BijectiveLinearTransform(BaseTransform):
             bias: bias vector
             m_inv: inverse weight matrix
         """
+        super().__init__(*args, **kwargs)
         self.dim = dim
         self.bias = bias
-        self.m = m
+        
+        self.forth = torch.nn.Linear(dim, dim, bias=True)
+        self.forth.weight = torch.nn.Parameter(m)
+        self.forth.bias = torch.nn.Parameter(bias)
+        
+        self.back = torch.nn.Linear(dim, dim, bias=True)
+        self.back.weight = torch.nn.Parameter(m_inv)
+        self.back.bias = torch.nn.Parameter(-torch.matmul(m_inv, bias))
+        
         self.m_inv = m_inv
         self.log_abs_det_jacobian = torch.linalg.slogdet(m)[1]
         
-        super().__init__(*args, **kwargs)
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
+        """ Computes the log absolute determinant of the Jacobian of the transform
         
-        def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
-            """ Computes the log absolute determinant of the Jacobian of the transform
-            
-            Args:
-                x (torch.Tensor): input tensor
-                y (torch.Tensor): output tensor
-            
-            Returns:
-                float: log absolute determinant of the Jacobian of the transform
-            """
-            return self.log_abs_det_jacobian
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): output tensor
         
-        def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
-            """ Computes the affine transform $y = \mathbf{W}x + \mathbf{b}$.
-            
-            Args:
-                x (torch.Tensor): input tensor
-                context (torch.Tensor): context tensor (ignored)
-            """
-            
-            return torch.matmul(self.m, x) + self.bias
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform
+        """
+        return self.log_abs_det_jacobian
+    
+    def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the affine transform $y = \mathbf{W}x + \mathbf{b}$.
         
-        def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
-            """ Computes the inverse transform $y = \mathbf{W}^{-1}x + \mathbf{b}$.
-            
-            Args:
-                y (torch.Tensor): input tensor
-                context (torch.Tensor): context tensor (ignored)
-            """
-            return torch.matmul(self.m_inv, y - self.bias)
+        Args:
+            x (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        
+        return self.forth(x)
+    
+    def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the inverse transform $y = \mathbf{W}^{-1}x + \mathbf{b}$.
+        
+        Args:
+            y (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        return self.back(y)
 
 class LUTransform(BaseTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
@@ -429,11 +444,10 @@ class LUTransform(BaseTransform):
                 + perturbation * torch.eye(self.dim, device=self.U_raw.device)
             )
     
-    def to_linear() -> BijectiveLinearTransform:
+    def to_linear(self) -> BijectiveLinearTransform:
         """ Converts the transform to a linear transform"""
-        M = torch.matmul(self.L, self.U)
-        bias = torch.matmul(self.L, self.bias)
-        M_inv = torch.inverse(M)
+        M_inv = torch.matmul(self.L, self.U)
+        M = torch.inverse(M_inv)
         return BijectiveLinearTransform(self.dim, M, self.bias, M_inv)
             
 
@@ -509,7 +523,6 @@ class MaskedCoupling(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform
         """
-        x_masked = x * self.mask
         return 0.0
 
     def sign(self) -> int:

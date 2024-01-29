@@ -78,7 +78,7 @@ class HyperoptExperiment(Experiment):
         
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = None) -> Dict[str, float]:
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
         
         Args:
@@ -228,6 +228,7 @@ class HyperoptExperiment(Experiment):
         best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
         self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
+        ray.shutdown()
     
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
         trial_id = best_result.trial_id
