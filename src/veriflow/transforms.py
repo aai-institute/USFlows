@@ -241,7 +241,8 @@ class BijectiveLinearTransform(BaseTransform):
         self.back.bias = torch.nn.Parameter(-torch.matmul(m_inv, bias))
         
         self.m_inv = m_inv
-        self.log_abs_det_jacobian = torch.linalg.slogdet(m)[1]
+        with torch.no_grad():
+            self.ladj = torch.linalg.slogdet(m)[1]
         
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
         """ Computes the log absolute determinant of the Jacobian of the transform
@@ -253,7 +254,7 @@ class BijectiveLinearTransform(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform
         """
-        return self.log_abs_det_jacobian
+        return self.ladj
     
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """ Computes the affine transform $y = \mathbf{W}x + \mathbf{b}$.

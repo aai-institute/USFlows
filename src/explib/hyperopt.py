@@ -28,19 +28,7 @@ from src.veriflow.flows import NiceFlow
 from src.veriflow.networks import AdditiveAffineNN
 from src.veriflow.transforms import ScaleTransform
 
-HyperParams = Literal[
-    "train",
-    "test",
-    "coupling_layers",
-    "coupling_nn_layers",
-    "split_dim",
-    "epochs",
-    "iters",
-    "batch_size",
-    "optim",
-    "optim_params",
-    "base_dist",
-]
+
 
 class HyperoptExperiment(Experiment):
     """Hyperparameter optimization experiment."""
@@ -134,7 +122,8 @@ class HyperoptExperiment(Experiment):
                 best_loss = val_loss
                 
                 # Create checkpoint
-                torch.save(flow.state_dict(), "./checkpoint.pt")
+                
+                torch.save(flow.state_dict(), f"./checkpoint.pt")
                 
                 # Advanced logging
                 try:
@@ -171,7 +160,7 @@ class HyperoptExperiment(Experiment):
                 strikes += 1
                 if strikes >= config["patience"]:
                     break
-
+        writer.close()
         return {
             "val_loss_best": best_loss,
             "val_loss": val_loss,
@@ -186,16 +175,19 @@ class HyperoptExperiment(Experiment):
         """
         home = os.path.expanduser("~")
         
-        ray.init(_temp_dir=storage_path)
-
+        ray.init(_temp_dir=f"{storage_path}/temp/")
+        #ray.init()
+        
         if storage_path is not None:
-            tuner_config = {"run_config": RunConfig(local_dir=storage_path)}
+            runcfg = RunConfig(storage_path=storage_path)
+            runcfg.local_dir = f"{storage_path}/local/"
+            tuner_config = {"run_config": runcfg}
         else:
             storage_path = os.path.expanduser("~/ray_results")
             tuner_config = {}
 
         exptime = str(datetime.now())
-
+        trial_config = self.trial_config
         tuner = tune.Tuner(
             tune.with_resources(
                 tune.with_parameters(HyperoptExperiment._trial),
@@ -274,7 +266,6 @@ class HyperoptExperiment(Experiment):
             config_prefix: The config_prefix parameter is the prefix for the config items.
         """
         report = None
-        print(os.listdir(expdir))
         for d in os.listdir(expdir):
             if os.path.isdir(expdir + "/" + d):
                 try:
