@@ -2,6 +2,7 @@ import click
 import onnx
 import onnxruntime as ort
 import os
+import sys
 import torch
 
 from datetime import datetime
@@ -87,10 +88,8 @@ class OnnxConverter(Experiment):
 
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
-        self.path_flow
-        PATH_CLASSIFIER = self.path_classifier
         model = onnx.load(self.path_flow)
-        classifier = onnx.load(PATH_CLASSIFIER)
+        classifier = onnx.load(self.path_classifier)
 
         # save input models into the reports target folder.
         # Might be redundant in the sense that the input models are most likely already saved elsewhere.
@@ -120,3 +119,13 @@ class OnnxConverter(Experiment):
             )
             onnx.checker.check_model(model=fixed_weights_model, full_check=True)
             onnx.save(combined_model, f'{dir}/merged_model.onnx')
+
+        try:
+            sys.path.append('/home/mustafa/repos/Marabou')
+            from maraboupy import Marabou
+        except ImportError:
+            Marabou = None
+        if Marabou:
+            print(f'Marabou available! {Marabou}')
+        else:
+            print(Fore.RED + 'Marabou not found!')
