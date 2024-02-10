@@ -81,10 +81,17 @@ class OnnxConverter(Experiment):
                 # Replace "Mul" node with "MatMul"
                 node.op_type = "MatMul"
                 for i in node.input:
-                    if "Constant" in i or "trainable_layers.2.scale" in i:
+                    if "Constant" in i or "trainable_layers.2.scale" in i\
+                            or "trainable_layers.3.scale" in i\
+                            or "trainable_layers.4.scale" in i:
                         weights_to_fix  = weights_to_fix + [(node.name, i)]
         # Save the modified model
         return model, weights_to_fix
+
+    def dummy_verification(self, unmodified_flow, classifier, combined_model_path, marabou):
+        marabou.createOptions(verbosity=1)
+        print(f'reading{combined_model_path}')
+        marabou.read_onnx(combined_model_path)
 
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
@@ -95,22 +102,26 @@ class OnnxConverter(Experiment):
         # Might be redundant in the sense that the input models are most likely already saved elsewhere.
         # This way we can make sure that
         curtime = str(datetime.now()).replace(" ", "")
-        dir = f'{report_dir}/{self.name}/{curtime}/'
+        dir = f'{report_dir}/{self.name}/{curtime}'
+        combined_model_path = f'{dir}/merged_model.onnx'
         os.makedirs(dir)
         onnx.save(model, f'{dir}/unmodified_model.onnx')
         onnx.save(classifier, f'{dir}/classifier.onnx')
 
         # First replace each node of type mul with matmul and save the names of its constant parameters.
         only_matmuls, weights_to_fix = self.replace_mul_with_matmul(model)
+        print(weights_to_fix)
         # replace these constant parameters with their corresponding diagonals.
         fixed_weights_model = self.fix_node_weights(only_matmuls,weights_to_fix)
         onnx.checker.check_model(model=fixed_weights_model, full_check=True)
 
         errors = self.compare_models(self.path_flow, fixed_weights_model)
+        combined_model = None
         if errors >0:
             print(Fore.RED + 'Model has errors! do not use it.')
         else:
             fixed_weights_model = self.convert_to_IR_8(fixed_weights_model)
+            onnx.save(fixed_weights_model, f'{dir}/modified_model.onnx')
             flow_output = fixed_weights_model.graph.output[0].name
             classifier_input = classifier.graph.input[0].name
             combined_model = onnx.compose.merge_models(
@@ -118,7 +129,7 @@ class OnnxConverter(Experiment):
                 io_map=[(flow_output, classifier_input)]
             )
             onnx.checker.check_model(model=fixed_weights_model, full_check=True)
-            onnx.save(combined_model, f'{dir}/merged_model.onnx')
+            onnx.save(combined_model, combined_model_path)
 
         try:
             sys.path.append('/home/mustafa/repos/Marabou')
@@ -127,5 +138,8 @@ class OnnxConverter(Experiment):
             Marabou = None
         if Marabou:
             print(f'Marabou available! {Marabou}')
+            if combined_model:
+                self.dummy_verification(self.path_flow, self.path_classifier, combined_model_path, Marabou)
+
         else:
             print(Fore.RED + 'Marabou not found!')
