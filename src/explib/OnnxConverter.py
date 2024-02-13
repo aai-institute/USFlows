@@ -1,5 +1,6 @@
 import click
 import onnx
+from onnx import helper
 import onnxruntime as ort
 import os
 import sys
@@ -9,6 +10,7 @@ from datetime import datetime
 from src.explib.base import Experiment
 from colorama import Fore
 from sam4onnx import modify
+import numpy as np
 
 class OnnxConverter(Experiment):
 
@@ -78,20 +80,26 @@ class OnnxConverter(Experiment):
         # Iterate through all nodes in the model
         for node in model.graph.node:
             if node.op_type == "Mul":
+                matmul = onnx.helper.make_node(
+                    "MatMul",
+                    inputs=node.input,
+                    outputs=node.output,
+                )
+                model.graph.node.remove(node)
+                model.graph.node.append(matmul)
                 # Replace "Mul" node with "MatMul"
-                node.op_type = "MatMul"
-                for i in node.input:
+                for i in matmul.input:
                     if "Constant" in i or "trainable_layers.2.scale" in i\
                             or "trainable_layers.3.scale" in i\
                             or "trainable_layers.4.scale" in i:
-                        weights_to_fix  = weights_to_fix + [(node.name, i)]
+                        weights_to_fix  = weights_to_fix + [(matmul.name, i)]
         # Save the modified model
         return model, weights_to_fix
 
     def dummy_verification(self, unmodified_flow, classifier, combined_model_path, marabou):
         marabou.createOptions(verbosity=1)
-        print(f'reading{combined_model_path}')
-        marabou.read_onnx(combined_model_path)
+        print(f'reading{unmodified_flow}')
+        marabou.read_onnx(unmodified_flow)
 
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
