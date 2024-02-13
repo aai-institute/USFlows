@@ -1,16 +1,12 @@
-import click
 import onnx
-from onnx import helper
-import onnxruntime as ort
 import os
 import sys
-import torch
+import onnxruntime as ort
+import numpy as np
 
 from datetime import datetime
 from src.explib.base import Experiment
 from colorama import Fore
-from sam4onnx import modify
-import numpy as np
 
 class OnnxConverter(Experiment):
 
@@ -31,76 +27,35 @@ class OnnxConverter(Experiment):
         self.path_flow = path_flow
         self.path_classifier = path_classifier
 
-    def convert_to_IR_8(self, model):
-        model.ir_version = 8
-        return model
+    def dummy_verification(self, unmodified_flow, classifier, combined_model_path, marabou):
+        options = marabou.createOptions(verbosity = 1)
+        print(f'reading{combined_model_path}')
+        network = marabou.read_onnx(combined_model_path)
+        inputVars = network.inputVars[0]
+        outputVars = network.outputVars[0][0]
+        for i in range(len(inputVars)):
+            network.setLowerBound(inputVars[i], -1)
+            network.setUpperBound(inputVars[i], 1)
+        # Patch inside of the MarabouPy library on commit master: 3374ed71 fix (#720)
+        # is required due to the matmul layer there being considers as a single value multiplied with a vector,
+        # but that in our case is rather a pairwise mul of the vector.
+        # maraboupy / MarabouNetworkONNX.py
+        # in line -1123,7 +1123,7 in class MarabouNetworkONNX(MarabouNetwork.MarabouNetwork):
+        # e.addAddend(multiple[i], input1[i]) # changed from multiple to multiple[i]
 
-    def compare_models(self, model_unmodified_path, model_modified):
-        ort_sess_approved = ort.InferenceSession(model_unmodified_path)
-        ort_sess_modified = ort.InferenceSession(model_modified.SerializeToString())
-        diff_counter = 0
-        random_test_counts = 100
-        for i in range(random_test_counts):
-            x = torch.rand(100)
-            outputs_approved = ort_sess_approved.run(None, {'x.1': x.numpy()})
-            outputs_modified = ort_sess_modified.run(None, {'x.1': x.numpy()})
-            for i in range(len(outputs_approved[0])):
-                diff = abs(outputs_approved[0][i] - outputs_modified[0][i])
-                if diff > 0.001:
-                    diff_counter = diff_counter + 1
-                    print(diff)
-        print(f'diff counter: {diff_counter}')
-        return diff_counter
-
-    def fetch_weights(self, model, constant_name):
-        for ini in model.graph.initializer:
-            if ini.name in constant_name:
-                arr = onnx.numpy_helper.to_array(ini)
-                return arr
-        for node in model.graph.node:
-            if node.output[0] == constant_name:
-                arr = onnx.numpy_helper.to_array(node.attribute[0].t)
-                return arr
-
-    def fix_node_weights(self, model_without_muls, weights_to_fix):
-        modified_graph = model_without_muls
-        for (node_name,constant_name) in weights_to_fix:
-            numpy_weight = self.fetch_weights(model_without_muls, constant_name)
-            x = torch.from_numpy(numpy_weight)
-            x_diag = torch.diag(x)
-            modified_graph = modify(
-                onnx_graph=modified_graph,
-                op_name=node_name,
-                input_constants={constant_name: x_diag.numpy()}
-            )
-        return modified_graph
-
-    def replace_mul_with_matmul(self, model):
-        weights_to_fix = []
-        # Iterate through all nodes in the model
+        vals = network.solve(options=options)
+        print(vals)
+        assignments = [vals[1][i] for i in range(100)]
+        ort_sess_classifier = ort.InferenceSession(combined_model_path)
+        outputs_classifier = ort_sess_classifier.run(None, {'x.1': np.asarray(assignments).astype(np.float32)})
+        print(outputs_classifier)
+        vals[1]
+    def swap_mul_inputs(self, model):
         for node in model.graph.node:
             if node.op_type == "Mul":
-                matmul = onnx.helper.make_node(
-                    "MatMul",
-                    inputs=node.input,
-                    outputs=node.output,
-                )
-                model.graph.node.remove(node)
-                model.graph.node.append(matmul)
-                # Replace "Mul" node with "MatMul"
-                for i in matmul.input:
-                    if "Constant" in i or "trainable_layers.2.scale" in i\
-                            or "trainable_layers.3.scale" in i\
-                            or "trainable_layers.4.scale" in i:
-                        weights_to_fix  = weights_to_fix + [(matmul.name, i)]
-        # Save the modified model
-        return model, weights_to_fix
-
-    def dummy_verification(self, unmodified_flow, classifier, combined_model_path, marabou):
-        marabou.createOptions(verbosity=1)
-        print(f'reading{unmodified_flow}')
-        marabou.read_onnx(unmodified_flow)
-
+                if "Constant" in node.input[0]:
+                    node.input[0], node.input[1] = node.input[1], node.input[0]
+        return model
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
@@ -113,31 +68,20 @@ class OnnxConverter(Experiment):
         dir = f'{report_dir}/{self.name}/{curtime}'
         combined_model_path = f'{dir}/merged_model.onnx'
         os.makedirs(dir)
-        onnx.save(model, f'{dir}/unmodified_model.onnx')
         onnx.save(classifier, f'{dir}/classifier.onnx')
+        onnx.save(model, f'{dir}/unmodified_model.onnx')
 
-        # First replace each node of type mul with matmul and save the names of its constant parameters.
-        only_matmuls, weights_to_fix = self.replace_mul_with_matmul(model)
-        print(weights_to_fix)
-        # replace these constant parameters with their corresponding diagonals.
-        fixed_weights_model = self.fix_node_weights(only_matmuls,weights_to_fix)
-        onnx.checker.check_model(model=fixed_weights_model, full_check=True)
+        modified_model = self.swap_mul_inputs(model)
 
-        errors = self.compare_models(self.path_flow, fixed_weights_model)
         combined_model = None
-        if errors >0:
-            print(Fore.RED + 'Model has errors! do not use it.')
-        else:
-            fixed_weights_model = self.convert_to_IR_8(fixed_weights_model)
-            onnx.save(fixed_weights_model, f'{dir}/modified_model.onnx')
-            flow_output = fixed_weights_model.graph.output[0].name
-            classifier_input = classifier.graph.input[0].name
-            combined_model = onnx.compose.merge_models(
-                fixed_weights_model, classifier,
-                io_map=[(flow_output, classifier_input)]
-            )
-            onnx.checker.check_model(model=fixed_weights_model, full_check=True)
-            onnx.save(combined_model, combined_model_path)
+        flow_output = model.graph.output[0].name
+        classifier_input = classifier.graph.input[0].name
+        combined_model = onnx.compose.merge_models(
+            modified_model, classifier,
+            io_map=[(flow_output, classifier_input)]
+        )
+        onnx.checker.check_model(model=combined_model, full_check=True)
+        onnx.save(combined_model, combined_model_path)
 
         try:
             sys.path.append('/home/mustafa/repos/Marabou')
@@ -148,6 +92,5 @@ class OnnxConverter(Experiment):
             print(f'Marabou available! {Marabou}')
             if combined_model:
                 self.dummy_verification(self.path_flow, self.path_classifier, combined_model_path, Marabou)
-
         else:
             print(Fore.RED + 'Marabou not found!')
