@@ -46,7 +46,7 @@ class Flow(torch.nn.Module):
         base_distribution,
         layers,
         soft_training: bool = False,
-        training_noise_prior=dist.Laplace(0, 1e-6),
+        training_noise_prior=dist.Uniform(0, 1e-6),
         *args,
         **kwargs,
     ) -> None:

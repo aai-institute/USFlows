@@ -40,7 +40,7 @@ experiments:
         params:
           soft_training: true
           training_noise_prior:
-            __object__: pyro.distributions.Laplace
+            __object__: pyro.distributions.Uniform
             loc: 0.0
             scale: 0.001
           prior_scale: 1.0
@@ -51,7 +51,7 @@ experiments:
           nonlinearity: &nonlinearity 
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 
-            __eval__: tune.choice([50])
+            __eval__: tune.choice([i for i in range(50, 393)])
           base_distribution: 
             __object__: pyro.distributions.Laplace
             loc: 

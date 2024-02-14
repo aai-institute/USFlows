@@ -5,8 +5,7 @@ import os
 import shutil
 import typing as T
 from datetime import datetime
-from typing import Any, Dict, Iterable, Literal, Optional
-import warnings
+from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -14,10 +13,7 @@ from pickle import dump
 from PIL import Image
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from matplotlib import pyplot as plt
 import plotly.express as px
-from pyro import distributions as dist
-from pyro.distributions.transforms import AffineCoupling, Permute
 import ray
 from ray import tune
 from ray.air import RunConfig, session
@@ -187,7 +183,6 @@ class HyperoptExperiment(Experiment):
             tuner_config = {}
 
         exptime = str(datetime.now())
-        trial_config = self.trial_config
         tuner = tune.Tuner(
             tune.with_resources(
                 tune.with_parameters(HyperoptExperiment._trial),
@@ -222,6 +217,7 @@ class HyperoptExperiment(Experiment):
         self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
         ray.shutdown()
     
+    @classmethod
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
         trial_id = best_result.trial_id
         id = f"exp_{exp_id}_{trial_id}"
@@ -256,7 +252,8 @@ class HyperoptExperiment(Experiment):
         )
         
         return best_result
-        
+    
+    @classmethod  
     def _build_report(self, expdir: str, report_file: str, config_prefix: str = "") -> pd.DataFrame:
         """Builds a report of the hyperopt experiment.
 
