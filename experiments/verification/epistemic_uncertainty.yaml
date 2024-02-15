@@ -1,0 +1,5 @@
+---
+__object__: src.explib.OnnxConverter.OnnxConverter
+name: epistemic_uncertainty_verification
+path_flow: &path_flow "/home/mustafa/repos/VeriFlow/src/explib/model_forward.onnx"
+path_classifier: &path_classifier "/home/mustafa/repos/VeriFlow/src/explib/MnistSimpleClassifier.onnx"

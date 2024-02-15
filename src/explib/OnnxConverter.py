@@ -55,23 +55,26 @@ class OnnxConverter(Experiment):
                     node.input[0], node.input[1] = node.input[1], node.input[0]
         return model
 
+    def fetch_directory(self, report_dir):
+        curtime = str(datetime.now()).replace(" ", "")
+        directory = f'{report_dir}/{self.name}/{curtime}'
+        os.makedirs(directory)
+        return directory
+
+    def save_model(self, model, directory, modelname):
+        saved_path = f'{directory}/{modelname}'
+        onnx.save(model, f'{directory}/{modelname}')
+        return saved_path
+
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
         classifier = onnx.load(self.path_classifier)
-
-        # save input models into the reports target folder.
-        # Might be redundant in the sense that the input models are most likely already saved elsewhere.
-        # This way we can make sure that
-        curtime = str(datetime.now()).replace(" ", "")
-        dir = f'{report_dir}/{self.name}/{curtime}'
-        combined_model_path = f'{dir}/merged_model.onnx'
-        os.makedirs(dir)
-        onnx.save(classifier, f'{dir}/classifier.onnx')
-        onnx.save(model, f'{dir}/unmodified_model.onnx')
+        directory = self.fetch_directory(report_dir)
+        self.save_model(model, directory, "unmodified_model.onnx")
+        self.save_model(classifier, directory, "classifier.onnx")
 
         modified_model = self.swap_mul_inputs(model)
 
-        combined_model = None
         flow_output = model.graph.output[0].name
         classifier_input = classifier.graph.input[0].name
         combined_model = onnx.compose.merge_models(
@@ -79,7 +82,7 @@ class OnnxConverter(Experiment):
             io_map=[(flow_output, classifier_input)]
         )
         onnx.checker.check_model(model=combined_model, full_check=True)
-        onnx.save(combined_model, combined_model_path)
+        combined_model_path = self.save_model(combined_model, directory, "merged_model.onnx")
 
         try:
             sys.path.append('/home/mustafa/repos/Marabou')
