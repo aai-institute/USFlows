@@ -27,21 +27,19 @@ class OnnxConverter(Experiment):
         self.path_flow = path_flow
         self.path_classifier = path_classifier
 
-    def dummy_verification(self, unmodified_flow, classifier, combined_model_path, marabou):
-        options = marabou.createOptions(verbosity = 1)
+    def dummy_verification(self, unmodified_flow, classifier, combined_model_path, maraboupy):
+        options = maraboupy.Marabou.createOptions(verbosity = 1)
         print(f'reading{combined_model_path}')
-        network = marabou.read_onnx(combined_model_path)
+        network = maraboupy.Marabou.read_onnx(combined_model_path)
         inputVars = network.inputVars[0]
         outputVars = network.outputVars[0][0]
         for i in range(len(inputVars)):
             network.setLowerBound(inputVars[i], -1)
             network.setUpperBound(inputVars[i], 1)
-        # Patch inside of the MarabouPy library on commit master: 3374ed71 fix (#720)
-        # is required due to the matmul layer there being considers as a single value multiplied with a vector,
-        # but that in our case is rather a pairwise mul of the vector.
-        # maraboupy / MarabouNetworkONNX.py
-        # in line -1123,7 +1123,7 in class MarabouNetworkONNX(MarabouNetwork.MarabouNetwork):
-        # e.addAddend(multiple[i], input1[i]) # changed from multiple to multiple[i]
+
+        for j in range(len(outputVars)):
+            eq_verified = maraboupy.Marabou.MarabouCore.Equation(maraboupy.Marabou.MarabouCore.Equation.EQ)
+            network.addConstraint(maraboupy.MarabouPythonic.Var(outputVars[0]) <= maraboupy.MarabouPythonic.Var(outputVars[1]))
 
         vals = network.solve(options=options)
         print(vals)
@@ -49,7 +47,7 @@ class OnnxConverter(Experiment):
         ort_sess_classifier = ort.InferenceSession(combined_model_path)
         outputs_classifier = ort_sess_classifier.run(None, {'x.1': np.asarray(assignments).astype(np.float32)})
         print(outputs_classifier)
-        vals[1]
+
     def swap_mul_inputs(self, model):
         for node in model.graph.node:
             if node.op_type == "Mul":
@@ -86,11 +84,12 @@ class OnnxConverter(Experiment):
         try:
             sys.path.append('/home/mustafa/repos/Marabou')
             from maraboupy import Marabou
+            import maraboupy
         except ImportError:
             Marabou = None
         if Marabou:
             print(f'Marabou available! {Marabou}')
             if combined_model:
-                self.dummy_verification(self.path_flow, self.path_classifier, combined_model_path, Marabou)
+                self.dummy_verification(self.path_flow, self.path_classifier, combined_model_path, maraboupy)
         else:
             print(Fore.RED + 'Marabou not found!')
