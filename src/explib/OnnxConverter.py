@@ -43,6 +43,9 @@ class OnnxConverter(Experiment):
 
     @staticmethod
     def swap_mul_inputs(self, model):
+        # Ensures that the second input to the mul node is the constant node (and not the variable).
+        # This constraint is imposed by the marabou library that implicitly
+        # assumes the first input to be the variable and the second the constant factor.
         for node in model.graph.node:
             if node.op_type == "Mul":
                 if "Constant" in node.input[0]:
