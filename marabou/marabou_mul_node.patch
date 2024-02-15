@@ -1,0 +1,24 @@
+diff --git a/maraboupy/MarabouNetworkONNX.py b/maraboupy/MarabouNetworkONNX.py
+index 0ebf69ee..ca3a9b49 100644
+--- a/maraboupy/MarabouNetworkONNX.py
++++ b/maraboupy/MarabouNetworkONNX.py
+@@ -1119,6 +1119,7 @@ class MarabouNetworkONNX(MarabouNetwork.MarabouNetwork):
+             return
+ 
+         multiple = self.constantMap[inputName2]
++        multiple_is_array = hasattr(multiple,"__len__")
+         input1 = self.varMap[inputName1]
+         outputVariables = self.makeNewVariables(nodeName)
+         input1 = input1.reshape(-1)
+@@ -1126,7 +1127,10 @@ class MarabouNetworkONNX(MarabouNetwork.MarabouNetwork):
+ 
+         for i in range(len(input1)):
+             e = MarabouUtils.Equation()
+-            e.addAddend(multiple, input1[i])
++            if multiple_is_array:
++                e.addAddend(multiple[i], input1[i])
++            else:
++                e.addAddend(multiple, input1[i])
+             e.addAddend(-1, outputVariables[i])
+             e.setScalar(0.0)
+             self.addEquation(e)
