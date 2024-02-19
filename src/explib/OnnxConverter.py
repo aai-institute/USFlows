@@ -22,7 +22,7 @@ class OnnxConverter(Experiment):
         self.path_classifier = path_classifier
 
     @staticmethod
-    def dummy_verification(self, combined_model_path, maraboupy):
+    def dummy_verification(combined_model_path, maraboupy):
         options = maraboupy.Marabou.createOptions(verbosity=1)
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
@@ -42,7 +42,7 @@ class OnnxConverter(Experiment):
         print(f' outputs of the classifier using onnxruntime: {outputs_classifier}')
 
     @staticmethod
-    def swap_mul_inputs(self, model):
+    def swap_mul_inputs(model):
         # Ensures that the second input to the mul node is the constant node (and not the variable).
         # This constraint is imposed by the marabou library that implicitly
         # assumes the first input to be the variable and the second the constant factor.
@@ -59,13 +59,13 @@ class OnnxConverter(Experiment):
         return directory
 
     @staticmethod
-    def save_model(self, model, directory, model_name):
+    def save_model(model, directory, model_name):
         saved_path = f'{directory}/{model_name}'
         onnx.save(model, f'{directory}/{model_name}')
         return saved_path
 
     @staticmethod
-    def merge_models(self, modified_model, classifier):
+    def merge_models(modified_model, classifier):
         flow_output = modified_model.graph.output[0].name
         classifier_input = classifier.graph.input[0].name
         combined_model = onnx.compose.merge_models(
