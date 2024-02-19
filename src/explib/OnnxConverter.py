@@ -23,18 +23,41 @@ class OnnxConverter(Experiment):
 
     @staticmethod
     def dummy_verification(combined_model_path, maraboupy):
+
+        # -------------------------------------
+        #for i in range(len(input_vars)):
+        #    network.setLowerBound(input_vars[i], -1)
+        #    network.setUpperBound(input_vars[i], 1)
+
+        # -------------------------------------
+
+
         options = maraboupy.Marabou.createOptions(verbosity=1)
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        for i in range(len(input_vars)):
-            network.setLowerBound(input_vars[i], -1)
-            network.setUpperBound(input_vars[i], 1)
+        threshold_input = 91.5
+        lower_bound = -1.0 * threshold_input
+        upper_bound = threshold_input
+        num_vars = network.numVars
+        redundant_vars = [i for i in range(num_vars, num_vars+100)]
+        ones = [1.0 for i in range(len(redundant_vars))]
+        network.numVars = num_vars + 100 # add 100 additional variables that will encode the abs of the input vars.
+        for i in range(100):
+            network.setLowerBound(i, lower_bound)
+            network.setUpperBound(i, upper_bound)
+            network.addAbsConstraint(i, num_vars+i)
+        network.addInequality(redundant_vars, ones, 18.0)
+
+
 
         var = maraboupy.MarabouPythonic.Var
         network.addConstraint(var(output_vars[0]) <= var(output_vars[1]))
+
         vals = network.solve(options=options)
+
         assignments = [vals[1][i] for i in range(100)]
+        print(f'sum of assignments  {sum(assignments)}')
         ort_sess_classifier = ort.InferenceSession(combined_model_path)
         outputs_classifier = ort_sess_classifier.run(
             None,
@@ -54,7 +77,7 @@ class OnnxConverter(Experiment):
 
     def fetch_directory(self, report_dir):
         current_time = str(datetime.now()).replace(" ", "")
-        directory = f'{report_dir}/{self.name}/{current_time}'
+        directory = f'  {report_dir}/{self.name}/{current_time}'
         os.makedirs(directory)
         return directory
 
@@ -82,6 +105,7 @@ class OnnxConverter(Experiment):
         self.save_model(model, directory, "unmodified_model.onnx")
         self.save_model(classifier, directory, "classifier.onnx")
         modified_model = self.swap_mul_inputs(model)
+
         combined_model = self.merge_models(modified_model,classifier)
         combined_model_path = self.save_model(combined_model, directory, "merged_model.onnx")
 
