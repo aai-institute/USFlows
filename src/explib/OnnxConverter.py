@@ -7,6 +7,8 @@ import numpy
 from datetime import datetime
 from src.explib.base import Experiment
 from colorama import Fore
+from matplotlib import pyplot as plt
+import torch
 
 
 class OnnxConverter(Experiment):
@@ -27,7 +29,7 @@ class OnnxConverter(Experiment):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        threshold_input = 91.5  # central 20% of the laplace distribution
+        threshold_input = 77.96830158049467  # ~ central 1% of the laplace distribution
         lower_bound = -1.0 * threshold_input
         upper_bound = threshold_input
         num_vars = network.numVars
@@ -41,9 +43,9 @@ class OnnxConverter(Experiment):
         network.addInequality(redundant_vars, ones, threshold_input)
 
         var = maraboupy.MarabouPythonic.Var
-        target_class = 9
-        imposter_class = 4
-        delta_target_imposter = 5
+        target_class = 0
+        imposter_class = 6
+        delta_target_imposter = 1
         for i in range(len(output_vars)):
             network.addConstraint(var(output_vars[i]) <= var(output_vars[target_class]))
 
@@ -51,12 +53,13 @@ class OnnxConverter(Experiment):
         vals = network.solve(options=options)
 
         assignments = [vals[1][i] for i in range(100)]
-        print(f'sum of assignments  {sum(assignments)}')
+        print(f'sum of assignments  {sum([abs(ele) for ele in assignments])}')
         ort_sess_classifier = ort.InferenceSession(combined_model_path)
-        outputs_classifier = ort_sess_classifier.run(
+        outputs_combined_model = ort_sess_classifier.run(
             None,
-            {'x.1': numpy.asarray(assignments).astype(numpy.float32)})
-        print(f' outputs of the classifier using onnxruntime: {outputs_classifier}')
+            {'onnx::MatMul_0': numpy.asarray(assignments).astype(numpy.float32)})  #before x.1
+        print(f' outputs of the combined model using onnxruntime: {outputs_combined_model}')
+        return numpy.asarray(assignments).astype(numpy.float32)
 
     @staticmethod
     def swap_mul_inputs(model):
@@ -96,8 +99,8 @@ class OnnxConverter(Experiment):
         model = onnx.load(self.path_flow)
         classifier = onnx.load(self.path_classifier)
         directory = self.fetch_directory(report_dir)
-        self.save_model(model, directory, "unmodified_model.onnx")
-        self.save_model(classifier, directory, "classifier.onnx")
+        unmodified_model_path = self.save_model(model, directory, "unmodified_model.onnx")
+        classifier_path = self.save_model(classifier, directory, "classifier.onnx")
         modified_model = self.swap_mul_inputs(model)
 
         combined_model = self.merge_models(modified_model,classifier)
@@ -112,6 +115,25 @@ class OnnxConverter(Experiment):
         if Marabou:
             print(f'Marabou available! {Marabou}')
             if combined_model:
-                self.dummy_verification(combined_model_path, maraboupy)
+                counter_example = self.dummy_verification(combined_model_path, maraboupy)
+
+                #counter_example = numpy.ones(100).astype(numpy.float32) # only to check whether the flow works
+
+                ort_sess_classifier = ort.InferenceSession(unmodified_model_path)
+                outputs_flow_image = ort_sess_classifier.run(
+                    None,
+                    {'onnx::MatMul_0': counter_example})  # before x.1
+                print(f'outputs_flow_image {outputs_flow_image}')
+                plt.imshow(torch.tensor(outputs_flow_image).view(10, 10), cmap='gray', vmin=numpy.min(outputs_flow_image[0]), vmax = numpy.max(outputs_flow_image[0]))
+                plt.savefig(f'{directory}/counterexample.png')
+                numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
+
+                ort_sess_classifier = ort.InferenceSession(classifier_path)
+                outputs_classifier = ort_sess_classifier.run(
+                    None,
+                    {'onnx::MatMul_0': numpy.array(outputs_flow_image[0])})
+                print(f'outputs_classifier {outputs_classifier}')
+                numpy.save(file=f'{directory}/classifications.npy', arr=outputs_classifier)
+
         else:
             print(Fore.RED + 'Marabou not found!')
