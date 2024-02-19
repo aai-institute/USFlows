@@ -23,37 +23,31 @@ class OnnxConverter(Experiment):
 
     @staticmethod
     def dummy_verification(combined_model_path, maraboupy):
-
-        # -------------------------------------
-        #for i in range(len(input_vars)):
-        #    network.setLowerBound(input_vars[i], -1)
-        #    network.setUpperBound(input_vars[i], 1)
-
-        # -------------------------------------
-
-
         options = maraboupy.Marabou.createOptions(verbosity=1)
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        threshold_input = 91.5
+        threshold_input = 91.5  # central 20% of the laplace distribution
         lower_bound = -1.0 * threshold_input
         upper_bound = threshold_input
         num_vars = network.numVars
         redundant_vars = [i for i in range(num_vars, num_vars+100)]
         ones = [1.0 for i in range(len(redundant_vars))]
-        network.numVars = num_vars + 100 # add 100 additional variables that will encode the abs of the input vars.
+        network.numVars = num_vars + 100  # add 100 additional variables that will encode the abs of the input vars.
         for i in range(100):
             network.setLowerBound(i, lower_bound)
             network.setUpperBound(i, upper_bound)
             network.addAbsConstraint(i, num_vars+i)
-        network.addInequality(redundant_vars, ones, 18.0)
-
-
+        network.addInequality(redundant_vars, ones, threshold_input)
 
         var = maraboupy.MarabouPythonic.Var
-        network.addConstraint(var(output_vars[0]) <= var(output_vars[1]))
+        target_class = 9
+        imposter_class = 4
+        delta_target_imposter = 5
+        for i in range(len(output_vars)):
+            network.addConstraint(var(output_vars[i]) <= var(output_vars[target_class]))
 
+        network.addConstraint(var(output_vars[imposter_class]) >= var(output_vars[target_class]) - delta_target_imposter)
         vals = network.solve(options=options)
 
         assignments = [vals[1][i] for i in range(100)]
