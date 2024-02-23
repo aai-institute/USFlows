@@ -1,6 +1,8 @@
 from copy import deepcopy
 import os
 import typing as T
+from pathlib import Path
+from typing import Optional
 
 
 class Experiment(object):
@@ -38,6 +40,17 @@ class Experiment(object):
     ) -> None:
         """Conducts the experiment and saves the results to the report directory. The method is expected to store all results in report_dir."""
         raise NotImplementedError
+
+    def run_cli(self):
+        def main(storage_path: Optional[str] = None, report_dir: str ="./reports"):
+            """
+            :param storage_path: Path to Ray storage directory. Defaults to None.
+            :param report_dir: Directory to save report to.
+            """
+            self.conduct(report_dir=Path(report_dir), storage_path=Path(storage_path))
+
+        from jsonargparse import CLI
+        CLI(main)
 
 
 class ExperimentCollection(Experiment):
