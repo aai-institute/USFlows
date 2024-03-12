@@ -31,6 +31,7 @@ bayesian-optimization = "^1.4.3"
 tensorboard = "^2.15.1"
 torchvision = "^0.16.2"
 traitlets = "5.9.0"
+sympy = "^1.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
