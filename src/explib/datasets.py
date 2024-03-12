@@ -192,6 +192,8 @@ class SyntheticDataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int):
         if isinstance(self.dataset, np.ndarray):
             x = self.dataset[index].copy()
+        else:
+            x = self.dataset[index]
         if not isinstance(x, Tensor):
             x = Tensor(x)
         return x, torch.zeros_like(x)

@@ -22,6 +22,7 @@ class Flow(torch.nn.Module):
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
     export: export_modes = "log_prob"
+    device = "cpu"
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -267,7 +268,7 @@ class NiceFlow(Flow):
         nonlinearity: Optional[torch.nn.Module] = None,
         masktype: mask = "half",
         use_lu: bool = True,
-        prior_scale: float = 1.0,
+        prior_scale: Optional[float] = None,
         soft_training: bool = False,
         *args,
         **kwargs,

@@ -217,7 +217,6 @@ class HyperoptExperiment(Experiment):
         self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
         ray.shutdown()
     
-    @classmethod
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
         trial_id = best_result.trial_id
         id = f"exp_{exp_id}_{trial_id}"
