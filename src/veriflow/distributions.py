@@ -39,7 +39,66 @@ class RotatedLaplace(torch.distributions.Distribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.laplace.log_prob(torch.matmul(x, self.rotation.t()))
+ 
+from torch.distributions import Distribution, Chi2
+
+class Chi(Distribution):
+    arg_constraints = {"df": constraints.positive}
+    support = constraints.positive
+    has_enumerate_support = False  
     
+    def __init__(self, df, validate_args=None):
+        """
+        Initialize the Chi distribution with degrees of freedom `df`.
+        Args:
+            df (Tensor): degrees of freedom.
+            validate_args (bool, optional): Whether to validate input parameters. Default: None.
+        """
+        self.chi2 = Chi2(df)
+        self.df = df
+        super(Chi, self).__init__(self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args)
+        
+    def sample(self, sample_shape=torch.Size()):
+        """
+        Generate samples from the Chi distribution.
+        Args:
+            sample_shape (torch.Size, optional): The size of the sample to draw. Default: torch.Size().
+        Returns:
+            Tensor: A sample of the specified shape.
+        """
+        return torch.sqrt(self.chi2.sample(sample_shape))
+    
+    def log_prob(self, value):
+        """
+        Calculate the log probability of a given value.
+        Args:
+            value (Tensor): The value at which to evaluate the log probability.
+        Returns:
+            Tensor: The log probability of the value.
+        """
+        y = value ** 2
+        return self.chi2.log_prob(y) + torch.log(value * 2)
+    
+    def cdf(self, value):
+        """
+        Calculate the cumulative distribution function (CDF) at a given value.
+        Args:
+            value (Tensor): The value at which to evaluate the CDF.
+        Returns:
+            Tensor: The CDF of the value.
+        """
+        y = value ** 2
+        return self.chi2.cdf(y)
+    
+    def entropy(self):
+        """
+        Calculate the entropy of the distribution.
+        Returns:
+            Tensor: The entropy of the distribution.
+        """
+        return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
+ 
+   
 class UniformUnitLpBall(torch.distributions.Distribution):
     """Implements a uniform distribution on the unit ball."""
     
@@ -98,10 +157,10 @@ class RadialDistribution(torch.distributions.Distribution):
     Args:
         loc: Location of the distribution
         radial_distribution: Distribution of the radial component
-        p: Exponent of the Lp norm used to define the distribution. Currently p = 1, 2, and inf are supported.
+        p: Exponent of the Lp norm used to define the distribution. Currently, p = 1, 2, and inf are supported.
     """
     arg_constraints = {"loc": constraints.real}
-    support = constraints.real
+    support = constraints.positive
     has_enumerate_support = False  
     
     def __init__(self, loc: torch.Tensor, radial_distribution: torch.distributions.Distribution, p: float):
