@@ -8,7 +8,9 @@ from datetime import datetime
 from src.explib.base import Experiment
 from colorama import Fore
 from matplotlib import pyplot as plt
+from scipy.stats import norm
 import torch
+import math
 
 
 class OnnxConverter(Experiment):
@@ -23,19 +25,25 @@ class OnnxConverter(Experiment):
         self.path_flow = path_flow
         self.path_classifier = path_classifier
 
-    @staticmethod
-    def dummy_verification(combined_model_path, maraboupy):
+
+    def quantile_log_normal(self, p, mu=1, sigma=0.5):
+        return math.exp(mu + sigma * norm.ppf(p))
+
+
+    def dummy_verification(self, combined_model_path, maraboupy, directory):
         options = maraboupy.Marabou.createOptions(verbosity=1)
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        threshold_input = 77.96830158049467  # ~ central 1% of the laplace distribution
+        threshold_input = self.quantile_log_normal(p=0.001)# ~ central p fraction of the radial distribution
+        print(f'threshold_input: {threshold_input}')
         lower_bound = -1.0 * threshold_input
         upper_bound = threshold_input
         num_vars = network.numVars
-        redundant_vars = [i for i in range(num_vars, num_vars+100)]
+        rendundant_var_count = 100
+        redundant_vars = [i for i in range(num_vars, num_vars + rendundant_var_count)]
         ones = [1.0 for i in range(len(redundant_vars))]
-        network.numVars = num_vars + 100  # add 100 additional variables that will encode the abs of the input vars.
+        network.numVars = num_vars + rendundant_var_count  # add 100 additional variables that will encode the abs of the input vars.
         for i in range(100):
             network.setLowerBound(i, lower_bound)
             network.setUpperBound(i, upper_bound)
@@ -45,12 +53,12 @@ class OnnxConverter(Experiment):
         var = maraboupy.MarabouPythonic.Var
         target_class = 0
         imposter_class = 6
-        delta_target_imposter = 1
+        delta_target_imposter = 0.1
         for i in range(len(output_vars)):
             network.addConstraint(var(output_vars[i]) <= var(output_vars[target_class]))
 
         network.addConstraint(var(output_vars[imposter_class]) >= var(output_vars[target_class]) - delta_target_imposter)
-        vals = network.solve(options=options)
+        vals = network.solve(filename =f'{directory}/marabou-output.txt', options=options)
 
         assignments = [vals[1][i] for i in range(100)]
         print(f'sum of assignments  {sum([abs(ele) for ele in assignments])}')
@@ -115,16 +123,13 @@ class OnnxConverter(Experiment):
         if Marabou:
             print(f'Marabou available! {Marabou}')
             if combined_model:
-                counter_example = self.dummy_verification(combined_model_path, maraboupy)
-
-                #counter_example = numpy.ones(100).astype(numpy.float32) # only to check whether the flow works
-
+                counter_example = self.dummy_verification(combined_model_path, maraboupy, directory)
                 ort_sess_classifier = ort.InferenceSession(unmodified_model_path)
                 outputs_flow_image = ort_sess_classifier.run(
                     None,
                     {'onnx::MatMul_0': counter_example})  # before x.1
                 print(f'outputs_flow_image {outputs_flow_image}')
-                plt.imshow(torch.tensor(outputs_flow_image).view(10, 10), cmap='gray', vmin=numpy.min(outputs_flow_image[0]), vmax = numpy.max(outputs_flow_image[0]))
+                plt.imshow(torch.tensor(outputs_flow_image).view(10, 10), cmap='gray')
                 plt.savefig(f'{directory}/counterexample.png')
                 numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
 
