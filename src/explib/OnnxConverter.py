@@ -35,7 +35,7 @@ class OnnxConverter(Experiment):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        threshold_input = self.quantile_log_normal(p=0.3)# ~ central p fraction of the radial distribution
+        threshold_input = self.quantile_log_normal(p=0.1171875)# ~ central p fraction of the radial distribution
         print(f'threshold_input: {threshold_input}')
         num_vars = network.numVars
         redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
@@ -127,7 +127,9 @@ class OnnxConverter(Experiment):
                     None,
                     {'onnx::MatMul_0': counter_example})  # before x.1
                 print(f'outputs_flow_image {outputs_flow_image}')
-                plt.imshow(torch.tensor(outputs_flow_image).view(10, 10), cmap='gray')
+                sample = outputs_flow_image
+                sample = numpy.uint8(numpy.clip(sample, 0, 1) * 255)
+                plt.imshow(torch.tensor(sample).view(10, 10), cmap='gray')
                 plt.savefig(f'{directory}/counterexample.png')
                 numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
                 numpy.savetxt(f'{directory}/counter_example.txt', counter_example)
