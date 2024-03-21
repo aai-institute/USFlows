@@ -38,12 +38,14 @@ class OnnxConverter(Experiment):
         threshold_input = self.quantile_log_normal(p=0.3)# ~ central p fraction of the radial distribution
         print(f'threshold_input: {threshold_input}')
         num_vars = network.numVars
-        rendundant_var_count = 100
-        redundant_vars = [i for i in range(num_vars, num_vars + rendundant_var_count)]
+        redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
+        redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
         ones = [1.0 for i in range(len(redundant_vars))]
-        network.numVars = num_vars + rendundant_var_count  # add 100 additional variables that will encode the abs of the input vars.
-        for i in range(100):
-            network.addAbsConstraint(i, num_vars+i)
+        network.numVars = num_vars + redundant_var_count  # add 100 additional variables that will encode the abs of the input vars.
+        for i in range(redundant_var_count):
+            # sets the value of the new variables as the abs value of the input
+            network.addAbsConstraint(i, redundant_vars[i])
+        # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
         network.addInequality(redundant_vars, ones, threshold_input)
 
         var = maraboupy.MarabouPythonic.Var
