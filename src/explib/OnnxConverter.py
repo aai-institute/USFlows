@@ -35,25 +35,21 @@ class OnnxConverter(Experiment):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         input_vars = network.inputVars[0]
         output_vars = network.outputVars[0][0]
-        threshold_input = self.quantile_log_normal(p=0.001)# ~ central p fraction of the radial distribution
+        threshold_input = self.quantile_log_normal(p=0.3)# ~ central p fraction of the radial distribution
         print(f'threshold_input: {threshold_input}')
-        lower_bound = -1.0 * threshold_input
-        upper_bound = threshold_input
         num_vars = network.numVars
         rendundant_var_count = 100
         redundant_vars = [i for i in range(num_vars, num_vars + rendundant_var_count)]
         ones = [1.0 for i in range(len(redundant_vars))]
         network.numVars = num_vars + rendundant_var_count  # add 100 additional variables that will encode the abs of the input vars.
         for i in range(100):
-            network.setLowerBound(i, lower_bound)
-            network.setUpperBound(i, upper_bound)
             network.addAbsConstraint(i, num_vars+i)
         network.addInequality(redundant_vars, ones, threshold_input)
 
         var = maraboupy.MarabouPythonic.Var
         target_class = 0
         imposter_class = 6
-        delta_target_imposter = 0.1
+        delta_target_imposter = 1
         for i in range(len(output_vars)):
             network.addConstraint(var(output_vars[i]) <= var(output_vars[target_class]))
 
@@ -132,6 +128,7 @@ class OnnxConverter(Experiment):
                 plt.imshow(torch.tensor(outputs_flow_image).view(10, 10), cmap='gray')
                 plt.savefig(f'{directory}/counterexample.png')
                 numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
+                numpy.savetxt(f'{directory}/counter_example.txt', counter_example)
 
                 ort_sess_classifier = ort.InferenceSession(classifier_path)
                 outputs_classifier = ort_sess_classifier.run(
@@ -139,6 +136,7 @@ class OnnxConverter(Experiment):
                     {'onnx::MatMul_0': numpy.array(outputs_flow_image[0])})
                 print(f'outputs_classifier {outputs_classifier}')
                 numpy.save(file=f'{directory}/classifications.npy', arr=outputs_classifier)
+                numpy.savetxt(f'{directory}/classifications.txt', outputs_classifier)
 
         else:
             print(Fore.RED + 'Marabou not found!')
