@@ -61,7 +61,7 @@ class OnnxConverter(Experiment):
         # confidence is lower than indicated by the threshold.
         coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
         print(coefficients_classifier)
-        confidence_threshold = 0.3
+        confidence_threshold = 0.5
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
         network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
 
