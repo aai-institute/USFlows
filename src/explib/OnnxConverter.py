@@ -30,36 +30,32 @@ class OnnxConverter(Experiment):
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
 
-
-    def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class):
-        network = maraboupy.Marabou.read_onnx(classifier_path)
-        # Add 100 additional variables that will encode the abs of the input vars.
-        for i in range(len(network.inputVars[0])):
-            # sets the value of the new variables as the abs value of the input
-            network.setLowerBound(i, 0)
-            network.setUpperBound(i, 255)
-        # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
-
+    def add_post_condition(self, network, target_class, maraboupy):
         var = maraboupy.MarabouPythonic.Var
         output_vars = network.outputVars[0][0]
-        # Add inequalities that ensure that the input is classified as 0
+        # Add inequalities that ensure that the input is classified as target_class
         for i in range(len(output_vars)):
             if not i == target_class:
-                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.01)
+                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
 
         # Now add the confidence term that ensures that the input is classified with high confidence.
         # Since we look for counter examples, check for violations. I.e. instances where the
         # confidence is lower than indicated by the threshold.
         coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
-        print(coefficients_classifier)
-        confidence_threshold = 5.0
+        confidence_threshold = 50.0
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
         network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
+
+    def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class):
+        network = maraboupy.Marabou.read_onnx(classifier_path)
+        for i in range(len(network.inputVars[0])):
+            network.setLowerBound(i, 0)
+            network.setUpperBound(i, 255)
+        self.add_post_condition(network, target_class, maraboupy)
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1))
         assignments = [vals[1][i] for i in range(100)]
         return numpy.asarray(assignments).astype(numpy.float32)
-
 
 
     def verify_merged_model(self, combined_model_path, maraboupy, directory, target_class):
@@ -77,27 +73,16 @@ class OnnxConverter(Experiment):
         # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
         network.addInequality(redundant_vars, ones, threshold_input)
 
-        var = maraboupy.MarabouPythonic.Var
-        output_vars = network.outputVars[0][0]
-        # Add inequalities that ensure that the input is classified as 0
-        for i in range(len(output_vars)):
-            if not i == target_class:
-                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
-
-        # Now add the confidence term that ensures that the input is classified with high confidence.
-        # Since we look for counter examples, check for violations. I.e. instances where the
-        # confidence is lower than indicated by the threshold.
-        coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
-        print(coefficients_classifier)
-        confidence_threshold = 50.0
-        # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
-        network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
+        self.add_post_condition(network, target_class, maraboupy)
 
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1))
 
         assignments = [vals[1][i] for i in range(100)]
-        print(f'sum of assignments  {sum([abs(ele) for ele in assignments])}')
+        sum_of_assignments = sum([abs(ele) for ele in assignments])
+        if sum_of_assignments > threshold_input + 0.001:
+            print(Fore.RED + f'ERROR: sum of abs assignments exceeds threshold')
+            sys.exit(0)
         return numpy.asarray(assignments).astype(numpy.float32)
 
 
@@ -135,19 +120,9 @@ class OnnxConverter(Experiment):
         onnx.checker.check_model(model=combined_model, full_check=True)
         return combined_model
 
-    def analyze_result(self, model_path, counterexample, target_class):
-        ort_sess_classifier = ort.InferenceSession(model_path)
-        outputs_combined_model = ort_sess_classifier.run(
-            None,
-            {'onnx::MatMul_0': counterexample})  # before x.1
-        print(f' outputs of the combined model using onnxruntime: {outputs_combined_model}')
-        logits = numpy.asarray(outputs_combined_model[0]).astype(numpy.float32)
-        print(f'max at position {numpy.argmax(logits)} and target is {target_class}')
-        print(
-            f'confidence: {(len(logits) * logits[target_class] - (numpy.sum(logits) - logits[target_class])) / len(logits)}')
 
-    def fill_report(self, image, counter_example, directory, classifier_path):
 
+    def fill_report(self, image, counter_example, directory, classifier_path, target_class):
         sample = image
         sample = numpy.uint8(numpy.clip(sample, 0, 1) * 255)
         plt.imshow(torch.tensor(sample).view(10, 10), cmap='gray')
@@ -158,9 +133,13 @@ class OnnxConverter(Experiment):
         outputs_classifier = ort_sess_classifier.run(
             None,
             {'onnx::MatMul_0': numpy.array(image)})
-        print(f'outputs_classifier {outputs_classifier}')
+        logits = numpy.asarray(outputs_classifier[0]).astype(numpy.float32)
+        confidence = (len(logits) * logits[target_class] - (numpy.sum(logits) - logits[target_class])) / len(logits)
+        classified_as = numpy.argmax(logits)
+        result_property_check = numpy.asarray([confidence, classified_as, target_class])
         numpy.save(file=f'{directory}/classifications.npy', arr=outputs_classifier)
         numpy.savetxt(f'{directory}/classifications.txt', outputs_classifier)
+        numpy.savetxt(f'{directory}/classification_confidence.txt', result_property_check)
 
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
@@ -186,19 +165,12 @@ class OnnxConverter(Experiment):
             if combined_model:
                 if self.test_with_flow:
                     counter_example = self.verify_merged_model(combined_model_path, maraboupy, directory, target_class)
-                    self.analyze_result(combined_model_path, counter_example, target_class)
-
-                    ort_sess_classifier = ort.InferenceSession(unmodified_model_path)
-                    outputs_flow_image = ort_sess_classifier.run(
+                    outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
                         None,
-                        {'onnx::MatMul_0': counter_example})  # before x.1
-                    print(f'outputs_flow_image {outputs_flow_image}')
-
-                    self.fill_report(outputs_flow_image[0], counter_example, directory, classifier_path)
-
+                        {'onnx::MatMul_0': counter_example})
+                    self.fill_report(outputs_flow_image[0], counter_example, directory, classifier_path,target_class)
                 else:
                     counter_example = self.verify_classifier_only(classifier_path, maraboupy, directory, target_class)
-                    self.analyze_result(classifier_path, counter_example, target_class)
-                    self.fill_report(counter_example, counter_example, directory, classifier_path)
+                    self.fill_report(counter_example, counter_example, directory, classifier_path,target_class)
         else:
             print(Fore.RED + 'Marabou not found!')
