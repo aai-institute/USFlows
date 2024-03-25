@@ -15,7 +15,7 @@ import math
 
 class OnnxConverter(Experiment):
 
-    def __init__(self, path_flow: str, path_classifier: str, test_with_flow: bool,  *args, **kwargs,) -> None:
+    def __init__(self, path_flow: str, path_classifier: str,  *args, **kwargs,) -> None:
         """Initialize verification experiment.
         Args:
             path_flow (string): The path to the flow model used for the verification experiment in ONNX format.
@@ -24,7 +24,6 @@ class OnnxConverter(Experiment):
         super().__init__(*args, **kwargs)
         self.path_flow = path_flow
         self.path_classifier = path_classifier
-        self.test_with_flow = test_with_flow
 
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
@@ -101,7 +100,11 @@ class OnnxConverter(Experiment):
         current_time = str(datetime.now()).replace(" ", "")
         directory = f'  {report_dir}/{self.name}/{current_time}'
         os.makedirs(directory)
-        return directory
+        directory_with_flow = f'{directory}/with_flow'
+        os.makedirs(directory_with_flow)
+        directory_without_flow = f'{directory}/without_flow'
+        os.makedirs(directory_without_flow)
+        return directory, directory_with_flow, directory_without_flow
 
     @staticmethod
     def save_model(model, directory, model_name):
@@ -145,7 +148,7 @@ class OnnxConverter(Experiment):
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
         classifier = onnx.load(self.path_classifier)
-        directory = self.fetch_directory(report_dir)
+        directory, directory_with_flow, directory_without_flow = self.fetch_directory(report_dir)
         unmodified_model_path = self.save_model(model, directory, "unmodified_model.onnx")
         classifier_path = self.save_model(classifier, directory, "classifier.onnx")
         modified_model = self.swap_mul_inputs(model)
@@ -163,14 +166,15 @@ class OnnxConverter(Experiment):
             print(f'Marabou available! {Marabou}')
             target_class = 0
             if combined_model:
-                if self.test_with_flow:
-                    counter_example = self.verify_merged_model(combined_model_path, maraboupy, directory, target_class)
-                    outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
-                        None,
-                        {'onnx::MatMul_0': counter_example})
-                    self.fill_report(outputs_flow_image[0], counter_example, directory, classifier_path,target_class)
-                else:
-                    counter_example = self.verify_classifier_only(classifier_path, maraboupy, directory, target_class)
-                    self.fill_report(counter_example, counter_example, directory, classifier_path,target_class)
+                counter_example = self.verify_merged_model(combined_model_path, maraboupy, directory_with_flow, target_class)
+                outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
+                    None,
+                    {'onnx::MatMul_0': counter_example})
+                self.fill_report(outputs_flow_image[0], counter_example, directory_with_flow, classifier_path,target_class)
+
+                counter_example = self.verify_classifier_only(classifier_path, maraboupy, directory_without_flow, target_class)
+                self.fill_report(counter_example, counter_example, directory_without_flow, classifier_path,target_class)
+            else:
+                print(Fore.RED + 'Error combining models has failed')
         else:
             print(Fore.RED + 'Marabou not found!')
