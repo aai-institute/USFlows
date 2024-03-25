@@ -29,7 +29,7 @@ class OnnxConverter(Experiment):
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
 
-    def add_post_condition(self, network, target_class, maraboupy):
+    def add_post_condition(self, network, target_class, maraboupy, confidence_threshold):
         var = maraboupy.MarabouPythonic.Var
         output_vars = network.outputVars[0][0]
         # Add inequalities that ensure that the input is classified as target_class
@@ -41,23 +41,26 @@ class OnnxConverter(Experiment):
         # Since we look for counter examples, check for violations. I.e. instances where the
         # confidence is lower than indicated by the threshold.
         coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
-        confidence_threshold = 50.0
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
         network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
 
-    def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class):
+    def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class, confidence_threshold):
         network = maraboupy.Marabou.read_onnx(classifier_path)
         for i in range(len(network.inputVars[0])):
             network.setLowerBound(i, 0)
             network.setUpperBound(i, 255)
-        self.add_post_condition(network, target_class, maraboupy)
+        self.add_post_condition(network, target_class, maraboupy, confidence_threshold)
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
+        if vals[0] == 'TIMEOUT':
+            print(f'did not solve experiment {confidence_threshold} without flow')
+            return numpy.asarray([]), True
+
         assignments = [vals[1][i] for i in range(100)]
-        return numpy.asarray(assignments).astype(numpy.float32)
+        return numpy.asarray(assignments).astype(numpy.float32), False
 
 
-    def verify_merged_model(self, combined_model_path, maraboupy, directory, target_class):
+    def verify_merged_model(self, combined_model_path, maraboupy, directory, target_class , confidence_threshold):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         threshold_input = self.quantile_log_normal(p=0.01)# ~ central p fraction of the radial distribution
         num_vars = network.numVars
@@ -72,17 +75,20 @@ class OnnxConverter(Experiment):
         # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
         network.addInequality(redundant_vars, ones, threshold_input)
 
-        self.add_post_condition(network, target_class, maraboupy)
+        self.add_post_condition(network, target_class, maraboupy, confidence_threshold)
 
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
+        if vals[0] == 'TIMEOUT':
+            print(f'did not solve experiment {confidence_threshold} with flow')
+            return numpy.asarray([]), True
 
         assignments = [vals[1][i] for i in range(100)]
         sum_of_assignments = sum([abs(ele) for ele in assignments])
         if sum_of_assignments > threshold_input + 0.001:
             print(Fore.RED + f'ERROR: sum of abs assignments exceeds threshold')
             sys.exit(0)
-        return numpy.asarray(assignments).astype(numpy.float32)
+        return numpy.asarray(assignments).astype(numpy.float32), False
 
 
     @staticmethod
@@ -105,6 +111,11 @@ class OnnxConverter(Experiment):
         directory_without_flow = f'{directory}/without_flow'
         os.makedirs(directory_without_flow)
         return directory, directory_with_flow, directory_without_flow
+
+    def create_experiment_subdir(self, directory, folder_name):
+        subdirectory = f'{directory}/{folder_name}'
+        os.makedirs(subdirectory)
+        return subdirectory
 
     @staticmethod
     def save_model(model, directory, model_name):
@@ -166,14 +177,22 @@ class OnnxConverter(Experiment):
             print(f'Marabou available! {Marabou}')
             target_class = 0
             if combined_model:
-                counter_example = self.verify_merged_model(combined_model_path, maraboupy, directory_with_flow, target_class)
-                outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
-                    None,
-                    {'onnx::MatMul_0': counter_example})
-                self.fill_report(outputs_flow_image[0], counter_example, directory_with_flow, classifier_path,target_class)
+                for confidence_threshold in range(1,21,1):
+                    print(f'experiment no {confidence_threshold} of 20')
+                    experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
+                    counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy, experiment_directory_with_flow, target_class, confidence_threshold)
+                    if is_error:
+                        continue
+                    outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
+                        None,
+                        {'onnx::MatMul_0': counter_example})
+                    self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path,target_class)
 
-                counter_example = self.verify_classifier_only(classifier_path, maraboupy, directory_without_flow, target_class)
-                self.fill_report(counter_example, counter_example, directory_without_flow, classifier_path,target_class)
+                    experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow, confidence_threshold)
+                    counter_example, is_error = self.verify_classifier_only(classifier_path, maraboupy, experiment_directory_without_flow, target_class, confidence_threshold)
+                    if is_error:
+                        continue
+                    self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,target_class)
             else:
                 print(Fore.RED + 'Error combining models has failed')
         else:
