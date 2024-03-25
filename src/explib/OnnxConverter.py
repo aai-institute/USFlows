@@ -55,7 +55,7 @@ class OnnxConverter(Experiment):
         # confidence is lower than indicated by the threshold.
         coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
         print(coefficients_classifier)
-        confidence_threshold = 0.5
+        confidence_threshold = 5.0
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
         network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
         vals = network.solve(filename =f'{directory}/marabou-output.txt', options=options)
@@ -65,6 +65,8 @@ class OnnxConverter(Experiment):
             None,
             {'onnx::MatMul_0': numpy.asarray(assignments).astype(numpy.float32)})  #before x.1
         print(f' outputs of the classifier using onnxruntime: {outputs_combined_model}')
+        logits = numpy.asarray(outputs_combined_model[0]).astype(numpy.float32)
+        print(f'confidence: {(len(logits) * logits[target_class] - (numpy.sum(logits) - logits[target_class])) / len(logits)}')
         return numpy.asarray(assignments).astype(numpy.float32)
 
 
@@ -93,14 +95,14 @@ class OnnxConverter(Experiment):
         # Add inequalities that ensure that the input is classified as 0
         for i in range(len(output_vars)):
             if not i == target_class:
-                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.01)
+                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
 
         # Now add the confidence term that ensures that the input is classified with high confidence.
         # Since we look for counter examples, check for violations. I.e. instances where the
         # confidence is lower than indicated by the threshold.
         coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
         print(coefficients_classifier)
-        confidence_threshold = 0.5
+        confidence_threshold = 5.0
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
         network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
 
@@ -113,11 +115,11 @@ class OnnxConverter(Experiment):
             None,
             {'onnx::MatMul_0': numpy.asarray(assignments).astype(numpy.float32)})  #before x.1
         print(f' outputs of the combined model using onnxruntime: {outputs_combined_model}')
-        logits = numpy.asarray(assignments).astype(numpy.float32)
+        logits = numpy.asarray(outputs_combined_model[0]).astype(numpy.float32)
         print(f'max at position {numpy.argmax(logits)} and target is {target_class}')
         print(f'confidence: {(len(logits) * logits[target_class] - (numpy.sum(logits) - logits[target_class])) / len(logits)}')
 
-        return logits
+        return numpy.asarray(assignments).astype(numpy.float32)
 
     @staticmethod
     def swap_mul_inputs(model):
