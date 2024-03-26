@@ -1,5 +1,6 @@
 ---
 __object__: src.explib.OnnxConverter.OnnxConverter
 name: convert_onnx
-path_flow: &path_flow "/home/mustafa/repos/VeriFlow/experiments/verification/resources/radial/model_0_lognormal_decay_forward.onnx"
+path_flow: &path_flow "/home/mustafa/repos/VeriFlow/experiments/verification/resources/radial/mnist_9_forward.onnx"
 path_classifier: &path_classifier "/home/mustafa/repos/VeriFlow/src/explib/MnistSimpleClassifier.onnx"
+verify_within_dist: True

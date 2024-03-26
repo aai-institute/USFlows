@@ -15,7 +15,7 @@ import math
 
 class OnnxConverter(Experiment):
 
-    def __init__(self, path_flow: str, path_classifier: str,  *args, **kwargs,) -> None:
+    def __init__(self, path_flow: str, path_classifier: str, verify_within_dist: bool,  *args, **kwargs,) -> None:
         """Initialize verification experiment.
         Args:
             path_flow (string): The path to the flow model used for the verification experiment in ONNX format.
@@ -24,6 +24,7 @@ class OnnxConverter(Experiment):
         super().__init__(*args, **kwargs)
         self.path_flow = path_flow
         self.path_classifier = path_classifier
+        self.verify_within_dist = verify_within_dist
 
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
@@ -156,6 +157,33 @@ class OnnxConverter(Experiment):
         numpy.savetxt(f'{directory}/classification_confidence.txt', result_property_check)
 
 
+    def run_within_distribution_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
+                                             unmodified_model_path, classifier_path, directory_without_flow):
+
+        for confidence_threshold in range(1, 21, 1):
+            print(f'experiment no {confidence_threshold} of 20')
+            experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
+            counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy,
+                                                                 experiment_directory_with_flow, target_class,
+                                                                 confidence_threshold)
+            if is_error:
+                continue
+            outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
+                None,
+                {'onnx::MatMul_0': counter_example})
+            self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path,
+                             target_class)
+
+            experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow,
+                                                                              confidence_threshold)
+            counter_example, is_error = self.verify_classifier_only(classifier_path, maraboupy,
+                                                                    experiment_directory_without_flow, target_class,
+                                                                    confidence_threshold)
+            if is_error:
+                continue
+            self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,
+                             target_class)
+
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
         classifier = onnx.load(self.path_classifier)
@@ -175,24 +203,13 @@ class OnnxConverter(Experiment):
             Marabou = None
         if Marabou:
             print(f'Marabou available! {Marabou}')
-            target_class = 0
+            target_class = 9
             if combined_model:
-                for confidence_threshold in range(1,21,1):
-                    print(f'experiment no {confidence_threshold} of 20')
-                    experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
-                    counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy, experiment_directory_with_flow, target_class, confidence_threshold)
-                    if is_error:
-                        continue
-                    outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
-                        None,
-                        {'onnx::MatMul_0': counter_example})
-                    self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path,target_class)
+                if self.verify_within_dist:
+                    self.run_within_distribution_verification(directory_with_flow, combined_model_path, maraboupy,
+                                                              target_class, unmodified_model_path, classifier_path,
+                                                              directory_without_flow)
 
-                    experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow, confidence_threshold)
-                    counter_example, is_error = self.verify_classifier_only(classifier_path, maraboupy, experiment_directory_without_flow, target_class, confidence_threshold)
-                    if is_error:
-                        continue
-                    self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,target_class)
             else:
                 print(Fore.RED + 'Error combining models has failed')
         else:
