@@ -64,23 +64,24 @@ class OnnxConverter(Experiment):
         assignments = [vals[1][i] for i in range(100)]
         return numpy.asarray(assignments).astype(numpy.float32), False
 
-
-    def verify_merged_model(self, combined_model_path, maraboupy, directory, target_class , confidence_threshold):
+    def verify_with_flow(self, combined_model_path, maraboupy, directory, target_class, confidence_threshold, p_lower, p_upper, post_condition_func):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
-        threshold_input = self.quantile_log_normal(p=0.01)# ~ central p fraction of the radial distribution
+        threshold_input_lower = self.quantile_log_normal(p=p_lower)
+        threshold_input_upper = self.quantile_log_normal(p=p_upper)
         num_vars = network.numVars
         redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
         redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
         ones = [1.0 for i in range(len(redundant_vars))]
+        neg_ones = [-1.0 for i in range(len(redundant_vars))]
         # Add 100 additional variables that will encode the abs of the input vars.
         network.numVars = num_vars + redundant_var_count
         for i in range(redundant_var_count):
             # sets the value of the new variables as the abs value of the input
             network.addAbsConstraint(i, redundant_vars[i])
-        # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
-        network.addInequality(redundant_vars, ones, threshold_input)
-
-        self.add_low_confidence_post_cond(network, target_class, maraboupy, confidence_threshold)
+        # inequality sum [factor*var] <= threshold
+        network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
+        network.addInequality(redundant_vars, ones, threshold_input_upper)
+        post_condition_func(network, target_class, maraboupy, confidence_threshold)
 
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
@@ -90,10 +91,18 @@ class OnnxConverter(Experiment):
 
         assignments = [vals[1][i] for i in range(100)]
         sum_of_assignments = sum([abs(ele) for ele in assignments])
-        if sum_of_assignments > threshold_input + 0.001:
-            print(Fore.RED + f'ERROR: sum of abs assignments exceeds threshold')
+        if sum_of_assignments > threshold_input_upper + 0.001:
+            print(Fore.RED + f'ERROR: sum of abs assignments exceeds upper bound threshold')
+            sys.exit(0)
+        if sum_of_assignments < threshold_input_upper - 0.001:
+            print(Fore.RED + f'ERROR: sum of abs assignments below lower bound threshold')
             sys.exit(0)
         return numpy.asarray(assignments).astype(numpy.float32), False
+
+
+    def verify_merged_model(self, combined_model_path, maraboupy, directory, target_class , confidence_threshold):
+        return self.verify_with_flow(combined_model_path, maraboupy, directory, target_class, confidence_threshold,
+                                     0.0, 0.01, self.add_low_confidence_post_cond)
 
 
     @staticmethod
@@ -195,38 +204,12 @@ class OnnxConverter(Experiment):
 
 
     def verify_epistemic_uncertainty(self, combined_model_path, maraboupy, directory, target_class, confidence_threshold):
-        network = maraboupy.Marabou.read_onnx(combined_model_path)
-        threshold_input_lower = self.quantile_log_normal(p=0.9)# ~ central p fraction of the radial distribution
-        threshold_input_upper = self.quantile_log_normal(p=0.99)# ~ central p fraction of the radial distribution
-        num_vars = network.numVars
-        redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
-        redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
-        ones = [1.0 for i in range(len(redundant_vars))]
-        neg_ones = [-1.0 for i in range(len(redundant_vars))]
-        # Add 100 additional variables that will encode the abs of the input vars.
-        network.numVars = num_vars + redundant_var_count
-        for i in range(redundant_var_count):
-            # sets the value of the new variables as the abs value of the input
-            network.addAbsConstraint(i, redundant_vars[i])
-        # Adds inequality: (SUM_i (redundant_vars[i] * neg_ones[i]))  <= -threshold_input
-        network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
-        network.addInequality(redundant_vars, ones, threshold_input_upper)
-        self.add_epistemic_postcond(network, target_class, maraboupy, confidence_threshold)
+        return self.verify_with_flow(combined_model_path, maraboupy, directory, target_class, confidence_threshold,
+                                     0.9,0.99, self.add_epistemic_postcond)
 
-        vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
-        if vals[0] == 'TIMEOUT':
-            print(f'did not solve experiment {confidence_threshold} with flow')
-            return numpy.asarray([]), True
-
-        assignments = [vals[1][i] for i in range(100)]
-        sum_of_assignments = sum([abs(ele) for ele in assignments])
-        print(f'sum_of_assignments {sum_of_assignments}')
-        return numpy.asarray(assignments).astype(numpy.float32), False
 
     def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
-        p = 0.7
         confidence = 10
         counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy, directory_with_flow, target_class, confidence)
 
