@@ -30,7 +30,7 @@ class OnnxConverter(Experiment):
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
 
-    def add_post_condition(self, network, target_class, maraboupy, confidence_threshold):
+    def add_post_condition(self, network, target_class, maraboupy, confidence_threshold, sign):
         var = maraboupy.MarabouPythonic.Var
         output_vars = network.outputVars[0][0]
         # Add inequalities that ensure that the input is classified as target_class
@@ -41,16 +41,20 @@ class OnnxConverter(Experiment):
         # Now add the confidence term that ensures that the input is classified with high confidence.
         # Since we look for counter examples, check for violations. I.e. instances where the
         # confidence is lower than indicated by the threshold.
-        coefficients_classifier = [1 if i == target_class else -1/10 for i in range(len(output_vars))]
+        coefficients_classifier = [sign*1 if i == target_class else sign*(-1/10) for i in range(len(output_vars))]
         # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
-        network.addInequality(output_vars, coefficients_classifier, confidence_threshold)
+        network.addInequality(output_vars, coefficients_classifier, sign*confidence_threshold)
+
+    def add_low_confidence_post_cond(self, network, target_class, maraboupy, confidence_threshold):
+        self.add_post_condition(network, target_class, maraboupy, confidence_threshold,1)
+
 
     def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class, confidence_threshold):
         network = maraboupy.Marabou.read_onnx(classifier_path)
         for i in range(len(network.inputVars[0])):
             network.setLowerBound(i, 0)
             network.setUpperBound(i, 255)
-        self.add_post_condition(network, target_class, maraboupy, confidence_threshold)
+        self.add_low_confidence_post_cond(network, target_class, maraboupy, confidence_threshold)
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
         if vals[0] == 'TIMEOUT':
@@ -76,7 +80,7 @@ class OnnxConverter(Experiment):
         # Adds inequality: (SUM_i (redundant_vars[i] * ones[i]))  <= threshold_input
         network.addInequality(redundant_vars, ones, threshold_input)
 
-        self.add_post_condition(network, target_class, maraboupy, confidence_threshold)
+        self.add_low_confidence_post_cond(network, target_class, maraboupy, confidence_threshold)
 
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
@@ -187,19 +191,8 @@ class OnnxConverter(Experiment):
 
 
     def add_epistemic_postcond(self, network, target_class, maraboupy, confidence_threshold):
-        var = maraboupy.MarabouPythonic.Var
-        output_vars = network.outputVars[0][0]
-        # Add inequalities that ensure that the input is classified as target_class
-        for i in range(len(output_vars)):
-            if not i == target_class:
-                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
+        self.add_post_condition(network, target_class, maraboupy, confidence_threshold, -1)
 
-        # Now add the confidence term that ensures that the input is classified with high confidence.
-        # Since we look for counter examples, check for violations. I.e. instances where the
-        # confidence is lower than indicated by the threshold.
-        coefficients_classifier = [-1 if i == target_class else 1/10 for i in range(len(output_vars))]
-        # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
-        network.addInequality(output_vars, coefficients_classifier, -1*confidence_threshold)
 
     def verify_epistemic_uncertainty(self, combined_model_path, maraboupy, directory, target_class, confidence_threshold):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
@@ -264,7 +257,7 @@ class OnnxConverter(Experiment):
             Marabou = None
         if Marabou:
             print(f'Marabou available! {Marabou}')
-            target_class = 9
+            target_class = 0
             if combined_model:
                 if self.verify_within_dist:
                     self.run_within_distribution_verification(directory_with_flow, combined_model_path, maraboupy,
