@@ -210,16 +210,19 @@ class OnnxConverter(Experiment):
 
     def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
-        confidence = 10
-        counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy, directory_with_flow, target_class, confidence)
+        for confidence in range(10, 31, 1):
+            experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence)
+            counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy,
+                                                                          experiment_directory_with_flow,
+                                                                          target_class,confidence)
 
-        if is_error:
-            print(f'has some serious error issues')
-        outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
-            None,
-            {'onnx::MatMul_0': counter_example})
-        self.fill_report(outputs_flow_image[0], counter_example, directory_with_flow, classifier_path,
-                         target_class)
+            if is_error:
+                continue
+            outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
+                None,
+                {'onnx::MatMul_0': counter_example})
+            self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path,
+                             target_class)
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
