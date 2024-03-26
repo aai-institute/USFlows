@@ -157,6 +157,7 @@ class OnnxConverter(Experiment):
         numpy.savetxt(f'{directory}/classification_confidence.txt', result_property_check)
 
 
+
     def run_within_distribution_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
 
@@ -184,6 +185,66 @@ class OnnxConverter(Experiment):
             self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,
                              target_class)
 
+
+    def add_epistemic_postcond(self, network, target_class, maraboupy, confidence_threshold):
+        var = maraboupy.MarabouPythonic.Var
+        output_vars = network.outputVars[0][0]
+        # Add inequalities that ensure that the input is classified as target_class
+        for i in range(len(output_vars)):
+            if not i == target_class:
+                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
+
+        # Now add the confidence term that ensures that the input is classified with high confidence.
+        # Since we look for counter examples, check for violations. I.e. instances where the
+        # confidence is lower than indicated by the threshold.
+        coefficients_classifier = [-1 if i == target_class else 1/10 for i in range(len(output_vars))]
+        # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
+        network.addInequality(output_vars, coefficients_classifier, -1*confidence_threshold)
+
+    def verify_epistemic_uncertainty(self, combined_model_path, maraboupy, directory, target_class, confidence_threshold):
+        network = maraboupy.Marabou.read_onnx(combined_model_path)
+        threshold_input_lower = self.quantile_log_normal(p=0.9)# ~ central p fraction of the radial distribution
+        threshold_input_upper = self.quantile_log_normal(p=0.99)# ~ central p fraction of the radial distribution
+        num_vars = network.numVars
+        redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
+        redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
+        ones = [1.0 for i in range(len(redundant_vars))]
+        neg_ones = [-1.0 for i in range(len(redundant_vars))]
+        # Add 100 additional variables that will encode the abs of the input vars.
+        network.numVars = num_vars + redundant_var_count
+        for i in range(redundant_var_count):
+            # sets the value of the new variables as the abs value of the input
+            network.addAbsConstraint(i, redundant_vars[i])
+        # Adds inequality: (SUM_i (redundant_vars[i] * neg_ones[i]))  <= -threshold_input
+        network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
+        network.addInequality(redundant_vars, ones, threshold_input_upper)
+        self.add_epistemic_postcond(network, target_class, maraboupy, confidence_threshold)
+
+        vals = network.solve(filename =f'{directory}/marabou-output.txt',
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
+        if vals[0] == 'TIMEOUT':
+            print(f'did not solve experiment {confidence_threshold} with flow')
+            return numpy.asarray([]), True
+
+        assignments = [vals[1][i] for i in range(100)]
+        sum_of_assignments = sum([abs(ele) for ele in assignments])
+        print(f'sum_of_assignments {sum_of_assignments}')
+        return numpy.asarray(assignments).astype(numpy.float32), False
+
+    def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
+                                             unmodified_model_path, classifier_path, directory_without_flow):
+        p = 0.7
+        confidence = 10
+        counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy, directory_with_flow, target_class, confidence)
+
+        if is_error:
+            print(f'has some serious error issues')
+        outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
+            None,
+            {'onnx::MatMul_0': counter_example})
+        self.fill_report(outputs_flow_image[0], counter_example, directory_with_flow, classifier_path,
+                         target_class)
+
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
         model = onnx.load(self.path_flow)
         classifier = onnx.load(self.path_classifier)
@@ -209,7 +270,10 @@ class OnnxConverter(Experiment):
                     self.run_within_distribution_verification(directory_with_flow, combined_model_path, maraboupy,
                                                               target_class, unmodified_model_path, classifier_path,
                                                               directory_without_flow)
-
+                else:
+                    self.run_epistemic_uncertainty_verification(directory_with_flow, combined_model_path, maraboupy,
+                                                              target_class, unmodified_model_path, classifier_path,
+                                                              directory_without_flow)
             else:
                 print(Fore.RED + 'Error combining models has failed')
         else:
