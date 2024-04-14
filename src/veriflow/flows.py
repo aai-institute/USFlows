@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 from torch.utils.data import Dataset
@@ -234,7 +235,7 @@ class Flow(torch.nn.Module):
         self.trainable_layers = torch.nn.ModuleList(
             [l.to(device) for l in self.trainable_layers]
         )
-        self._disrtibution_to(device)
+        self._distribution_to(device)
         return super().to(device)
 
     def is_feasible(self) -> bool:
@@ -249,7 +250,7 @@ class Flow(torch.nn.Module):
             if isinstance(l, BaseTransform) and not l.is_feasible():
                 l.add_jitter(jitter)
 
-    def _disrtibution_to(self, device: str) -> None:
+    def _distribution_to(self, device: str) -> None:
         """Moves the base distribution to the given device"""
         pass
 
@@ -301,7 +302,7 @@ class NiceFlow(Flow):
         layers = []
         self.lu_layers = []
         layer_scale = (
-            self.prior_scale**2 / coupling_layers
+            math.sqrt(self.prior_scale**2 / coupling_layers)
             if self.prior_scale is not None
             else None
         )

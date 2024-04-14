@@ -328,7 +328,7 @@ class LUTransform(BaseTransform):
             # TODO: Proper handling
             d = self.dim
             sign = -torch.ones(d) + 2 * torch.bernoulli(.5 * torch.ones(d))
-            scale = self.prior_scale * torch.ones(d) if self.prior_scale is not None else torch.ones(d)
+            scale = self.prior_scale * torch.ones(d) * 1/self.dim if self.prior_scale is not None else torch.ones(d)
             self.U_raw += sign * torch.normal(torch.zeros(self.dim), scale).exp().diag()
             self.U_raw.copy_(self.U_raw.triu())
 
