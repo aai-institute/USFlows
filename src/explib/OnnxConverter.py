@@ -15,7 +15,7 @@ import math
 
 class OnnxConverter(Experiment):
 
-    def __init__(self, path_flow: str, path_classifier: str, verify_within_dist: bool,  *args, **kwargs,) -> None:
+    def __init__(self, path_flow: str, path_classifier: str, verify_within_dist: bool, verify_full_UDL: bool,  *args, **kwargs,) -> None:
         """Initialize verification experiment.
         Args:
             path_flow (string): The path to the flow model used for the verification experiment in ONNX format.
@@ -25,25 +25,48 @@ class OnnxConverter(Experiment):
         self.path_flow = path_flow
         self.path_classifier = path_classifier
         self.verify_within_dist = verify_within_dist
+        self.verify_full_UDL = verify_full_UDL
 
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
 
     def add_post_condition(self, network, target_class, maraboupy, confidence_threshold, sign):
-        var = maraboupy.MarabouPythonic.Var
-        output_vars = network.outputVars[0][0]
-        # Add inequalities that ensure that the input is classified as target_class
-        for i in range(len(output_vars)):
-            if not i == target_class:
-                network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
+        if self.verify_full_UDL:
+            var = maraboupy.MarabouPythonic.Var
+            output_vars = network.outputVars[0][0]
+            # Add inequalities that ensure that the input is classified as target_class
+            for i in range(len(output_vars)):
+                if not i == target_class:
+                    network.addConstraint(var(output_vars[target_class]) - var(output_vars[i]) >= 0.001)
 
-        # Now add the confidence term that ensures that the input is classified with high confidence.
-        # Since we look for counter examples, check for violations. I.e. instances where the
-        # confidence is lower than indicated by the threshold.
-        coefficients_classifier = [sign*1 if i == target_class else sign*(-1/10) for i in range(len(output_vars))]
-        # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
-        network.addInequality(output_vars, coefficients_classifier, sign*confidence_threshold)
+            # Now add the confidence term that ensures that the input is classified with high confidence.
+            # Since we look for counter examples, check for violations. I.e. instances where the
+            # confidence is lower than indicated by the threshold.
+            coefficients_classifier = [sign*1 if i == target_class else sign*(-1/10) for i in range(len(output_vars))]
+            # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
+            network.addInequality(output_vars, coefficients_classifier, sign*confidence_threshold)
+        else:
+            var = maraboupy.MarabouPythonic.Var
+            output_vars = network.outputVars[0][0]
+            # Add inequalities that ensure that the input is classified as target_class
+            disjunction = []
+            for i in range(len(output_vars)):
+                if not i == target_class:
+                    # This is a different postcondition, it shall resemble the
+                    # postcondition that we use in the abstract interpretation verification.
+                    # Actually in abstract interpretation we check both, whether the whole input space is
+                    # classified as target and then if everything is classified as target,
+                    # we check the guaranteed confidence threshold.
+                    # Latter is still missing in the implementation here. TODO.
+                    eq = maraboupy.Marabou.Equation(maraboupy.MarabouCore.Equation.LE)
+                    eq.addAddend(1, output_vars[target_class])
+                    eq.addAddend(-1, output_vars[i])
+                    eq.setScalar(-0.001)
+                    disjunction.append([eq])
+                    #disjunction.append([var(output_vars[target_class]) - var(output_vars[i]) <= 0.001])
+            network.addDisjunctionConstraint(disjunction)
+
 
     def add_low_confidence_post_cond(self, network, target_class, maraboupy, confidence_threshold):
         self.add_post_condition(network, target_class, maraboupy, confidence_threshold,1)
@@ -68,19 +91,25 @@ class OnnxConverter(Experiment):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
         threshold_input_lower = self.quantile_log_normal(p=p_lower)
         threshold_input_upper = self.quantile_log_normal(p=p_upper)
-        num_vars = network.numVars
-        redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
-        redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
-        ones = [1.0 for i in range(len(redundant_vars))]
-        neg_ones = [-1.0 for i in range(len(redundant_vars))]
-        # Add 100 additional variables that will encode the abs of the input vars.
-        network.numVars = num_vars + redundant_var_count
-        for i in range(redundant_var_count):
-            # sets the value of the new variables as the abs value of the input
-            network.addAbsConstraint(i, redundant_vars[i])
-        # inequality sum [factor*var] <= threshold
-        network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
-        network.addInequality(redundant_vars, ones, threshold_input_upper)
+        if self.verify_full_UDL:
+            num_vars = network.numVars
+            redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
+            redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
+            ones = [1.0 for i in range(len(redundant_vars))]
+            neg_ones = [-1.0 for i in range(len(redundant_vars))]
+            # Add 100 additional variables that will encode the abs of the input vars.
+            network.numVars = num_vars + redundant_var_count
+            for i in range(redundant_var_count):
+                # sets the value of the new variables as the abs value of the input
+                network.addAbsConstraint(i, redundant_vars[i])
+            # inequality sum [factor*var] <= threshold
+            network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
+            network.addInequality(redundant_vars, ones, threshold_input_upper)
+        else:
+            for i in range(100): # the 100 input variables.
+                network.setLowerBound(i, -0.01)
+                network.setUpperBound(i, 0.01)
+
         post_condition_func(network, target_class, maraboupy, confidence_threshold)
 
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
@@ -90,13 +119,14 @@ class OnnxConverter(Experiment):
             return numpy.asarray([]), True
 
         assignments = [vals[1][i] for i in range(100)]
-        sum_of_assignments = sum([abs(ele) for ele in assignments])
-        if sum_of_assignments > threshold_input_upper + 0.001:
-            print(Fore.RED + f'ERROR: sum of abs assignments exceeds upper bound threshold')
-            sys.exit(0)
-        if sum_of_assignments < threshold_input_upper - 0.001:
-            print(Fore.RED + f'ERROR: sum of abs assignments below lower bound threshold')
-            sys.exit(0)
+        if self.verify_full_UDL:
+            sum_of_assignments = sum([abs(ele) for ele in assignments])
+            if sum_of_assignments > threshold_input_upper + 0.001:
+                print(Fore.RED + f'ERROR: sum of abs assignments exceeds upper bound threshold')
+                sys.exit(0)
+            if sum_of_assignments < threshold_input_upper - 0.001:
+                print(Fore.RED + f'ERROR: sum of abs assignments below lower bound threshold')
+                sys.exit(0)
         return numpy.asarray(assignments).astype(numpy.float32), False
 
 
