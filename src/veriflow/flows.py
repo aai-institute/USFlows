@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 from torch.utils.data import Dataset
@@ -22,6 +23,7 @@ class Flow(torch.nn.Module):
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
     export: export_modes = "log_prob"
+    device = "cpu"
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -30,6 +32,14 @@ class Flow(torch.nn.Module):
             return self.log_prob(x)
         elif self.export == "sample":
             return self.sample()
+        elif self.export == "forward":
+            for layer in self.layers:
+                x = layer.forward(x)
+            return x
+        elif self.export == "backward":
+            for layer in reversed(self.layers):
+                x = layer.backward(x)
+            return x
         else:
             raise ValueError(f"Unknown export mode {self.export}")
 
@@ -38,7 +48,7 @@ class Flow(torch.nn.Module):
         base_distribution,
         layers,
         soft_training: bool = False,
-        training_noise_prior=dist.Laplace(0, 1e-6),
+        training_noise_prior=dist.Uniform(0, 1e-6),
         *args,
         **kwargs,
     ) -> None:
@@ -100,7 +110,7 @@ class Flow(torch.nn.Module):
             if torch.backends.mps.is_available():
                 device = torch.device("mps")
             elif torch.cuda.is_available():
-                device = torch.device("cuda")
+                device = torch.device("cuda:0")
             else:
                 device = torch.device("cpu")
 
@@ -128,7 +138,7 @@ class Flow(torch.nn.Module):
                     continue
 
                 if self.soft_training:
-                    noise = self.training_noise_prior.sample([sample.shape[0]]).abs()
+                    noise = self.training_noise_prior.sample([sample.shape[0]]) 
 
                     # Repeat noise for all data dimensions
                     sigma = noise
@@ -140,6 +150,8 @@ class Flow(torch.nn.Module):
                     sample = sample + e
                     noise = noise.unsqueeze(-1)
                     noise = noise.detach().to(device)
+                    # scaling of noise for the conditioning recommended by SoftFlow paper
+                    noise = noise * 2/self.training_noise_prior.high
                 else:
                     noise = None
 
@@ -223,7 +235,7 @@ class Flow(torch.nn.Module):
         self.trainable_layers = torch.nn.ModuleList(
             [l.to(device) for l in self.trainable_layers]
         )
-        self._disrtibution_to(device)
+        self._distribution_to(device)
         return super().to(device)
 
     def is_feasible(self) -> bool:
@@ -238,7 +250,7 @@ class Flow(torch.nn.Module):
             if isinstance(l, BaseTransform) and not l.is_feasible():
                 l.add_jitter(jitter)
 
-    def _disrtibution_to(self, device: str) -> None:
+    def _distribution_to(self, device: str) -> None:
         """Moves the base distribution to the given device"""
         pass
 
@@ -257,7 +269,7 @@ class NiceFlow(Flow):
         nonlinearity: Optional[torch.nn.Module] = None,
         masktype: mask = "half",
         use_lu: bool = True,
-        prior_scale: float = 1.0,
+        prior_scale: Optional[float] = None,
         soft_training: bool = False,
         *args,
         **kwargs,
@@ -290,7 +302,7 @@ class NiceFlow(Flow):
         layers = []
         self.lu_layers = []
         layer_scale = (
-            self.prior_scale**2 / coupling_layers
+            math.sqrt(self.prior_scale**2 / coupling_layers)
             if self.prior_scale is not None
             else None
         )
@@ -301,6 +313,7 @@ class NiceFlow(Flow):
             mask = self._get_mask(masktype, i)
             
             if soft_training:
+                # conditioning on noise scale 
                 layers.append(
                     MaskedCoupling(
                         mask,
@@ -342,7 +355,7 @@ class NiceFlow(Flow):
         else:
             if self.soft_training:
                 # implicit conditioning with noise scale 0
-                context = torch.zeros(x.shape[0]).unsqueeze(-1)
+                context = torch.zeros(x.shape[0]).unsqueeze(-1).to(x.device)
             return super().log_prob(x, context)
             
     def sample(
@@ -353,7 +366,7 @@ class NiceFlow(Flow):
         else:
             if self.soft_training:
                 return super().sample(
-                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1)
+                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1).to(self.device)
                 )
             else:
                 return super().sample(
@@ -424,6 +437,16 @@ class NiceFlow(Flow):
             return log_prior
         else:
             return 0
+    
+    def simplify(self) -> Flow:
+        """Simplifies the flow by removing LU layers and replacing them with a BijectiveLinear layer"""
+        layers = []
+        for l in self.layers:
+            if isinstance(l, LUTransform):
+                layers.append(l.to_linear())
+            else:
+                layers.append(l)
+        return Flow(self.base_distribution, layers)
 
 
 class NiceMaskedConvFlow(Flow):
@@ -483,7 +506,7 @@ class NiceMaskedConvFlow(Flow):
 
         layers.append(ScaleTransform(mask.shape))
 
-        super().__init__(base_distribution, layers, *args, **kwargs)
+        super().__init__(base_distribution, layers, soft_training=False, *args, **kwargs)
 
     @classmethod
     def create_checkerboard_mask(
