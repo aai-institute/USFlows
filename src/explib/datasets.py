@@ -317,7 +317,6 @@ class MnistDequantized(DequantizedDataset):
 
         dataset = idx2numpy.convert_from_file(path)
         if scale:
-            
             dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
