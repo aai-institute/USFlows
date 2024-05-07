@@ -720,7 +720,7 @@ class CompositeRotation(BaseTransform):
             
         return x
     
-    def backward(self, y: torch.Tensor, context: Any | None = None) -> torch.Tensor:
+    def backward(self, y: torch.Tensor, context: Optional[Any] = None) -> torch.Tensor:
         for rot in self.rotations[::-1]:
             y = rot.backward(y)
             
