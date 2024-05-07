@@ -127,7 +127,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
             
         if self.p == 1:
             x = pyro.distributions.Dirichlet(torch.ones(self.dim)).sample(sample_shape)
-            dims = pyro.distributions.Categorical(probs=torch.ones(self.dim, 2) / 2).sample(sample_shape) * 2 - 1
+            dims = pyro.distributions.Categorical(probs=torch.ones(2) / 2).sample(sample_shape + (self.dim,)) * 2 - 1
             x = x * dims
         elif self.p == 2:
             x = pyro.distributions.Normal(0, 1).sample(sample_shape + (self.dim,))
@@ -179,15 +179,21 @@ class RadialDistribution(torch.distributions.Distribution):
         
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
+        peel = False
         if sample_shape is None:
-            sample_shape = ()
+            sample_shape = (1,)
+            peel = True
         else:
             sample_shape = tuple(sample_shape)
         
         r = self.radial_distribution.sample(sample_shape)
+        r = r.repeat(*[1 for _ in sample_shape], self.dim)
         u = self.unit_ball_distribution.sample(sample_shape)
         x = r * u
  
+        if peel:
+            x = x.squeeze(0)
+            
         return x + self.loc
     
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
