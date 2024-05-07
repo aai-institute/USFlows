@@ -169,7 +169,8 @@ class HyperoptExperiment(Experiment):
             report_dir (os.PathLike): report directory
             storage_path (os.PathLike, optional): Ray logging path. Defaults to None.
         """
-        home = os.path.expanduser("~")
+        if storage_path is None:
+            storage_path = os.path.expanduser("~")
         
         ray.init(_temp_dir=f"{storage_path}/temp/")
         #ray.init()
