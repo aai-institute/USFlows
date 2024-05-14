@@ -1,4 +1,4 @@
-# USFlows: Generative Flow Based Density Estimators for Neuro-Symbolic Verification
+# USFlows: Flow Based Density Estimators for Neuro-Symbolic Verification
 USFlows provides a stable and convenient library of flow based general purpose density models with flexibile base distributions, 
 which are specifically tailored towards the use in neuro-symbolic verification procedures. The major goal is to
 provide models that can represent reference distributions which are suitable for satisfiability based approaches, 
