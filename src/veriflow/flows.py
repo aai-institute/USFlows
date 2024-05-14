@@ -92,7 +92,7 @@ class Flow(torch.nn.Module):
         epochs: int = 1,
     ) -> float:
         """
-        Wrapper function for the fitting procedure. Allows basic configuration of the optimizer and other
+        Fitting method. Allows basic configuration of the optimizer and other
         fitting parameters.
 
         Args:

@@ -2,15 +2,15 @@
 __object__: src.explib.base.ExperimentCollection
 name: mnist_ablation
 experiments:
-  - &exp_nice_lu_laplace
+  - &exp_rad_logN
     __object__: src.explib.hyperopt.HyperoptExperiment
-    name: mnist_nice_lu_laplace
+    name: mnist_full_radial_logN
     scheduler: &scheduler 
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: &num_hyperopt_samples 25
+    num_hyperopt_samples: &num_hyperopt_samples 3
     gpus_per_trial: &gpus_per_trial 0
     cpus_per_trial: &cpus_per_trial 1
     tuner_params: &tuner_params
@@ -44,24 +44,39 @@ experiments:
             loc: 0.0
             scale: 0.001
           prior_scale: 1.0
-          coupling_layers: &coupling_layers 
-            __eval__: tune.choice([2 + i for i in range(10)])
-          coupling_nn_layers: &coupling_nn_layers 
-            __eval__: "tune.choice([[w] * l for w in range(100, 201, 100) for l in range(1, 4)])" # tune.choice([[c*32, c*16, c*8, c*16, c*32] for c in [1, 2, 3, 4]] + [[c*64, c*32, c*64]  for c in range(1,5)] + [[c*128] * 2 for c in range(1,5)] + [[c*256] for c in range(1,5)])
+          coupling_layers: 10
+          coupling_nn_layers: [300, 300, 300] 
           nonlinearity: &nonlinearity 
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim: 
-            __eval__: tune.choice([i for i in range(50, 393)])
+          split_dim: 392
           base_distribution: 
-            __object__: pyro.distributions.Laplace
+            _object__: src.veriflow.distributions.RadialDistribution       
+            p: 1.0
             loc: 
-              __eval__: torch.zeros(784)
-            scale: 
-              __eval__: torch.ones(784)
+              __eval__: torch.zeros(784).to("cpu")
+            radial_distribution:
+              __object__: pyro.distributions.LogNormal
+              loc: 
+                __eval__: torch.zeros(1).to("cpu")
+              scale: 
+                __eval__: (.5 * torch.ones(1)).to("cpu")
           use_lu: true
-  - &exp_nice_lu_normal
-    __overwrites__: *exp_nice_lu_laplace
-    name: mnist_nice_lu_normal
+  - &exp_laplace
+    __overwrites__: *exp_rad_logN
+    name: mnist_full_laplace
+    trial_config:
+      model_cfg: 
+          params:
+            base_distribution:
+              __exact__: 
+                __object__: pyro.distributions.Laplace
+                loc: 
+                  __eval__: torch.zeros(784)
+                scale: 
+                  __eval__: torch.ones(784)
+  - &exp_normal
+    __overwrites__: *exp_rad_logN
+    name: mnist_full_laplace
     trial_config:
       model_cfg: 
           params:
@@ -69,29 +84,6 @@ experiments:
               __exact__: 
                 __object__: pyro.distributions.Normal
                 loc: 
-                  __eval__: torch.zeros(100)
+                  __eval__: torch.zeros(784)
                 scale: 
-                  __eval__: torch.ones(100)
-  - &exp_nice_rand_laplace
-    __overwrites__: *exp_nice_lu_laplace
-    name: mnist_nice_rand_laplace
-    trial_config:
-      model_cfg: 
-        params:
-          use_lu: false
-          permutation: random
-  - &exp_nice_rand_normal
-    __overwrites__: *exp_nice_lu_laplace
-    name: mnist_nice_rand_normal
-    trial_config:
-      model_cfg: 
-        params:
-          use_lu: false
-          permutation: random
-          base_distribution: 
-            __exact__: 
-              __object__: pyro.distributions.Normal
-              loc: 
-                __eval__: torch.zeros(100)
-              scale: 
-                __eval__: torch.ones(100)
+                  __eval__: torch.ones(784)
