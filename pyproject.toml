@@ -10,7 +10,7 @@ packages = [{include = "src"}, {include = "scripts"}]
 python = ">=3.9,<4.0"
 pyro-ppl = "^1.8.5"
 scikit-learn = "^1.4.0"
-ray = "^2.9.1"
+ray = "==2.9.1"
 pandas = "^2.0.3"
 pyarrow = "^12.0.1"
 click = "^8.1.6"
