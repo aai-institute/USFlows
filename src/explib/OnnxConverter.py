@@ -1,3 +1,5 @@
+import time
+
 import onnx
 import os
 import sys
@@ -66,19 +68,32 @@ class OnnxConverter(Experiment):
                     disjunction.append([eq])
                     #disjunction.append([var(output_vars[target_class]) - var(output_vars[i]) <= 0.001])
             network.addDisjunctionConstraint(disjunction)
+            # Now add the confidence term that ensures that the input is classified with high confidence.
+            # Since we look for counter examples, check for violations. I.e. instances where the
+            # confidence is lower than indicated by the threshold.
+            #coefficients_classifier = [sign*1 if i == target_class else sign*(-1/10) for i in range(len(output_vars))]
+            # less or equal inequality. (SUM_{0<=i<=9}coefficients_classifier[i]*output_vars) <= confidence_threshold
+            #network.addInequality(output_vars, coefficients_classifier, sign*confidence_threshold)
 
 
     def add_low_confidence_post_cond(self, network, target_class, maraboupy, confidence_threshold):
         self.add_post_condition(network, target_class, maraboupy, confidence_threshold,1)
 
 
-    def verify_classifier_only(self, classifier_path, maraboupy, directory, target_class, confidence_threshold):
+    def verify_classifier_only(self, classifier_path, maraboupy, directory,
+                               target_class,
+                               confidence_threshold,
+                               epistemic_uncertainty_postcond = False):
         network = maraboupy.Marabou.read_onnx(classifier_path)
         for i in range(len(network.inputVars[0])):
             network.setLowerBound(i, 0)
             network.setUpperBound(i, 255)
-        self.add_low_confidence_post_cond(network, target_class, maraboupy, confidence_threshold)
-        vals = network.solve(filename =f'{directory}/marabou-output.txt',
+
+        if epistemic_uncertainty_postcond:
+            self.add_epistemic_postcond(network, target_class, maraboupy, confidence_threshold)
+        else:
+            self.add_low_confidence_post_cond(network, target_class, maraboupy, confidence_threshold)
+        vals = network.solve(filename=f'{directory}/marabou-output.txt',
                              options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} without flow')
@@ -107,15 +122,19 @@ class OnnxConverter(Experiment):
             network.addInequality(redundant_vars, ones, threshold_input_upper)
         else:
             for i in range(100): # the 100 input variables.
-                network.setLowerBound(i, -0.01)
-                network.setUpperBound(i, 0.01)
+                network.setLowerBound(i, -0.002)  # 0.0025 takes 521 seconds
+                network.setUpperBound(i, 0.002) #0.01  0.00215 was sat?!
 
         post_condition_func(network, target_class, maraboupy, confidence_threshold)
-
+        start_time = time.time()
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=100))
+        print(f'Runtime: {time.time()-start_time}')
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} with flow')
+            return numpy.asarray([]), True
+        if vals[0] == 'unsat':
+            print(f'proof certificate with flow')
             return numpy.asarray([]), True
 
         assignments = [vals[1][i] for i in range(100)]
@@ -252,6 +271,16 @@ class OnnxConverter(Experiment):
                 None,
                 {'onnx::MatMul_0': counter_example})
             self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path,
+                             target_class)
+
+            experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow,
+                                                                              confidence)
+            counter_example, is_error = self.verify_classifier_only(classifier_path, maraboupy,
+                                                                    experiment_directory_without_flow, target_class,
+                                                                    confidence, True)
+            if is_error:
+                return
+            self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,
                              target_class)
 
     def conduct(self, report_dir: os.PathLike, storage_path: os.PathLike = None):
