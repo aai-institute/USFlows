@@ -192,7 +192,9 @@ class OnnxConverter(Experiment):
         classifier_input = classifier.graph.input[0].name
         combined_model = onnx.compose.merge_models(
             modified_model, classifier,
-            io_map=[(flow_output, classifier_input)]
+            io_map=[(flow_output, classifier_input)],
+            prefix1="flow",
+            prefix2="classifier"
         )
         onnx.checker.check_model(model=combined_model, full_check=True)
         return combined_model
