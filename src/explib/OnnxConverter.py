@@ -204,6 +204,7 @@ class OnnxConverter(Experiment):
     def fill_report(self, image, counter_example, directory, classifier_path, target_class):
         sample = image
         sample = numpy.uint8(numpy.clip(sample, 0, 1) * 255)
+        plt.axis('off')
         plt.imshow(torch.tensor(sample).view(10, 10), cmap='gray')
         plt.savefig(f'{directory}/counterexample.png')
         numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
