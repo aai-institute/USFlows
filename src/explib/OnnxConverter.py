@@ -141,10 +141,12 @@ class OnnxConverter(Experiment):
         if self.verify_full_UDL:
             sum_of_assignments = sum([abs(ele) for ele in assignments])
             if sum_of_assignments > threshold_input_upper + 0.001:
-                print(Fore.RED + f'ERROR: sum of abs assignments exceeds upper bound threshold')
+                print(Fore.RED + f'ERROR: sum of abs assignments {sum_of_assignments} exceeds upper bound threshold'
+                                 f'{threshold_input_upper}')
                 sys.exit(0)
             if sum_of_assignments < threshold_input_upper - 0.001:
-                print(Fore.RED + f'ERROR: sum of abs assignments below lower bound threshold')
+                print(Fore.RED + f'ERROR: sum of abs assignments {sum_of_assignments} below lower bound threshold'
+                                 f'{threshold_input_upper}')
                 sys.exit(0)
         return numpy.asarray(assignments).astype(numpy.float32), False
 
