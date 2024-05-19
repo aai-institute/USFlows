@@ -10,8 +10,8 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: &num_hyperopt_samples 3
-    gpus_per_trial: &gpus_per_trial 0
+    num_hyperopt_samples: &num_hyperopt_samples 1
+    gpus_per_trial: &gpus_per_trial 1
     cpus_per_trial: &cpus_per_trial 1
     tuner_params: &tuner_params
       metric: val_loss
@@ -23,7 +23,7 @@ experiments:
       dataset: &dataset
         __object__: src.explib.datasets.MnistSplit
       epochs: &epochs 200000
-      patience: &patience 10
+      patience: &patience 2
       batch_size: &batch_size 
         __eval__: tune.choice([32])
       optim_cfg: &optim 
@@ -31,7 +31,7 @@ experiments:
           __class__: torch.optim.Adam 
         params:
           lr: 
-            __eval__: tune.loguniform(1e-5, 1e-3)
+            __eval__: 1e-4
           weight_decay: 0.0
       
       model_cfg: 
@@ -41,8 +41,9 @@ experiments:
           soft_training: true
           training_noise_prior:
             __object__: pyro.distributions.Uniform
-            loc: 0.0
-            scale: 0.001
+            low: 
+              __eval__: 1e-20
+            high: 0.01
           prior_scale: 1.0
           coupling_layers: 10
           coupling_nn_layers: [300, 300, 300] 
@@ -50,16 +51,17 @@ experiments:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 392
           base_distribution: 
-            _object__: src.veriflow.distributions.RadialDistribution       
+            __object__: src.veriflow.distributions.RadialDistribution       
+            device: cuda
             p: 1.0
             loc: 
-              __eval__: torch.zeros(784).to("cpu")
+              __eval__: torch.zeros(784).to("cuda")
             radial_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
-                __eval__: torch.zeros(1).to("cpu")
+                __eval__: torch.zeros(1).to("cuda")
               scale: 
-                __eval__: (.5 * torch.ones(1)).to("cpu")
+                __eval__: (.5 * torch.ones(1)).to("cuda")
           use_lu: true
   - &exp_laplace
     __overwrites__: *exp_rad_logN
@@ -71,9 +73,9 @@ experiments:
               __exact__: 
                 __object__: pyro.distributions.Laplace
                 loc: 
-                  __eval__: torch.zeros(784)
+                  __eval__: torch.zeros(784).to("cuda")
                 scale: 
-                  __eval__: torch.ones(784)
+                  __eval__: torch.ones(784).to("cuda")
   - &exp_normal
     __overwrites__: *exp_rad_logN
     name: mnist_full_laplace
@@ -84,6 +86,6 @@ experiments:
               __exact__: 
                 __object__: pyro.distributions.Normal
                 loc: 
-                  __eval__: torch.zeros(784)
+                  __eval__: torch.zeros(784).to("cuda")
                 scale: 
-                  __eval__: torch.ones(784)
+                  __eval__: torch.ones(784).to("cuda")
