@@ -202,8 +202,37 @@ class RadialDistribution(torch.distributions.Distribution):
         x = x - self.loc
         r = x.norm(dim=-1, p=self.p)
         log_prob_radial = self.radial_distribution.log_prob(r)
+        delta_v
         log_prob_unit_ball = self.unit_ball_distribution.log_prob(x / r.unsqueeze(-1))
         
         conv_log_abs_det_jacobian = (self.dim - 1) * torch.log(r)
         
         return log_prob_radial + log_prob_unit_ball - conv_log_abs_det_jacobian 
+    
+    def log_delta_volume(p: int, r: Union[float, torch.Tensor]) -> Union[float. torch.Tensor]:
+        """Computes the differential log-volume of an $L^p$ ball with radius r. 
+        Currently, $p=1,2,\text{ or }\infty$ is implemented
+        
+        Args:
+            p: p norm
+            r: radius (batch)
+        Returns:
+            Differential volume (batch)
+        """
+        if p == 1:
+           # V_1^d'(r) = (2r)**(d-1) / (d-1)!
+           log_denominator = sum([math.log(i) for i in range(1, self.dim)])
+           log_dv = math.log(2) * d + math.log(r) * (d-1) - ldfac
+        elif p == 2:
+           # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+           log_numerator = (
+               math.log(self.dim) + (self.dim / 2) * math.log(math.pi) + (d - 1) * math.log(r)
+           )
+           log_dv = log_numerator - math.lgamma((d / 2) + 1)
+        elif p == math.inf:
+           # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+           log_dv = math.log(self.dim) + self.dim * math.log(2) + (self.dim - 1) * math.log(r)  
+        else:
+            raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
+        
+        return log_dv
