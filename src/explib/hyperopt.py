@@ -37,6 +37,7 @@ class HyperoptExperiment(Experiment):
         cpus_per_trial: int,
         scheduler: tune.schedulers.FIFOScheduler,
         tuner_params: T.Dict[str, T.Any],
+        device: str = "cpu", 
         *args,
         **kwargs,
     ) -> None:
@@ -58,11 +59,14 @@ class HyperoptExperiment(Experiment):
         self.gpus_per_trial = gpus_per_trial
         self.cpus_per_trial = cpus_per_trial
         self.tuner_params = tuner_params
+        self.device = device
+        
+        self.trial_config["device"] = device
         
         
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = None) -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
         
         Args:
@@ -75,7 +79,9 @@ class HyperoptExperiment(Experiment):
         # warnings.simplefilter("error")
         torch.autograd.set_detect_anomaly(True)
         if device is None:
-            if torch.backends.mps.is_available():
+            if config["device"] is not None:
+                device = config["device"]
+            elif torch.backends.mps.is_available():
                 device = torch.device("mps")
                 # torch.mps.empty_cache()
             elif torch.cuda.is_available():
@@ -289,7 +295,10 @@ class HyperoptExperiment(Experiment):
                     )
 
         os.makedirs(os.path.dirname(report_file), exist_ok=True)
-        report.to_csv(report_file, index=False)
+        try:
+            report.to_csv(report_file, index=False)
+        except:
+            pass
         return report
 
 
