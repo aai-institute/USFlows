@@ -163,13 +163,14 @@ class RadialDistribution(torch.distributions.Distribution):
     support = constraints.positive
     has_enumerate_support = False  
     
-    def __init__(self, loc: torch.Tensor, radial_distribution: torch.distributions.Distribution, p: float):
+    def __init__(self, loc: torch.Tensor, radial_distribution: torch.distributions.Distribution, p: float, device: str = "cpu"):
         if not isinstance(p, float):
             raise ValueError("p must be a float.")
         if p <= 0:
             raise ValueError("p must be positive.")
         
-        self.loc = loc
+        self.device = device
+        self.loc = loc.to(device)
         self.radial_distribution = radial_distribution
         self.p = p
         self.dim = loc.shape[0]
@@ -186,9 +187,9 @@ class RadialDistribution(torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
         
-        r = self.radial_distribution.sample(sample_shape)
+        r = self.radial_distribution.sample(sample_shape).to(self.device)
         r = r.repeat(*[1 for _ in sample_shape], self.dim)
-        u = self.unit_ball_distribution.sample(sample_shape)
+        u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
         x = r * u
  
         if peel:
