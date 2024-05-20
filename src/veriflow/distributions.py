@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Union
 from src.veriflow.transforms import Rotation, CompositeRotation
 from src.veriflow.linalg import random_orthonormal_matrix
 import torch
@@ -206,7 +206,7 @@ class RadialDistribution(torch.distributions.Distribution):
         
         return log_prob_norm - log_dV
     
-    def log_delta_volume(p: int, r: Union[float, torch.Tensor]) -> Union[float. torch.Tensor]:
+    def log_delta_volume(self, p: int, r: Union[float, torch.Tensor]) -> Union[float. torch.Tensor]:
         """Computes the differential log-volume of an $L^p$ ball with radius r. 
         Currently, $p=1,2,\text{ or }\infty$ is implemented
         
