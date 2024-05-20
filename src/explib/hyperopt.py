@@ -38,6 +38,7 @@ class HyperoptExperiment(Experiment):
         scheduler: tune.schedulers.FIFOScheduler,
         tuner_params: T.Dict[str, T.Any],
         device: str = "cpu", 
+        skip: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -60,6 +61,7 @@ class HyperoptExperiment(Experiment):
         self.cpus_per_trial = cpus_per_trial
         self.tuner_params = tuner_params
         self.device = device
+        self.skip = skip
         
         self.trial_config["device"] = device
         
@@ -175,6 +177,9 @@ class HyperoptExperiment(Experiment):
             report_dir (os.PathLike): report directory
             storage_path (os.PathLike, optional): Ray logging path. Defaults to None.
         """
+        if self.skip:
+            return
+        
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
