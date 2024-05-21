@@ -186,7 +186,8 @@ class RadialDistribution(torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
         
-        r = self.radial_distribution.sample(sample_shape)
+        r = self.radial_distribution.sample(sample_shape).unsqueeze(-1)
+
         r = r.repeat(*[1 for _ in sample_shape], self.dim)
         u = self.unit_ball_distribution.sample(sample_shape)
         x = r * u
