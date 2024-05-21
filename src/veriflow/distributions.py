@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Union
 from src.veriflow.transforms import Rotation, CompositeRotation
 from src.veriflow.linalg import random_orthonormal_matrix
 import torch
@@ -156,21 +156,22 @@ class RadialDistribution(torch.distributions.Distribution):
     
     Args:
         loc: Location of the distribution
-        radial_distribution: Distribution of the radial component
+        norm_distribution: Distribution of the radial component
         p: Exponent of the Lp norm used to define the distribution. Currently, p = 1, 2, and inf are supported.
     """
     arg_constraints = {"loc": constraints.real}
     support = constraints.positive
     has_enumerate_support = False  
     
-    def __init__(self, loc: torch.Tensor, radial_distribution: torch.distributions.Distribution, p: float):
+    def __init__(self, loc: torch.Tensor, norm_distribution: torch.distributions.Distribution, p: float, device: str = "cpu"):
         if not isinstance(p, float):
             raise ValueError("p must be a float.")
         if p <= 0:
             raise ValueError("p must be positive.")
         
-        self.loc = loc
-        self.radial_distribution = radial_distribution
+        self.device = device
+        self.loc = loc.to(device)
+        self.norm_distribution = norm_distribution
         self.p = p
         self.dim = loc.shape[0]
         self.unit_ball_distribution = UniformUnitLpBall(self.dim, p)
@@ -186,10 +187,11 @@ class RadialDistribution(torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
         
-        r = self.radial_distribution.sample(sample_shape).unsqueeze(-1)
+
+        r = self.norm_distribution.sample(sample_shape).unsqueeze(-1).to(self.device)
 
         r = r.repeat(*[1 for _ in sample_shape], self.dim)
-        u = self.unit_ball_distribution.sample(sample_shape)
+        u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
         x = r * u
  
         if peel:
@@ -201,9 +203,35 @@ class RadialDistribution(torch.distributions.Distribution):
         """Computes the log probability of the points x under the distribution."""
         x = x - self.loc
         r = x.norm(dim=-1, p=self.p)
-        log_prob_radial = self.radial_distribution.log_prob(r)
-        log_prob_unit_ball = self.unit_ball_distribution.log_prob(x / r.unsqueeze(-1))
+        log_prob_norm = self.norm_distribution.log_prob(r)
+        log_dV = self.log_delta_volume(self.p, r)
         
-        conv_log_abs_det_jacobian = (self.dim - 1) * torch.log(r)
+        return log_prob_norm - log_dV
+    
+    def log_delta_volume(self, p: int, r: Union[float, torch.Tensor]) -> Union[float, torch.Tensor]:
+        """Computes the differential log-volume of an $L^p$ ball with radius r. 
+        Currently, $p=1,2,\text{ or }\infty$ is implemented
         
-        return log_prob_radial + log_prob_unit_ball - conv_log_abs_det_jacobian 
+        Args:
+            p: p norm
+            r: radius (batch)
+        Returns:
+            Differential volume (batch)
+        """
+        if p == 1:
+           # V_1^d'(r) = (2r)**(d-1) / (d-1)!
+           log_denominator = sum([math.log(i) for i in range(1, self.dim)])
+           log_dv = math.log(2) * self.dim + torch.log(r) * (self.dim-1) - log_denominator
+        elif p == 2:
+           # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+           log_numerator = (
+               math.log(self.dim) + (self.dim / 2) * math.log(math.pi) + (self.dim - 1) * torch.log(r)
+           )
+           log_dv = log_numerator - math.lgamma((self.dim / 2) + 1)
+        elif p == math.inf:
+           # V_\infty^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+           log_dv = math.log(self.dim) + self.dim * math.log(2) + (self.dim - 1) * torch.log(r)  
+        else:
+            raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
+        
+        return log_dv
