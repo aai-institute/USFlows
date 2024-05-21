@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Union
 from src.veriflow.transforms import Rotation, CompositeRotation
 from src.veriflow.linalg import random_orthonormal_matrix
 import torch
@@ -206,7 +206,7 @@ class RadialDistribution(torch.distributions.Distribution):
         
         return log_prob_norm - log_dV
     
-    def log_delta_volume(p: int, r: Union[float, torch.Tensor]) -> Union[float. torch.Tensor]:
+    def log_delta_volume(self, p: int, r: Union[float, torch.Tensor]) -> Union[float, torch.Tensor]:
         """Computes the differential log-volume of an $L^p$ ball with radius r. 
         Currently, $p=1,2,\text{ or }\infty$ is implemented
         
@@ -219,16 +219,16 @@ class RadialDistribution(torch.distributions.Distribution):
         if p == 1:
            # V_1^d'(r) = (2r)**(d-1) / (d-1)!
            log_denominator = sum([math.log(i) for i in range(1, self.dim)])
-           log_dv = math.log(2) * d + math.log(r) * (d-1) - ldfac
+           log_dv = math.log(2) * self.dim + torch.log(r) * (self.dim-1) - log_denominator
         elif p == 2:
            # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
            log_numerator = (
-               math.log(self.dim) + (self.dim / 2) * math.log(math.pi) + (d - 1) * math.log(r)
+               math.log(self.dim) + (self.dim / 2) * math.log(math.pi) + (self.dim - 1) * torch.log(r)
            )
-           log_dv = log_numerator - math.lgamma((d / 2) + 1)
+           log_dv = log_numerator - math.lgamma((self.dim / 2) + 1)
         elif p == math.inf:
            # V_\infty^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
-           log_dv = math.log(self.dim) + self.dim * math.log(2) + (self.dim - 1) * math.log(r)  
+           log_dv = math.log(self.dim) + self.dim * math.log(2) + (self.dim - 1) * torch.log(r)  
         else:
             raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
         
