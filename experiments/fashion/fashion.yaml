@@ -6,6 +6,7 @@ experiments:
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: fashion_full_radial_logN
     device: cuda
+    skip: true
     scheduler: &scheduler 
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
@@ -57,7 +58,7 @@ experiments:
             p: 1.0
             loc: 
               __eval__: torch.zeros(784).to("cuda")
-            radial_distribution:
+            norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
                 __eval__: torch.zeros(1).to("cuda")
@@ -67,6 +68,7 @@ experiments:
   - &exp_laplace
     __overwrites__: *exp_rad_logN
     name: fashion_full_laplace
+    skip: false
     trial_config:
       model_cfg: 
           params:
@@ -80,6 +82,7 @@ experiments:
   - &exp_normal
     __overwrites__: *exp_rad_logN
     name: fashion_full_laplace
+    skip: false
     trial_config:
       model_cfg: 
           params:
