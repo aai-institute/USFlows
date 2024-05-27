@@ -188,7 +188,10 @@ class RadialDistribution(torch.distributions.Distribution):
             sample_shape = tuple(sample_shape)
         
 
-        r = self.norm_distribution.sample(sample_shape).unsqueeze(-1).to(self.device)
+        if self.device == "cpu":
+            r = self.norm_distribution.sample(sample_shape).to(self.device)
+        else:
+            r = self.norm_distribution.sample(sample_shape).unsqueeze(-1).to(self.device)
 
         r = r.repeat(*[1 for _ in sample_shape], self.dim)
         u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
