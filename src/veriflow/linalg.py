@@ -26,17 +26,20 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
             if not np.allclose(M.cpu().detach().numpy(), np.tril(M.cpu().detach().numpy())):
                 raise ValueError("M needs to be triangular.")
           
-        print(M.size())
-        print(y.size())
-        # if len(M.size()) != len(y.size()) + 1:
-        #     new_shape = [1] * (len(y.size()) + 1 - len(M.size())) + list(M.size())
-        #     M = M.reshape(new_shape)
+        # From: https://pytorch.org/docs/stable/generated/torch.linalg.solve_triangular.html 
+        # M size (*, n, n)
+        # y size (*, n, k)
         
-        if len(y.size()) == 1:
-             y = y.unsqueeze(0)
+        if (M.size(-2) != y.size(-1)) and (M.size(-2) != y.size(-2)):
+            raise ValueError(f"M and y must have the same size. Got M={M.size()}, y={y.size()}.") 
         
-        x = torch.linalg.solve_triangular(M, y.transpose(-1, -2), upper=is_upper).transpose(-1, -2)#[0]
-        print(type(x))
+        if M.size(-2) == y.size(-1):
+            y = y.transpose(-1, -2)
+        # if len(y.size()) == 1:
+        #      y = y.unsqueeze(0)
+        
+        x = torch.linalg.solve_triangular(M, y, upper=is_upper)
+        
         return x
     
     else:
