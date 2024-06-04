@@ -11,7 +11,6 @@ def test_solve_triangular():
     M_lower = torch.tril(M_base)
     y_lower = torch.stack([M_lower @ x_i for x_i in x])
     x_lower = solve_triangular(M_lower, y_lower)
-
     assert  ((x_lower - x).abs() < tol).all()
     
     M_upper = torch.triu(M_base)
