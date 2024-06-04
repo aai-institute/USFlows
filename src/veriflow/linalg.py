@@ -35,7 +35,8 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
         if len(y.size()) == 1:
              y = y.unsqueeze(0)
         
-        x = torch.linalg.solve_triangular(M, y.transpose(-1, -2), upper=is_upper).transpose(-1, -2)[0]
+        x = torch.linalg.solve_triangular(M, y.transpose(-1, -2), upper=is_upper).transpose(-1, -2)#[0]
+        print(type(x))
         return x
     
     else:
