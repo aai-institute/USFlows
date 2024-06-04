@@ -30,15 +30,16 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
         # M size (*, n, n)
         # y size (*, n, k)
         
+        if len(y.size()) == 1:
+            y = y.unsqueeze(0)
+            
         if (M.size(-2) != y.size(-1)) and (M.size(-2) != y.size(-2)):
             raise ValueError(f"M and y must have the same size. Got M={M.size()}, y={y.size()}.") 
         
         if M.size(-2) == y.size(-1):
             y = y.transpose(-1, -2)
-        # if len(y.size()) == 1:
-        #      y = y.unsqueeze(0)
         
-        x = torch.linalg.solve_triangular(M, y, upper=is_upper)
+        x = torch.linalg.solve_triangular(M, y, upper=is_upper).transpose(-1, -2)
         
         return x
     

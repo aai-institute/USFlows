@@ -2,7 +2,7 @@ import torch
 from src.veriflow.linalg import solve_triangular
 
 test_size = 10
-tol = 1e-4
+tol =  1e-5
 
 def test_solve_triangular():
     M_base = torch.ones(10, 10)
@@ -11,8 +11,6 @@ def test_solve_triangular():
     M_lower = torch.tril(M_base)
     y_lower = torch.stack([M_lower @ x_i for x_i in x])
     x_lower = solve_triangular(M_lower, y_lower)
-    
-    print(x_lower)
     
     assert  ((x_lower - x).abs() < tol).all()
     
