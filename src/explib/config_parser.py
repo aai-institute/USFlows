@@ -161,8 +161,9 @@ def read_config(yaml_path: Union[str, Path]) -> dict:
     with open(yaml_path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    config = unfold_raw_config(config)
+    config = unfold_raw_config(config) 
     config = apply_overwrite(config, recurse=True)
+
     config = parse_raw_config(config)
 
     return config

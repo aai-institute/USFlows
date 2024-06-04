@@ -206,4 +206,4 @@ def latent_radial_qqplot(models: Dict[str, Flow], data: datasets, p, n_samples, 
     plt.tight_layout()
     if save_to:
         plt.savefig(save_to)
-    plt.show()
+    plt.show() 

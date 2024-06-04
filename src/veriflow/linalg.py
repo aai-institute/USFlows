@@ -25,8 +25,13 @@ def solve_triangular(M: torch.Tensor, y: torch.Tensor, pivot: Optional[int]=None
         if not is_upper:
             if not np.allclose(M.cpu().detach().numpy(), np.tril(M.cpu().detach().numpy())):
                 raise ValueError("M needs to be triangular.")
-         
-        x = torch.linalg.solve_triangular(M, y.transpose(1, 0), upper=is_upper).transpose(1, 0)
+          
+        if len(M.size()) != len(y.size()) + 1:
+            new_shape = [1] * (len(y.size()) + 1 - len(M.size())) + list(M.size())
+            M = M.reshape(new_shape)
+        
+        x = torch.linalg.solve_triangular(M, y.transpose(-1, -2), upper=is_upper).transpose(-1, -2)[0]
+        
         return x
     
     else:
