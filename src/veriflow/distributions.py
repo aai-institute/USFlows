@@ -111,7 +111,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
         if self.p == 1: 
             self.log_surface_area_unit_ball = (3/2) * math.log(self.dim) + math.log(2) * self.dim  -  torch.log(torch.arange(1, self.dim + 1)).sum() 
         elif self.p == 2:
-            self.log_surface_area_unit_ball = math.log(2) + (self.dim / 2) * math.log(math.pi) - torch.lgamma(self.dim / 2)
+            self.log_surface_area_unit_ball = math.log(2) + (self.dim / 2) * math.log(math.pi) - math.lgamma(self.dim / 2)
         elif self.p == math.inf:
             self.log_surface_area_unit_ball = math.log(2) * self.dim + math.log(self.dim) 
         else:
@@ -187,9 +187,8 @@ class RadialDistribution(torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
         
-
-        r = self.norm_distribution.sample(sample_shape).unsqueeze(-1).to(self.device)
-
+        r = self.norm_distribution.sample(sample_shape).to(self.device)
+    
         r = r.repeat(*[1 for _ in sample_shape], self.dim)
         u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
         x = r * u

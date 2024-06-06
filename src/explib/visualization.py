@@ -189,9 +189,9 @@ def latent_radial_qqplot(models: Dict[str, Flow], data: datasets, p, n_samples, 
     curves = {"Optimal": plt.plot([0, 1], [0, 1])}
     for name, model in models.items():
         learned_samples =  model.sample((n_samples,))
-        model.export = "backward"
-        true_latent_norms = norm(model.forward(true_samples), p).sort()[0].detach()
-        learned_latent_norms = norm(model.forward(learned_samples), p).sort()[0].detach()
+        model.export = "backward" 
+        true_latent_norms = norm(model.forward(true_samples.to(model.device)), p).sort()[0].cpu().detach()
+        learned_latent_norms = norm(model.forward(learned_samples), p).sort()[0].cpu().detach()
 
         def cdf(r, samples):
             return (samples <= r).sum()/samples.shape[0]
@@ -206,4 +206,4 @@ def latent_radial_qqplot(models: Dict[str, Flow], data: datasets, p, n_samples, 
     plt.tight_layout()
     if save_to:
         plt.savefig(save_to)
-    plt.show()
+    plt.show() 
