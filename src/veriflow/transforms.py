@@ -1,6 +1,6 @@
 import math
 from abc import abstractmethod
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 import pyro
@@ -328,7 +328,8 @@ class LUTransform(BaseTransform):
             # TODO: Proper handling
             d = self.dim
             sign = -torch.ones(d) + 2 * torch.bernoulli(.5 * torch.ones(d))
-            self.U_raw += sign * torch.normal(torch.zeros(self.dim), self.prior_scale * torch.ones(self.dim)).exp().diag()
+            scale = self.prior_scale * torch.ones(d) * 1/self.dim if self.prior_scale is not None else torch.ones(d)
+            self.U_raw += sign * torch.normal(torch.zeros(self.dim), scale).exp().diag()
             self.U_raw.copy_(self.U_raw.triu())
 
         if self.bias is not None:
@@ -606,6 +607,145 @@ class LeakyReLUTransform(BaseTransform):
         """
         return torch.log(y/x).sum()
 
-       
+class Rotation(BaseTransform):
+    """Implements a rotation transform. The transform is defined by two coordinate axes, defining a plane, and a rotation angle."""
+    bijective = True
+    domain = dist.constraints.real
+    codomain = dist.constraints.real
+    sign = 1
+    ladj = 0
+    
+    
+    def __init__(self, dim, plane: Tuple[int, int], angle: float, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if dim < 2:
+            raise ValueError("dim must be at least 2")
+        if plane[0] == plane[1]:
+            raise ValueError("plane must be a tuple of different indices")
+        if dim <= max(plane):
+            raise ValueError("plane indices must be smaller than dim")
+        
+        self.dim = dim
+        self.plane = plane
+        self.angle = angle
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Computes the rotation transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            
+        Returns:
+            torch.Tensor: transformed tensor
+        """
+        y = x.clone()
+        y[..., self.plane[0]] = x[..., self.plane[0]] * math.cos(self.angle) - x[..., self.plane[1]] * math.sin(self.angle)
+        y[..., self.plane[1]] = x[..., self.plane[0]] * math.sin(self.angle) + x[..., self.plane[1]] * math.cos(self.angle)
+        return y
+
+    def backward(self, y: torch.Tensor) -> torch.Tensor:
+        """ Computes the inverse transform
+        
+        Args:
+            y (torch.Tensor): input tensor
+        
+        Returns:
+            torch.Tensor: transformed tensor
+        """
+        y = y.clone()
+        y[..., self.plane[0]] = y[..., self.plane[0]] * math.cos(self.angle) + y[..., self.plane[1]] * math.sin(self.angle)
+        y[..., self.plane[1]] = -y[..., self.plane[0]] * math.sin(self.angle) + y[..., self.plane[1]] * math.cos(self.angle)
+        return y
+    
+    def as_matrix(self) -> torch.Tensor:
+        """ Returns the rotation matrix"""
+        R = torch.eye(self.dim)
+        R[self.plane[0], self.plane[0]] = math.cos(self.angle)
+        R[self.plane[0], self.plane[1]] = -math.sin(self.angle)
+        R[self.plane[1], self.plane[0]] = math.sin(self.angle)
+        R[self.plane[1], self.plane[1]] = math.cos(self.angle)
+        return R
+
+    def _call(self, x: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`forward`"""
+        return self.forward(x)
+
+    def _inverse(self, y: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`backward`"""
+        return self.backward(y)
+
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
+        """ Computes the log absolute determinant of the Jacobian of the transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): output tensor
+        
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform
+        """
+        return self.ladj
+        
+        
+
+class CompositeRotation(BaseTransform):
+    """Implements a composite rotation transform. The transform is defined by a sequence of rotations  $R_1, \ldots, R_n$."""
+    bijective = True
+    domain = dist.constraints.real
+    codomain = dist.constraints.real
+    sign = 1
+    ladj = 0
+    
+    def __init__(self, rotations: List[Rotation], *args, **kwargs) -> None:
+        """ Initializes the composite rotation transform.
+        
+        Args:
+            rotations (List[torch.Tensor]): list of rotation matrices
+        """
+        super().__init__(*args, **kwargs)
+        self.rotations = rotations
+        self.input_shape = rotations[0].dim
+    
+    def as_matrix(self) -> torch.Tensor:
+        """ Returns the composite rotation matrix"""
+        R = torch.eye(self.input_shape)
+        for rot in self.rotations:
+            R = torch.matmul(R, rot.as_matrix())
+        return R
+     
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Computes the composite rotation transform by applying the rotations in sequence"""
+        for rot in self.rotations:
+            x = rot(x)
+            
+        return x
+    
+    def backward(self, y: torch.Tensor, context: Optional[Any] = None) -> torch.Tensor:
+        for rot in self.rotations[::-1]:
+            y = rot.backward(y)
+            
+        return y
+
+    def _call(self, x: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`forward`"""
+        return self.forward(x)
+
+    def _inverse(self, y: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`backward`"""
+        return self.backward(y)
+
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
+        """ Computes the log absolute determinant of the Jacobian of the transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): output tensor
+        
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform
+        """
+        return self.ladj
+        
+
 
 

@@ -13,7 +13,7 @@ RUN apt-get update && \
     ssh && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip && pip install poetry
+RUN pip install --upgrade --break-system-packages pip && pip install --break-system-packages poetry
 
 RUN mkdir /root/.ssh/ && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts && \

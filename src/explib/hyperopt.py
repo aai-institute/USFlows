@@ -5,8 +5,7 @@ import os
 import shutil
 import typing as T
 from datetime import datetime
-from typing import Any, Dict, Iterable, Literal, Optional
-import warnings
+from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -14,10 +13,7 @@ from pickle import dump
 from PIL import Image
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from matplotlib import pyplot as plt
 import plotly.express as px
-from pyro import distributions as dist
-from pyro.distributions.transforms import AffineCoupling, Permute
 import ray
 from ray import tune
 from ray.air import RunConfig, session
@@ -41,6 +37,8 @@ class HyperoptExperiment(Experiment):
         cpus_per_trial: int,
         scheduler: tune.schedulers.FIFOScheduler,
         tuner_params: T.Dict[str, T.Any],
+        device: str = "cpu", 
+        skip: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -62,11 +60,15 @@ class HyperoptExperiment(Experiment):
         self.gpus_per_trial = gpus_per_trial
         self.cpus_per_trial = cpus_per_trial
         self.tuner_params = tuner_params
+        self.device = device
+        self.skip = skip
+        
+        self.trial_config["device"] = device
         
         
 
     @classmethod
-    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = "cpu") -> Dict[str, float]:
+    def _trial(cls, config: T.Dict[str, T.Any], device: torch.device = None) -> Dict[str, float]:
         """Worker function for hyperparameter optimization.
         
         Args:
@@ -79,7 +81,9 @@ class HyperoptExperiment(Experiment):
         # warnings.simplefilter("error")
         torch.autograd.set_detect_anomaly(True)
         if device is None:
-            if torch.backends.mps.is_available():
+            if config["device"] is not None:
+                device = config["device"]
+            elif torch.backends.mps.is_available():
                 device = torch.device("mps")
                 # torch.mps.empty_cache()
             elif torch.cuda.is_available():
@@ -173,7 +177,11 @@ class HyperoptExperiment(Experiment):
             report_dir (os.PathLike): report directory
             storage_path (os.PathLike, optional): Ray logging path. Defaults to None.
         """
-        home = os.path.expanduser("~")
+        if self.skip:
+            return
+        
+        if storage_path is None:
+            storage_path = os.path.expanduser("~")
         
         ray.init(_temp_dir=f"{storage_path}/temp/")
         #ray.init()
@@ -187,7 +195,6 @@ class HyperoptExperiment(Experiment):
             tuner_config = {}
 
         exptime = str(datetime.now())
-        trial_config = self.trial_config
         tuner = tune.Tuner(
             tune.with_resources(
                 tune.with_parameters(HyperoptExperiment._trial),
@@ -256,7 +263,8 @@ class HyperoptExperiment(Experiment):
         )
         
         return best_result
-        
+    
+    @classmethod  
     def _build_report(self, expdir: str, report_file: str, config_prefix: str = "") -> pd.DataFrame:
         """Builds a report of the hyperopt experiment.
 
@@ -292,7 +300,10 @@ class HyperoptExperiment(Experiment):
                     )
 
         os.makedirs(os.path.dirname(report_file), exist_ok=True)
-        report.to_csv(report_file, index=False)
+        try:
+            report.to_csv(report_file, index=False)
+        except:
+            pass
         return report
 
 

@@ -214,8 +214,13 @@ class ConditionalDenseNN(torch.nn.Module):
         # Save the nonlinearity
         self.f = nonlinearity
 
-    def forward(self, x, context):
-        h = self.f(self.layers[0](x) + self.layers[1](context))
+    def forward(self, x, context=None):
+        
+        h = self.layers[0](x) 
+        if context is not None:           
+            h = h + self.layers[1](context)
+            
+        h = self.f(h)
         
         for layer in self.layers[2:-1]:
             h = self.f(layer(h))
@@ -223,10 +228,3 @@ class ConditionalDenseNN(torch.nn.Module):
 
         return h
 
-
-    def _forward(self, x):
-        """
-        The forward method
-        """
-        h = x
-        

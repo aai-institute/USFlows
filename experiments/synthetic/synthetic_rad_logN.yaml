@@ -10,6 +10,8 @@ experiments:
         - &main_normal
           __object__:  src.explib.hyperopt.HyperoptExperiment
           name: normal
+          device: cpu
+          skip: true
           scheduler: &scheduler 
             __object__: ray.tune.schedulers.ASHAScheduler
             max_t: 10000
@@ -65,37 +67,32 @@ experiments:
                   __eval__: tune.choice([torch.nn.ReLU()])
                 split_dim: &split_dim 1
                 base_distribution:
-                  __object__: pyro.distributions.Normal
+                  __object__: src.veriflow.distributions.RadialDistribution       
+                  device: cpu
+                  p: 1.0
                   loc: 
-                    __eval__: torch.zeros(2)
-                  scale: 
-                    __eval__: torch.ones(2)
-        - __overwrites__: *main_normal
-          name: laplace
-          trial_config:
-            model_cfg: 
-              params:
-                base_distribution:
-                  __object__: pyro.distributions.Laplace
-                  loc: 
-                    __eval__: torch.zeros(2)
-                  scale: 
-                    __eval__: torch.ones(2)
+                    __eval__: torch.zeros(2).to("cpu")
+                  norm_distribution:
+                    __object__: pyro.distributions.LogNormal
+                    loc: 
+                      __eval__: torch.zeros(1).to("cpu")
+                    scale: 
+                      __eval__: (.5 * torch.ones(1)).to("cpu")
     - &moons
       __overwrites__: *main
       name: moons
       experiments:
-        - trial_config:
+        - skip: true
+          trial_config:
             dataset:
               generator: moons
-        - trial_config:
-            dataset:
-              generator: moons
+        
     - &circles
       __overwrites__: *main
-      name: blobs
+      name: circles
       experiments:
-        - trial_config:
+        - skip: false
+          trial_config:
             dataset:
               generator: blobs
               params_train: 
@@ -107,38 +104,13 @@ experiments:
               params_val: 
                 n_samples: 20000
                 centers: [[-5., -5.], [0., 0.], [5., 5.]]
-        - trial_config:
-            dataset:
-              generator: blobs
-              params_train: 
-                n_samples: 100000
-                centers: [[-5., -5.], [0., 0.], [5., 5.]]
-              params_test: 
-                n_samples: 20000
-                centers: [[-5., -5.], [0., 0.], [5., 5.]]
-              params_val:
-                n_samples: 20000
-                centers: [[-5., -5.], [0., 0.], [5., 5.]]
+   
     - &transformed
       __overwrites__: *main
       name: transformed
       experiments:
-        - trial_config:
-            dataset:
-              generator: transformed
-              params_train: 
-                dim: 2
-                transform:
-                  __eval__: torch.Tensor([[1.0, 0.5], [-0.5, 1.0]])
-              params_test: 
-                dim: 2
-                transform:
-                  __eval__: torch.Tensor([[1.0, 0.5], [-0.5, 1.0]])
-              params_val: 
-                dim: 2
-                transform:
-                  __eval__: torch.Tensor([[1.0, 0.5], [-0.5, 1.0]])
-        - trial_config:
+        - skip: true
+          trial_config:
             dataset:
               generator: transformed
               params_train: 

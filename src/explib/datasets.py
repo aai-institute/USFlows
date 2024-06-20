@@ -25,7 +25,7 @@ class DequantizedDataset(torch.utils.data.Dataset):
     ):
         if isinstance(dataset, torch.utils.data.Dataset) or isinstance(
             dataset, np.ndarray
-        ):
+        ) or isinstance(dataset, torch.Tensor):
             self.dataset = dataset
         else:
             self.dataset = pd.read_csv(dataset).values
@@ -192,6 +192,8 @@ class SyntheticDataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int):
         if isinstance(self.dataset, np.ndarray):
             x = self.dataset[index].copy()
+        else:
+            x = self.dataset[index]
         if not isinstance(x, Tensor):
             x = Tensor(x)
         return x, torch.zeros_like(x)
@@ -236,6 +238,7 @@ class FashionMnistDequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
+        scale: bool = False
     ):
         rel_path = (
             "FashionMNIST/raw/train-images-idx3-ubyte"
@@ -246,7 +249,9 @@ class FashionMnistDequantized(DequantizedDataset):
         if not os.path.exists(path):
             FashionMNIST(dataloc, train=train, download=True)
         # TODO: remove hardcoding of 3x3 downsampling, vectorizing
-        dataset = idx2numpy.convert_from_file(path)[:, ::3, ::3]
+        dataset = idx2numpy.convert_from_file(path)
+        if scale:
+            dataset = dataset[:, ::3, ::3]
         dataset = dataset.reshape(dataset.shape[0], -1)
         if label is not None:
             rel_path = (
@@ -315,7 +320,6 @@ class MnistDequantized(DequantizedDataset):
 
         dataset = idx2numpy.convert_from_file(path)
         if scale:
-            
             dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
@@ -327,10 +331,13 @@ class MnistDequantized(DequantizedDataset):
             path = os.path.join(dataloc, rel_path)
             labels = idx2numpy.convert_from_file(path)
             dataset = dataset[labels == digit]
-        super().__init__(dataset, num_bits=8)
+        super().__init__(torch.Tensor(dataset), num_bits=8)
 
     def __getitem__(self, index: int):
-        x = Tensor(self.dataset[index].copy())
+        if not isinstance(self.dataset, torch.Tensor):
+            x = Tensor(self.dataset[index].copy())
+        else:
+            x = self.dataset[index]
         x = self.transform(x)
         return x, 0
 

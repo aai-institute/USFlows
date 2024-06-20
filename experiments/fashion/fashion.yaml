@@ -1,10 +1,12 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_ablation
+name: fashion_ablation
 experiments:
   - &exp_rad_logN
     __object__: src.explib.hyperopt.HyperoptExperiment
-    name: mnist_full_radial_logN
+    name: fashion_full_radial_logN
+    device: cuda
+    skip: true
     scheduler: &scheduler 
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
@@ -21,7 +23,7 @@ experiments:
         images: true
         "image_shape": [28, 28]
       dataset: &dataset
-        __object__: src.explib.datasets.MnistSplit
+        __object__: src.explib.datasets.FashionMnistSplit
       epochs: &epochs 200000
       patience: &patience 2
       batch_size: &batch_size 
@@ -56,7 +58,7 @@ experiments:
             p: 1.0
             loc: 
               __eval__: torch.zeros(784).to("cuda")
-            radial_distribution:
+            norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
                 __eval__: torch.zeros(1).to("cuda")
@@ -65,7 +67,8 @@ experiments:
           use_lu: true
   - &exp_laplace
     __overwrites__: *exp_rad_logN
-    name: mnist_full_laplace
+    name: fashion_full_laplace
+    skip: false
     trial_config:
       model_cfg: 
           params:
@@ -78,7 +81,8 @@ experiments:
                   __eval__: torch.ones(784).to("cuda")
   - &exp_normal
     __overwrites__: *exp_rad_logN
-    name: mnist_full_laplace
+    name: fashion_full_laplace
+    skip: false
     trial_config:
       model_cfg: 
           params:
