@@ -122,8 +122,8 @@ class OnnxConverter(Experiment):
             network.addInequality(redundant_vars, ones, threshold_input_upper)
         else:
             for i in range(100): # the 100 input variables.
-                network.setLowerBound(i, -0.002)  # 0.0025 takes 521 seconds
-                network.setUpperBound(i, 0.002) #0.01  0.00215 was sat?!
+                network.setLowerBound(i, -0.01)  # 0.0025 takes 521 seconds
+                network.setUpperBound(i, 0.01) #0.01  0.00215 was sat?!
 
         post_condition_func(network, target_class, maraboupy, confidence_threshold)
         start_time = time.time()
@@ -228,7 +228,8 @@ class OnnxConverter(Experiment):
     def run_within_distribution_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
 
-        for confidence_threshold in range(1, 21, 1):
+        for confidence_threshold in range(8, 20, 1):
+            #confidence_threshold = 16.5
             print(f'experiment no {confidence_threshold} of 20')
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
             counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy,
@@ -236,6 +237,7 @@ class OnnxConverter(Experiment):
                                                                  confidence_threshold)
             if is_error:
                 continue
+                #return
             outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
                 None,
                 {'onnx::MatMul_0': counter_example})
@@ -249,6 +251,7 @@ class OnnxConverter(Experiment):
                                                                     confidence_threshold)
             if is_error:
                 continue
+                #return
             self.fill_report(counter_example, counter_example, experiment_directory_without_flow, classifier_path,
                              target_class)
 
@@ -264,12 +267,11 @@ class OnnxConverter(Experiment):
 
     def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
-        for confidence in range(8, 31, 1):
+        for confidence in range(8, 20, 1):
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence)
             counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy,
                                                                           experiment_directory_with_flow,
                                                                           target_class,confidence)
-
             if is_error:
                 continue
             outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
