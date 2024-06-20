@@ -226,15 +226,4 @@ class ConditionalDenseNN(torch.nn.Module):
             h = self.f(layer(h))
         h = self.layers[-1](h)
 
-        return h
-    
-    # TODO: not sure if this is necessary
-
-    # def to(self, device) -> None:
-    #     """Moves the model to the given device"""
-
-    #     self.device = device
-
-    #     self.layers = torch.nn.ModuleList([l.to(device) for l in self.layers])
-
-    #     return super().to(device)
+        return h 

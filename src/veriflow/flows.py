@@ -22,7 +22,7 @@ class Flow(torch.nn.Module):
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
     export: export_modes = "log_prob"
-    device = "cpu" #TODO: is it used somewhere?
+    device = "cuda"  
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -132,7 +132,7 @@ class Flow(torch.nn.Module):
             for idx in range(0, N, batch_size):
                 end = min(idx + batch_size, N)
                 try:
-                    sample = torch.Tensor(data_train_shuffle[idx:end]) # TODO: removed .to(device) because the all dataset has been passed to the device before
+                    sample = torch.Tensor(data_train_shuffle[idx:end])  
                 except:
                     continue
                  
