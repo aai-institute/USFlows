@@ -16,14 +16,13 @@ from src.veriflow.transforms import (
 )
 from src.veriflow.networks import ConvNet2D, ConditionalDenseNN
 
-
 class Flow(torch.nn.Module):
     """Base implementation of a flow model"""
 
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
     export: export_modes = "log_prob"
-    device = "cpu"
+    device = "cpu" #TODO: is it used somewhere?
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
@@ -133,16 +132,17 @@ class Flow(torch.nn.Module):
             for idx in range(0, N, batch_size):
                 end = min(idx + batch_size, N)
                 try:
-                    sample = torch.Tensor(data_train_shuffle[idx:end]).to(device)
+                    sample = torch.Tensor(data_train_shuffle[idx:end]) # TODO: removed .to(device) because the all dataset has been passed to the device before
                 except:
                     continue
-
+                 
                 if self.soft_training:
                     noise = self.training_noise_prior.sample([sample.shape[0]]) 
 
                     # Repeat noise for all data dimensions
                     sigma = noise
-                    r = torch.Tensor(list(sample.shape[1:])).prod().int()
+                    r = torch.Tensor(list(sample.shape[1:])).prod().int().to(device)
+                    
                     sigma = sigma.repeat_interleave(r)
                     sigma = sigma.reshape(sample.shape)
 
@@ -167,7 +167,7 @@ class Flow(torch.nn.Module):
                 optim.step()
                 if not self.is_feasible():
                     raise RuntimeError("Model is not invertible")
-
+ 
                 model.transform.clear_cache()
             epoch_losses.append(np.mean(losses))
 
@@ -220,7 +220,7 @@ class Flow(torch.nn.Module):
             sample_shape = [1]
 
         y = self.base_distribution.sample(sample_shape)
-        for layer in self.layers:
+        for layer in self.layers: 
             if context is not None:
                 y = layer.forward(y, context=context)
             else:
@@ -235,6 +235,7 @@ class Flow(torch.nn.Module):
         self.trainable_layers = torch.nn.ModuleList(
             [l.to(device) for l in self.trainable_layers]
         )
+                    
         self._distribution_to(device)
         return super().to(device)
 
@@ -350,6 +351,7 @@ class NiceFlow(Flow):
         )
 
     def log_prob(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
+         
         if context is not None:
             return super().log_prob(x, context)
         else:
@@ -364,14 +366,14 @@ class NiceFlow(Flow):
         if context is not None:
             return super().sample(sample_shape, context)
         else:
-            if self.soft_training:
-                return super().sample(
-                    sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1).to(self.device)
-                )
-            else:
-                return super().sample(
-                    sample_shape
-                )
+            # if self.soft_training:
+            #     return super().sample(
+            #         sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1).to(self.device)
+            #     )
+            # else:
+            return super().sample(
+                sample_shape
+            )
 
     def _get_mask(self, masktype: mask, i=0):
         """Returns a mask for the i-th coupling"""
@@ -408,7 +410,6 @@ class NiceFlow(Flow):
 
         Any additive constant is dropped in the optimization procedure.
         """
-
         if self.use_lu and self.prior_scale is not None:
             log_prior = 0
             n_layers = self.input_dim * len(self.lu_layers)
@@ -416,21 +417,22 @@ class NiceFlow(Flow):
                 precision = None
                 d = self.input_dim
                 if correlated:
+
                     # Pairwise negative correlation of 1/d
-                    covariance = -1 / d * torch.ones(d, d) + (1 + 1 / d) * torch.diag(
-                        torch.ones(d)
+                    covariance = -1 / d * torch.ones(d, d).to(self.device) + (1 + 1 / d) * torch.diag(
+                        torch.ones(d).to(self.device)
                     )
                     # Scaling
                     covariance = covariance * (self.prior_scale**2 / n_layers)
                 else:
-                    covariance = torch.eye(d)
+                    covariance = torch.eye(d).to(self.device)
                     # Scaling
                     covariance = covariance * (self.prior_scale**2 / (n_layers * d))
 
                 precision = torch.linalg.inv(covariance).to(self.device)
 
                 # log-density of Normal in log-space
-                x = p.U.diag().abs().log()
+                x = p.U.diag().abs().log() 
                 log_prior += -(x * (precision @ x)).sum()
                 # Change of variables to input space
                 log_prior += -x.sum()
