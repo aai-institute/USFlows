@@ -192,9 +192,8 @@ def latent_radial_qqplot(models: Dict[str, Flow], data: datasets, p, n_samples, 
         
         model.export = "backward" 
         true_latent_norms = norm(model.forward(true_samples.to(model.device)), p).sort()[0].cpu().detach()
-        print(f"true norms {true_latent_norms}")
         learned_latent_norms = norm(model.forward(learned_samples), p).sort()[0].cpu().detach()
-        print(f"learned norms {learned_latent_norms}")
+        
         def cdf(r, samples):
             return (samples <= r).sum()/samples.shape[0]
 
