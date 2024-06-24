@@ -183,7 +183,10 @@ class HyperoptExperiment(Experiment):
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
-        ray.init(_temp_dir=f"{storage_path}/temp/")
+        ray.init(local_mode=True,
+                 #configure_logging=True,
+                 #logging_level=logging.DEBUG,
+                 _temp_dir=f"{storage_path}/temp/")
         #ray.init()
         
         if storage_path is not None:
@@ -261,7 +264,8 @@ class HyperoptExperiment(Experiment):
         best_result.to_csv(
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
-        
+
+        best_model.to_onnx("/home/mustafa/repos/VeriFlow/scripts/reports/model.onnx")
         return best_result
     
     @classmethod  

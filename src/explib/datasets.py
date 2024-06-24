@@ -388,3 +388,36 @@ class Cifar10Dequantized(DequantizedDataset):
         if not os.path.exists(path):
             CIFAR10(dataloc, train=train, download=True)
             
+
+class CreditData(SimpleSplit):
+    def __init__(self,
+                 dataloc: os.PathLike,
+                 train: bool = True
+                 ):
+        print("fetching credit data")
+        path = dataloc
+        if not os.path.exists(path):
+            print(f'Dataset not found {path}')
+        else:
+            cred_data = pd.read_csv(path)
+            if cred_data is None:
+                print(f'Credit data is none')
+            self.dataloc = dataloc
+            cred_data = cred_data.drop(["Id"], axis=1)
+            # Split into 60% train, 20% validate and 20% test set.
+            self.train, self.val, self.test = \
+                np.split(cred_data.sample(frac=1, random_state=42),
+                         [int(.6 * len(cred_data)), int(.8 * len(cred_data))])
+
+            self.train = self.train.to_numpy(copy=True)
+            self.val = self.val.to_numpy(copy=True)
+            self.test = self.test.to_numpy(copy=True)
+
+            print("-------train-------------")
+            print(self.train)
+            print("-------val-------------")
+            print(self.val)
+            print("-------test-------------")
+            print(self.test)
+            print("--------------------")
+
