@@ -114,9 +114,7 @@ class HyperoptExperiment(Experiment):
             val_loss = 0
             for i in range(0, len(data_val), config["batch_size"]):
                 j = min([len(data_test), i + config["batch_size"]])
-                #val_loss += float(-flow.log_prob(data_val[i:j][0].to(device)).sum())
-                val_loss += float(-flow.log_prob(torch.from_numpy(data_val.copy()[i:j][0]).float().to(device)).sum())
-
+                val_loss += float(-flow.log_prob(data_val[i:j][0].to(device)).sum())
             val_loss /= len(data_val)
 
             session.report(
@@ -258,8 +256,7 @@ class HyperoptExperiment(Experiment):
         for i in range(0, len(data_test), 100):
             j = min([len(data_test), i + 100])
             test_loss += float(
-                # val_loss += float(-flow.log_prob(torch.from_numpy(data_val.copy()[i:j][0]).float().to(device)).sum())
-                -best_model.log_prob(torch.from_numpy(data_test.copy()[i:j][0]).to(device)).sum()
+                -best_model.log_prob(data_test[i:j][0].to(device)).sum()
             )
         test_loss /= len(data_test)
         
