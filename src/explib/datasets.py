@@ -405,13 +405,13 @@ class CreditData(SimpleSplit):
             self.dataloc = dataloc
             cred_data = cred_data.drop(["Id"], axis=1)
             # Split into 60% train, 20% validate and 20% test set.
-            self.train, self.val, self.test = \
+            train_nd, val_nd, test_nd = \
                 np.split(cred_data.sample(frac=1, random_state=42),
                          [int(.6 * len(cred_data)), int(.8 * len(cred_data))])
 
-            self.train = self.train.to_numpy(copy=True)
-            self.val = self.val.to_numpy(copy=True)
-            self.test = self.test.to_numpy(copy=True)
+            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float()
+            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float()
+            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float()
 
             print("-------train-------------")
             print(self.train)
