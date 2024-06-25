@@ -403,7 +403,7 @@ class CreditData(SimpleSplit):
             if cred_data is None:
                 print(f'Credit data is none')
             self.dataloc = dataloc
-            cred_data = cred_data.drop(["Id"], axis=1)
+            #cred_data = cred_data.drop(["Id"], axis=1)
             # Split into 60% train, 20% validate and 20% test set.
             train_nd, val_nd, test_nd = \
                 np.split(cred_data.sample(frac=1, random_state=42),

@@ -23,11 +23,11 @@ def preprocess_data(input_file, output_file):
     data_scaled = min_max_scaler.fit_transform(data)
 
     # Standardizing the data
-    standard_scaler = StandardScaler()
-    data_standardized = standard_scaler.fit_transform(data_scaled)
+    #standard_scaler = StandardScaler()
+    #data_standardized = standard_scaler.fit_transform(data_scaled)
 
     # Convert the standardized data back to DataFrame
-    data_standardized_df = pd.DataFrame(data_standardized, columns=data.columns)
+    data_standardized_df = pd.DataFrame(data_scaled, columns=data.columns)
 
     # Save the processed data to CSV
     data_standardized_df.to_csv(output_file, index=False)
@@ -35,8 +35,8 @@ def preprocess_data(input_file, output_file):
     # Save the scalers for inverse transform later
     with open('min_max_scaler.pkl', 'wb') as f:
         pickle.dump(min_max_scaler, f)
-    with open('standard_scaler.pkl', 'wb') as f:
-        pickle.dump(standard_scaler, f)
+    #with open('standard_scaler.pkl', 'wb') as f:
+    #    pickle.dump(standard_scaler, f)
 
     print(f"Processed data saved to {output_file}")
 
@@ -47,14 +47,14 @@ def inverse_transform(processed_data_file):
     # Load the scalers
     with open('min_max_scaler.pkl', 'rb') as f:
         min_max_scaler = pickle.load(f)
-    with open('standard_scaler.pkl', 'rb') as f:
-        standard_scaler = pickle.load(f)
+    #with open('standard_scaler.pkl', 'rb') as f:
+    #    standard_scaler = pickle.load(f)
 
     # Inverse transform the standardization
-    data_unstandardized = standard_scaler.inverse_transform(data_processed)
+    #data_unstandardized = standard_scaler.inverse_transform(data_processed)
 
     # Inverse transform the scaling to [0, 1]
-    original_data = min_max_scaler.inverse_transform(data_unstandardized)
+    original_data = min_max_scaler.inverse_transform(data_processed)
 
     # Convert back to DataFrame
     original_data_df = pd.DataFrame(original_data, columns=data_processed.columns)
