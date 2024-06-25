@@ -132,7 +132,9 @@ class Flow(torch.nn.Module):
             for idx in range(0, N, batch_size):
                 end = min(idx + batch_size, N)
                 try:
-                    sample = torch.Tensor(data_train_shuffle[idx:end]) # TODO: removed .to(device) because the all dataset has been passed to the device before
+                    sample = data_train_shuffle[idx:end]
+                    if not isinstance(sample, torch.Tensor):
+                        sample = torch.Tensor(sample)  
                 except:
                     continue
                  
@@ -141,7 +143,11 @@ class Flow(torch.nn.Module):
 
                     # Repeat noise for all data dimensions
                     sigma = noise
-                    r = torch.Tensor(list(sample.shape[1:])).prod().int().to(device)
+             
+                    r = list(sample.shape[1:])
+                    if not isinstance(r, torch.Tensor):
+                        r = torch.Tensor(r).prod()
+                    r = r.int().to(device)
                     
                     sigma = sigma.repeat_interleave(r)
                     sigma = sigma.reshape(sample.shape)
