@@ -33,8 +33,8 @@ def remove_reshape_node(model):
     return model
 
 if __name__ == '__main__':
-    path_flow = "model_0_lognormal_decay_forward.onnx"
+    path_flow = "models/model_0_lognormal_decay_forward.onnx"
     model = onnx.load(path_flow)
     model = remove_reshape_node(model)
     onnx.checker.check_model(model=model, full_check=True)
-    onnx.save(model, "./without_reshape.onnx")
+    onnx.save(model, "models/without_reshape.onnx")

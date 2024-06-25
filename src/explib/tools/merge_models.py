@@ -27,8 +27,8 @@ def swap_mul_inputs(model):
 
 
 if __name__ == '__main__':
-    PATH_FLOW = "matmuls_replaced_mnist_9_forward_IR_7.onnx"
-    PATH_CLASSIFIER ="./MnistSimpleClassifier_IR_7.onnx"
+    PATH_FLOW = "models/matmuls_replaced_mnist_9_forward_IR_7.onnx"
+    PATH_CLASSIFIER = "models/MnistSimpleClassifier_IR_7.onnx"
     model = onnx.load(PATH_FLOW)
     classifier = onnx.load(PATH_CLASSIFIER)
     modified_model = swap_mul_inputs(model)
