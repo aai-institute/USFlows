@@ -21,6 +21,7 @@ class DequantizedDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         dataset: T.Union[os.PathLike, torch.utils.data.Dataset, np.ndarray],
+        labels: T.Union[np.ndarray, torch.Tensor] = None, 
         num_bits: int = 8,
         device: torch.device = None, 
     ):
@@ -33,6 +34,11 @@ class DequantizedDataset(torch.utils.data.Dataset):
 
         #
         self.dataset = self.dataset.to(device)
+        if not isinstance(labels, torch.Tensor):
+            labels = torch.Tensor(labels)
+        
+        self.labels = labels.to(device)
+        
         self.num_bits = num_bits
         self.num_levels = 2**num_bits
         self.transform = transforms.Compose(
@@ -323,19 +329,24 @@ class MnistDequantized(DequantizedDataset):
             MNIST(dataloc, train=train, download=True)
 
         dataset = idx2numpy.convert_from_file(path)
+        
         if scale:
             dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
+        
+        if train:
+            rel_path = "MNIST/raw/train-labels-idx1-ubyte"
+        else:
+            rel_path = "MNIST/raw/t10k-labels-idx1-ubyte"
+        path = os.path.join(dataloc, rel_path)
+        labels = idx2numpy.convert_from_file(path)
+        
         if digit is not None:
-            if train:
-                rel_path = "MNIST/raw/train-labels-idx1-ubyte"
-            else:
-                rel_path = "MNIST/raw/t10k-labels-idx1-ubyte"
-            path = os.path.join(dataloc, rel_path)
-            labels = idx2numpy.convert_from_file(path)
             dataset = dataset[labels == digit]
-        super().__init__(torch.Tensor(dataset), num_bits=8, device=device)
+            labels = labels[labels == digit]
+            
+        super().__init__(torch.Tensor(dataset), labels=torch.Tensor(labels), num_bits=8, device=device)
 
     def __getitem__(self, index: int):
         if not isinstance(self.dataset, torch.Tensor):
@@ -343,7 +354,7 @@ class MnistDequantized(DequantizedDataset):
         else:
             x = self.dataset[index]
         x = self.transform(x)
-        return x, 0
+        return x, self.labels[index]
 
 class MnistSplit(DataSplit):
     def __init__(
