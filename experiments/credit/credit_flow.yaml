@@ -22,8 +22,8 @@ experiments:
         "image_shape": [21, 1] # [21,1] is shape of data after removing the ID column
       dataset: 
         __object__: src.explib.datasets.CreditData
-        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive.csv"
-      epochs:  2  #200000
+        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive_processed.csv"  #/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive.csv
+      epochs:  4000000  # 200000
       patience: 20
       batch_size:
         __eval__: tune.choice([16])
