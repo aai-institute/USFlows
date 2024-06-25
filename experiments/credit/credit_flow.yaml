@@ -42,8 +42,10 @@ experiments:
           soft_training: false
           training_noise_prior:
             __object__: pyro.distributions.Laplace
-            loc: 0.0
-            scale: 0.001  #0.001
+            loc:
+              __eval__: torch.zeros(21).to("cpu")
+            scale:
+              __eval__: torch.ones(21).to("cpu")
           prior_scale: 1.0
           coupling_layers: 
             __eval__: tune.choice([3])

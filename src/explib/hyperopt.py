@@ -265,7 +265,7 @@ class HyperoptExperiment(Experiment):
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
 
-        best_model.to_onnx("/home/mustafa/repos/VeriFlow/scripts/reports/model.onnx")
+        best_model.to_onnx("/home/mustafa/repos/VeriFlow/scripts/reports/model.onnx", export_mode="forward") #, export_mode="sample"backward
         return best_result
     
     @classmethod  
