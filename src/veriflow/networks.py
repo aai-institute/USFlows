@@ -226,5 +226,4 @@ class ConditionalDenseNN(torch.nn.Module):
             h = self.f(layer(h))
         h = self.layers[-1](h)
 
-        return h
-
+        return h 

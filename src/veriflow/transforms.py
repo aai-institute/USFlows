@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 from src.veriflow.linalg import solve_triangular
 
-
 class BaseTransform(dist.TransformModule):
     """Base class for transforms. Implemented as a thin layer on top of pyro's TransformModule. The baseTransform
     provides additional methods for checking and constraints on the parameters of the transform.
@@ -296,9 +295,9 @@ class LUTransform(BaseTransform):
             dim (int): dimension of the input and output
         """
         super().__init__(*args, **kwargs)
-        self.L_raw = torch.nn.Parameter(torch.empty(dim, dim))
-        self.U_raw = torch.nn.Parameter(torch.empty(dim, dim))
-        self.bias = torch.nn.Parameter(torch.empty(dim))
+        self.L_raw = torch.nn.Parameter(torch.empty(dim, dim)) 
+        self.U_raw = torch.nn.Parameter(torch.empty(dim, dim)) 
+        self.bias = torch.nn.Parameter(torch.empty(dim)) 
         self.dim = dim
         self.prior_scale = prior_scale
 
@@ -322,13 +321,15 @@ class LUTransform(BaseTransform):
             self.L_raw.copy_(self.L_raw.tril(diagonal=-1).fill_diagonal_(1))
 
         init.kaiming_uniform_(self.U_raw, nonlinearity="relu")
+         
         with torch.no_grad():
             self.U_raw.fill_diagonal_(0) 
             #self.U_raw += torch.eye(self.dim)
             # TODO: Proper handling
             d = self.dim
             sign = -torch.ones(d) + 2 * torch.bernoulli(.5 * torch.ones(d))
-            scale = self.prior_scale * torch.ones(d) * 1/self.dim if self.prior_scale is not None else torch.ones(d)
+            scale = self.prior_scale * torch.ones(d) * 1/self.dim if self.prior_scale is not None else torch.ones(d) 
+            
             self.U_raw += sign * torch.normal(torch.zeros(self.dim), scale).exp().diag()
             self.U_raw.copy_(self.U_raw.triu())
 
@@ -349,7 +350,9 @@ class LUTransform(BaseTransform):
         :type x: torch.Tensor
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
+
         x0 = x + torch.functional.F.linear(self.bias, self.inv_weight)
+        
         y0 = solve_triangular(self.L, x0)
         y = solve_triangular(self.U, y0)
         return y
@@ -423,9 +426,9 @@ class LUTransform(BaseTransform):
         """
         self.L_mask = self.L_mask.to(device)
         self.U_mask = self.U_mask.to(device)
-        #self.L_raw = self.L_raw.to(device)
-        #self.U_raw = self.U_raw.to(device)
-        #self.bias = self.bias.to(device)
+        # self.L_raw = self.L_raw.to(device)
+        # self.U_raw = self.U_raw.to(device)
+        # self.bias = self.bias.to(device)
         return super().to(device)
 
     def is_feasible(self) -> bool:
@@ -484,6 +487,7 @@ class MaskedCoupling(BaseTransform):
         Args:
             x (torch.Tensor): input tensor
         """
+
         x_masked = x * self.mask
         if context is None:
             x_transformed = x + (1 - self.mask) * self.conditioner(x_masked)
@@ -545,6 +549,7 @@ class MaskedCoupling(BaseTransform):
             device (torch.device): target device
         """
         self.mask = self.mask.to(device)
+        
         return super().to(device)
 
     
