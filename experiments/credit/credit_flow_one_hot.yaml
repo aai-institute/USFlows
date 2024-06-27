@@ -1,0 +1,64 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: credit
+experiments:
+  - &exp_nice_lu_laplace
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: credit_1
+    scheduler:  
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: 1
+    gpus_per_trial: 0
+    cpus_per_trial: 1
+    tuner_params: 
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [35, 1] # [21,1] is shape of data after removing the ID column
+      dataset: 
+        __object__: src.explib.datasets.CreditData
+        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive_processed_one_hot.csv"  #/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive.csv
+      epochs:  5000  # 200000
+      patience: 50
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg: 
+        optimizer:
+          __class__: torch.optim.Adam 
+        params:
+          lr: 
+            __eval__: tune.loguniform(1e-5, 1e-3)
+          weight_decay: 0.0
+      model_cfg: 
+        type:
+          __class__:  src.veriflow.flows.NiceFlow
+        params:
+          masktype: alternate
+          soft_training: false
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(35).to("cpu")
+            scale:
+              __eval__: torch.ones(35).to("cpu")
+          prior_scale: 1.0
+          coupling_layers: 
+            __eval__: tune.choice([3])
+          coupling_nn_layers:
+            __eval__: "tune.choice([[18],[35], [18, 18], [35, 18], [18, 35], [35, 35]])"
+          nonlinearity: 
+            __eval__: tune.choice([torch.nn.ReLU()])
+          split_dim: 
+            __eval__: tune.choice([10 + i for i in range(41)])
+          base_distribution: 
+            __object__: pyro.distributions.Laplace # src.veriflow.distributions.RadialDistribution  # alt: UniformUnitLpBall, Chi, RotatedLaplace RadialDistribution
+            loc:
+              __eval__: torch.zeros(35).to("cpu")
+            scale:
+              __eval__: torch.ones(35).to("cpu")
+          use_lu: false
