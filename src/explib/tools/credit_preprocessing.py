@@ -24,8 +24,8 @@ def preprocess_data(input_file, output_file):
     data = pd.get_dummies(data, columns=one_hot_features)
 
     # Scaling to range [0, 1]
-    min_max_scaler = MinMaxScaler()
-    data_scaled = min_max_scaler.fit_transform(data)
+    scaler = StandardScaler()
+    data_scaled = scaler.fit_transform(data)
 
     # Convert the standardized data back to DataFrame
     data_standardized_df = pd.DataFrame(data_scaled, columns=data.columns)
@@ -35,7 +35,7 @@ def preprocess_data(input_file, output_file):
 
     # Save the scalers for inverse transform later
     with open('min_max_scaler.pkl', 'wb') as f:
-        pickle.dump(min_max_scaler, f)
+        pickle.dump(scaler, f)
 
     print(f"Processed data saved to {output_file}")
 
