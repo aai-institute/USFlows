@@ -26,17 +26,13 @@ def preprocess_data(input_file, output_file):
     # Scaling to range [0, 1]
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
+    with open('standard_scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
 
     # Convert the standardized data back to DataFrame
     data_standardized_df = pd.DataFrame(data_scaled, columns=data.columns)
-
     # Save the processed data to CSV
     data_standardized_df.to_csv(output_file, index=False)
-
-    # Save the scalers for inverse transform later
-    with open('min_max_scaler.pkl', 'wb') as f:
-        pickle.dump(scaler, f)
-
     print(f"Processed data saved to {output_file}")
 
 def inverse_transform(processed_data_file, input_file):
@@ -44,7 +40,7 @@ def inverse_transform(processed_data_file, input_file):
     data_processed = pd.read_csv(processed_data_file)
 
     # Load the scalers
-    with open('min_max_scaler.pkl', 'rb') as f:
+    with open('standard_scaler.pkl', 'rb') as f:
         min_max_scaler = pickle.load(f)
 
     # Inverse transform the scaling to [0, 1]
@@ -54,7 +50,7 @@ def inverse_transform(processed_data_file, input_file):
     original_data_df = pd.DataFrame(original_data, columns=data_processed.columns)
     encoded_vars = "verw_0,verw_1,verw_2,verw_3,verw_4,verw_5,verw_6,verw_8,verw_9,verw_10,famges_1,famges_2,famges_3,famges_4,wohn_1,wohn_2,wohn_3".split(",")
     original_data_df_decode_dummies = pd.from_dummies(original_data_df[encoded_vars], sep="_")
-    original_data_df=original_data_df.drop(columns=encoded_vars)
+    original_data_df = original_data_df.drop(columns=encoded_vars)
     merged_data = pd.concat([original_data_df, original_data_df_decode_dummies], axis=1)
 
     data_processed = pd.read_csv(input_file)
@@ -76,6 +72,3 @@ original_data = inverse_transform(output_file, input_file)
 original_data.to_csv(reconstructed_file, index=False)
 print("Inverse transformed data:")
 print(original_data)
-
-
-# todo one-hot encoding of "verwendung", "famges", "wohn" ?,
