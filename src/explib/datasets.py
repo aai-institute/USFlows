@@ -21,9 +21,9 @@ class DequantizedDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         dataset: T.Union[os.PathLike, torch.utils.data.Dataset, np.ndarray],
-        labels: T.Union[np.ndarray, torch.Tensor] = None, 
+        labels: T.Union[np.ndarray, torch.Tensor],
         num_bits: int = 8,
-        device: torch.device = None, 
+        device: torch.device = "cpu", 
     ):
         if isinstance(dataset, torch.utils.data.Dataset) or isinstance(
             dataset, np.ndarray
@@ -32,11 +32,9 @@ class DequantizedDataset(torch.utils.data.Dataset):
         else:
             self.dataset = pd.read_csv(dataset).values
 
-        #
         self.dataset = self.dataset.to(device)
         if not isinstance(labels, torch.Tensor):
             labels = torch.Tensor(labels)
-        
         self.labels = labels.to(device)
         
         self.num_bits = num_bits
@@ -49,9 +47,9 @@ class DequantizedDataset(torch.utils.data.Dataset):
         )
 
     def __getitem__(self, index: int):
-        x, y = self.dataset[index]
+        x = self.dataset[index]
         x = Tensor(self.transform(x))
-        return x, y
+        return x, self.labels[index]
 
     def __len__(self):
         return len(self.dataset)
@@ -247,7 +245,8 @@ class FashionMnistDequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
-        scale: bool = False
+        scale: bool = False,
+        device: torch.device = "cpu"
     ):
         rel_path = (
             "FashionMNIST/raw/train-images-idx3-ubyte"
@@ -262,21 +261,25 @@ class FashionMnistDequantized(DequantizedDataset):
         if scale:
             dataset = dataset[:, ::3, ::3]
         dataset = dataset.reshape(dataset.shape[0], -1)
-        if label is not None:
-            rel_path = (
+        
+        rel_path = (
                 "FashionMNIST/raw/train-labels-idx1-ubyte"
                 if train
                 else "FashionMNIST/raw/t10k-labels-idx1-ubyte"
             )
-            path = os.path.join(dataloc, rel_path)
-            labels = idx2numpy.convert_from_file(path)
+        path = os.path.join(dataloc, rel_path)
+        labels = idx2numpy.convert_from_file(path)
+        
+        if label is not None:
             dataset = dataset[labels == label]
-        super().__init__(dataset, num_bits=8)
+            labels = labels[labels == label]
+        
+        super().__init__(dataset, torch.Tensor(labels), num_bits=8, device=device)
 
     def __getitem__(self, index: int):
         x = Tensor(self.dataset[index].copy())
         x = self.transform(x)
-        return x, 0
+        return x, self.labels[index]
 
 
 class FashionMnistSplit(DataSplit):
@@ -285,11 +288,13 @@ class FashionMnistSplit(DataSplit):
         dataloc: os.PathLike = None,
         val_split: float = 0.1,
         label: T.Optional[int] = None,
+        device: torch.device = "cpu"
     ):
+        self.label = label
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = FashionMnistDequantized(self.dataloc, train=True, label=label)
+        self.train = FashionMnistDequantized(self.dataloc, train=True, label=label, device=device)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -297,7 +302,7 @@ class FashionMnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label)
+        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label, device=device)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
@@ -318,7 +323,7 @@ class MnistDequantized(DequantizedDataset):
         digit: T.Optional[int] = None,
         flatten=True,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = "cpu"
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -329,12 +334,12 @@ class MnistDequantized(DequantizedDataset):
             MNIST(dataloc, train=train, download=True)
 
         dataset = idx2numpy.convert_from_file(path)
-        
+
         if scale:
             dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
-        
+            
         if train:
             rel_path = "MNIST/raw/train-labels-idx1-ubyte"
         else:
@@ -346,7 +351,7 @@ class MnistDequantized(DequantizedDataset):
             dataset = dataset[labels == digit]
             labels = labels[labels == digit]
             
-        super().__init__(torch.Tensor(dataset), labels=torch.Tensor(labels), num_bits=8, device=device)
+        super().__init__(torch.Tensor(dataset), torch.Tensor(labels), num_bits=8, device=device)
 
     def __getitem__(self, index: int):
         if not isinstance(self.dataset, torch.Tensor):
@@ -363,8 +368,9 @@ class MnistSplit(DataSplit):
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = "cpu"
     ):
+        self.digit = digit
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
@@ -404,3 +410,4 @@ class Cifar10Dequantized(DequantizedDataset):
         if not os.path.exists(path):
             CIFAR10(dataloc, train=train, download=True)
             
+
