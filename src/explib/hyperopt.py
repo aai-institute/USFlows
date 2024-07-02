@@ -179,7 +179,9 @@ class HyperoptExperiment(Experiment):
         """
         if self.skip:
             return
-        
+
+        current_time = str(datetime.now()).replace(" ", "")
+        report_dir = f'{report_dir}/{current_time}'
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
@@ -265,7 +267,8 @@ class HyperoptExperiment(Experiment):
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
 
-        best_model.to_onnx("/home/mustafa/repos/VeriFlow/scripts/reports/model.onnx", export_mode="forward") #, export_mode="sample"backward
+        best_model.to_onnx(f'{report_dir}/model_heloc_forward.onnx', export_mode='forward')
+        best_model.to_onnx(f'{report_dir}/model_heloc_backward.onnx', export_mode="backward")
         return best_result
     
     @classmethod  
