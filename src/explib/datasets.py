@@ -421,3 +421,34 @@ class CreditData(SimpleSplit):
             print(self.test)
             print("--------------------")
 
+
+class HelocData(SimpleSplit):
+    def __init__(self,
+                 dataloc: os.PathLike,
+                 train: bool = True
+                 ):
+        print("fetching heloc data")
+        path = dataloc
+        if not os.path.exists(path):
+            print(f'Dataset not found {path}')
+        else:
+            cred_data = pd.read_csv(path)
+            if cred_data is None:
+                print(f'Heloc data is none')
+            self.dataloc = dataloc
+            train_nd, val_nd, test_nd = \
+                np.split(cred_data.sample(frac=1, random_state=42),
+                         [int(.6 * len(cred_data)), int(.8 * len(cred_data))])
+
+            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float()
+            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float()
+            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float()
+
+            print("-------train-------------")
+            print(self.train)
+            print("-------val-------------")
+            print(self.val)
+            print("-------test-------------")
+            print(self.test)
+            print("--------------------")
+
