@@ -25,7 +25,7 @@ if __name__ == '__main__':
     model_path = '/scripts/reports/model_heloc_forward.onnx'
     ort_sess = ort.InferenceSession(model_path)
     # Load the scalers
-    with open('../standard_scaler_positive.pkl', 'rb') as f:
+    with open('standard_scaler_positive.pkl', 'rb') as f:
         standard_scaler = pickle.load(f)
 
     samples = []
