@@ -22,10 +22,10 @@ def samples_encoded_to_csv(samples, csv_path):
 
 
 if __name__ == '__main__':
-    model_path = '/home/mustafa/repos/VeriFlow/scripts/reports/model_heloc_forward.onnx'
+    model_path = '/scripts/reports/model_heloc_forward.onnx'
     ort_sess = ort.InferenceSession(model_path)
     # Load the scalers
-    with open('standard_scaler_positive.pkl', 'rb') as f:
+    with open('../standard_scaler_positive.pkl', 'rb') as f:
         standard_scaler = pickle.load(f)
 
     samples = []
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         outputs = ort_sess.run(None, {'x.1': x})
         original_data = standard_scaler.inverse_transform(outputs[0].reshape(1, -1))
         samples.append([i for i in original_data[0]])
-    raw_outputs_path = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/samples.csv'
+    raw_outputs_path = '/experiments/credit/dataset/heloc/samples.csv'
     samples_encoded_to_csv(samples, raw_outputs_path)
 
 

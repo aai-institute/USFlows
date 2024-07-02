@@ -61,12 +61,12 @@ def inverse_transform(processed_data_file, input_file):
 
 # Example usage:
 # Preprocess data
-input_file = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive.csv'
-output_file = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive_processed_one_hot.csv'
+input_file = '/experiments/credit/dataset/credit/train_positive.csv'
+output_file = '/experiments/credit/dataset/credit/train_positive_processed_one_hot.csv'
 preprocess_data(input_file, output_file)
 
 # Inverse transform
-reconstructed_file = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/recontructed.csv'
+reconstructed_file = '/experiments/credit/dataset/credit/recontructed.csv'
 original_data = inverse_transform(output_file, input_file)
 # Save the processed data to CSV
 original_data.to_csv(reconstructed_file, index=False)

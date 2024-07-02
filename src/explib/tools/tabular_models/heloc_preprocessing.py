@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-full_data_path = "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_full.csv"
+full_data_path = "/experiments/credit/dataset/heloc/heloc_full.csv"
 full_data_output = "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_full_scaled.csv"
 positive_data_output = "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_scaled.csv"
 negative_data_output = "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_negative_scaled.csv"

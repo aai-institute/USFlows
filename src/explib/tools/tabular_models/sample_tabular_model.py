@@ -74,7 +74,7 @@ def samples_decoded_to_csv(raw_outputs_path, column_names, output_path):
 
 if __name__ == '__main__':
     model_name = 'model_forward_with_preprocessing.onnx'
-    path = '/home/mustafa/repos/VeriFlow/scripts/reports/'
+    path = '/scripts/reports/'
 
     ort_sess = ort.InferenceSession(path+model_name)
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         samples.append([i for i in original_data[0]])
     raw_outputs_path = path+'/sampled.csv'
     samples_encoded_to_csv(samples, raw_outputs_path)
-    path_to_training_data = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/credit/train_positive_processed_one_hot.csv'
+    path_to_training_data = '/experiments/credit/dataset/credit/train_positive_processed_one_hot.csv'
     samples_decoded_to_csv(raw_outputs_path, encoded_column_names, raw_outputs_path)
 
 
