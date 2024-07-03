@@ -11,11 +11,13 @@ if __name__ == '__main__':
 
     heloc_data = pd.read_csv('/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_original.csv')
     generated_data = pd.read_csv('/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/samples.csv')
+    heloc_data = heloc_data[["ExternalRiskEstimate","MSinceOldestTradeOpen", "NumTotalTrades"]]
+    generated_data = generated_data[["ExternalRiskEstimate","MSinceOldestTradeOpen", "NumTotalTrades"]]
     # Combine the datasets
     #filtered_data =heloc_data.filter(items=["ExternalRiskEstimate","MSinceOldestTradeOpen"]).reset_index(drop=True)
     generated_scores = []
     # Train the LOF model on the combined dataset
-    lof = LocalOutlierFactor(n_neighbors=20,novelty=True)  # You can adjust n_neighbors and contamination as needed
+    lof = LocalOutlierFactor(n_neighbors=20, novelty=True)  # You can adjust n_neighbors and contamination as needed
     lof.fit(heloc_data)
     # Calculate LOF scores (negative_outlier_factor_)
     lof_scores = lof.negative_outlier_factor_
@@ -28,16 +30,3 @@ if __name__ == '__main__':
     print(f'Real data LOF scores mean: {np.mean(real_scores)}, std: {np.std(real_scores)}')
     print(f'Generated data LOF scores mean: {np.mean(generated_scores)}, std: {np.std(generated_scores)}')
 
-    plt.hist(real_scores, bins=10, alpha=0.5, label='Real Data')
-    plt.legend(loc='upper right')
-    plt.xlabel('LOF Score')
-    plt.ylabel('Frequency')
-    plt.title('Distribution of LOF Scores')
-    plt.show()
-
-    plt.hist(generated_scores, bins=10, alpha=0.5, label='Generated Data')
-    plt.legend(loc='upper right')
-    plt.xlabel('LOF Score')
-    plt.ylabel('Frequency')
-    plt.title('Distribution of LOF Scores')
-    plt.show()

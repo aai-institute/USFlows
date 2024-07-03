@@ -23,9 +23,9 @@ def samples_encoded_to_csv(samples, csv_path):
 
 if __name__ == '__main__':
 
-    USE_SCALE = True
+    USE_SCALE = False
 
-    model_path = '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/archive/0_credit_1/2024-07-0121:55:42.385660/model_heloc_forward.onnx'
+    model_path = '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/0_credit_1/2024-07-0222:47:15.621328/model_heloc_forward.onnx'
     ort_sess = ort.InferenceSession(model_path)
     # Load the scalers
     if USE_SCALE:
