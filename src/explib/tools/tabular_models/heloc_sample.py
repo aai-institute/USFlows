@@ -33,14 +33,14 @@ if __name__ == '__main__':
             standard_scaler = pickle.load(f)
 
     samples = []
-    for i in range(100):
-        x = np.random.uniform(low=-0.001, high=0.001, size=(22,)).astype(np.float32)
+    for i in range(1000):
+        x = np.random.uniform(low=-0.01, high=0.01, size=(22,)).astype(np.float32)
         outputs = ort_sess.run(None, {'x.1': x})
         if USE_SCALE:
             original_data = standard_scaler.inverse_transform(outputs[0].reshape(1, -1))
             samples.append([round(i) for i in original_data[0]])
         else:
-            samples.append([i for i in outputs[0]])
+            samples.append([round(i) for i in outputs[0]])
 
     raw_outputs_path = '/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/samples.csv'
     samples_encoded_to_csv(samples, raw_outputs_path)

@@ -22,8 +22,8 @@ experiments:
         "image_shape": [22, 1]
       dataset: 
         __object__: src.explib.datasets.HelocData
-        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_scaled.csv"
-      epochs:  5000  # 200000
+        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_original.csv"
+      epochs:  10000  # 200000
       patience: 60
       batch_size:
         __eval__: tune.choice([16])
@@ -31,7 +31,7 @@ experiments:
         optimizer:
           __class__: torch.optim.Adam 
         params:
-          lr: 0.0001 #tune.loguniform(1e-5, 1e-3)
+          lr: 0.0005 #tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
       model_cfg: 
         type:

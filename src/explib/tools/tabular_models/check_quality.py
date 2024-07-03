@@ -14,22 +14,16 @@ if __name__ == '__main__':
     # Combine the datasets
     #filtered_data =heloc_data.filter(items=["ExternalRiskEstimate","MSinceOldestTradeOpen"]).reset_index(drop=True)
     generated_scores = []
-    lof_scores = []
+    # Train the LOF model on the combined dataset
+    lof = LocalOutlierFactor(n_neighbors=20,novelty=True)  # You can adjust n_neighbors and contamination as needed
+    lof.fit(heloc_data)
+    # Calculate LOF scores (negative_outlier_factor_)
+    lof_scores = lof.negative_outlier_factor_
     for index, row in generated_data.iterrows():
-        combined_data = heloc_data._append(row)
-        #pd.concat([heloc_data,row], axis=0).reset_index(drop=True)
-
-        # Train the LOF model on the combined dataset
-        lof = LocalOutlierFactor(n_neighbors=20)  # You can adjust n_neighbors and contamination as needed
-        lof.fit(combined_data)
-
-        # Calculate LOF scores (negative_outlier_factor_)
-        lof_scores = lof.negative_outlier_factor_
-
-        generated_scores.append(lof_scores[len(lof_scores)-1])
+        generated_scores.append(lof.score_samples(row.to_frame().T))
 
     # Separate the scores for real and generated data
-    real_scores = lof_scores[:len(heloc_data)]
+    real_scores = lof_scores
     # Analyze the results
     print(f'Real data LOF scores mean: {np.mean(real_scores)}, std: {np.std(real_scores)}')
     print(f'Generated data LOF scores mean: {np.mean(generated_scores)}, std: {np.std(generated_scores)}')
