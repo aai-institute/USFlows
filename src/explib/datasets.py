@@ -32,7 +32,11 @@ class DequantizedDataset(torch.utils.data.Dataset):
         else:
             self.dataset = pd.read_csv(dataset).values
 
+        if not isinstance(self.dataset, torch.Tensor):
+            self.dataset = torch.tensor(self.dataset)
+            
         self.dataset = self.dataset.to(device)
+        
         if not isinstance(labels, torch.Tensor):
             labels = torch.Tensor(labels)
         self.labels = labels.to(device)
@@ -277,7 +281,10 @@ class FashionMnistDequantized(DequantizedDataset):
         super().__init__(dataset, torch.Tensor(labels), num_bits=8, device=device)
 
     def __getitem__(self, index: int):
-        x = Tensor(self.dataset[index].copy())
+        if not isinstance(self.dataset, torch.Tensor):
+            x = Tensor(self.dataset[index].copy())
+        else:
+            x = self.dataset[index]
         x = self.transform(x)
         return x, self.labels[index]
 
