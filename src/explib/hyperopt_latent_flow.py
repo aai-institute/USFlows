@@ -96,6 +96,8 @@ class HyperoptExperiment(Experiment):
         data_test = dataset.get_test()
         data_val = dataset.get_val()
 
+        # TODO: probably this can be done in the LatentFlow init method by passing the config
+        # TODO: do the same when encoder, decoder, mean_net are str (checkpoint path)
         encoder_params = config["model_cfg"]["params"]["encoder"]["params"]
         encoder = config["model_cfg"]["params"]["encoder"]["type"](**encoder_params)
         decoder_params = config["model_cfg"]["params"]["decoder"]["params"]
