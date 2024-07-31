@@ -97,6 +97,7 @@ class HyperoptExperiment(Experiment):
         data_val = dataset.get_val()
 
         # TODO: probably this can be done in the LatentFlow init method by passing the config
+        
         # TODO: do the same when encoder, decoder, mean_net are str (checkpoint path)
         encoder_params = config["model_cfg"]["params"]["encoder"]["params"]
         encoder = config["model_cfg"]["params"]["encoder"]["type"](**encoder_params)
@@ -107,14 +108,11 @@ class HyperoptExperiment(Experiment):
         
         model = config["model_cfg"]["type"](flow, encoder, decoder)
         model.to(device)
-        
-        print(model)
+         
         # SVI algorithm to train the latent flow
-        # optimizer needs to be an instance of pyro.optim.PyroOptim
-        
-        print(config["optim_cfg"]["optimizer"]["type"])
+        # (from pyro documentation) optimizer needs to be an instance of pyro.optim.PyroOptim
+          
         optimizer_params = config["optim_cfg"]["optimizer"]["params"]
-        print(optimizer_params)
         optimizer = config["optim_cfg"]["optimizer"]["type"](optimizer_params) 
         
         svi = SVI(model.model, model.guide, optimizer, loss=Trace_ELBO())
@@ -250,16 +248,21 @@ class HyperoptExperiment(Experiment):
         self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
         ray.shutdown()
     
-    # TODO: Haven't checked this function yet. The code run for the first training iterations --> need to try this at the end of the training.
+    # TODO: During training the checkpoint for latent flow is saved separately for the encoder, decoder and the flow components.
+    # This method is not working anymore since it is looking only for a single checkpoint. 
+    # Change how we save the model during training or how we load it here (do the same in the eval module)
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
+        print("HERE")
         trial_id = best_result.trial_id
         id = f"exp_{exp_id}_{trial_id}"
         for d in os.listdir(expdir):
             if trial_id in d:
+                
                 shutil.copyfile(
                     os.path.join(expdir, d, f"checkpoint.pt"), 
                     os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
                 )
+                
                 shutil.copyfile(
                     os.path.join(expdir, d, "params.pkl"), 
                     os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")

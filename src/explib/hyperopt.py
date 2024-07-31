@@ -128,7 +128,6 @@ class HyperoptExperiment(Experiment):
                 best_loss = val_loss
                 
                 # Create checkpoint
-                
                 torch.save(flow.state_dict(), f"./checkpoint.pt")
                 
                 # Advanced logging
