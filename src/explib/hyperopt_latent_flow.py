@@ -110,7 +110,7 @@ class HyperoptExperiment(Experiment):
         
         print(model)
         # SVI algorithm to train the latent flow
-        # optimizer should be an instance of pyro.optim.PyroOptim
+        # optimizer needs to be an instance of pyro.optim.PyroOptim
         
         print(config["optim_cfg"]["optimizer"]["type"])
         optimizer_params = config["optim_cfg"]["optimizer"]["params"]
@@ -147,7 +147,8 @@ class HyperoptExperiment(Experiment):
                 torch.save(model.decoder.state_dict(), f"./checkpoint_decoder.pt")
                 torch.save(model.flow.state_dict(), f"./checkpoint_flow.pt")
                
-                # TODO: check these functions if they still work for the LatentFlow 
+                # TODO: check these functions if they still work for the LatentFlow, in case modify!
+                
                 # Advanced logging
                 # try:
                 #     cfg_log = config["logging"]
