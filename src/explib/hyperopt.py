@@ -265,7 +265,10 @@ class HyperoptExperiment(Experiment):
         best_result.to_csv(
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
-        
+
+
+        best_model.to_onnx(f'{report_dir}/model_full_mnist_forward.onnx', export_mode='forward')
+        best_model.to_onnx(f'{report_dir}/model_full_mnist_backward.onnx', export_mode="backward")
         return best_result
     
     @classmethod  
