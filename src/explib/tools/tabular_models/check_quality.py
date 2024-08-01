@@ -35,7 +35,7 @@ if __name__ == '__main__':
         print(f'Generated data LOF scores mean: {np.mean(generated_scores)}, std: {np.std(generated_scores)}')
     else:
         # Model trained on positive samples maps samples to density:
-        model_path = '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/0_credit_1/2024-07-0222:47:15.621328/model_heloc_backward.onnx'
+        model_path = '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/0_credit_1/2024-07-0222:47:15.621328/without_reshape_backward.onnx'
 
         ort_sess = ort.InferenceSession(model_path)
         same_distribution_data = pd.read_csv("/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_original.csv")

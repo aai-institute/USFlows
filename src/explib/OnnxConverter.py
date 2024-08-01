@@ -169,7 +169,7 @@ class OnnxConverter(Experiment):
 
     def fetch_directory(self, report_dir):
         current_time = str(datetime.now()).replace(" ", "")
-        directory = f'  {report_dir}/{self.name}/{current_time}'
+        directory = f'{report_dir}/{self.name}/{current_time}'
         os.makedirs(directory)
         directory_with_flow = f'{directory}/with_flow'
         os.makedirs(directory_with_flow)

@@ -33,8 +33,8 @@ def remove_reshape_node(model):
     return model
 
 if __name__ == '__main__':
-    path_flow = "models/model_0_lognormal_decay_forward.onnx"
+    path_flow = '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/0_credit_1/2024-07-0222:47:15.621328/model_heloc_backward.onnx'
     model = onnx.load(path_flow)
     model = remove_reshape_node(model)
     onnx.checker.check_model(model=model, full_check=True)
-    onnx.save(model, "models/without_reshape.onnx")
+    onnx.save(model, '/home/mustafa/repos/VeriFlow/experiments/credit/report/credit/0_credit_1/2024-07-0222:47:15.621328/without_reshape_backward.onnx')
