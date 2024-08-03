@@ -188,7 +188,7 @@ class Flow(torch.nn.Module):
         """
         mode_cache = self.export
         self.export = export_mode
-        dummy_input = self.base_distribution.sample()
+        dummy_input = self.base_distribution.sample().to(torch.device('cpu'))
         torch.onnx.export(self, dummy_input, path, verbose=True)
         self.export = mode_cache
 
