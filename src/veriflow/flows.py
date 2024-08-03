@@ -22,7 +22,7 @@ class Flow(torch.nn.Module):
     # Export mode determines whether the log_prob or the sample function is exported to onnx
     export_modes = Literal["log_prob", "sample"]
     export: export_modes = "log_prob"
-    device = "cuda:0"
+    device = "cpu"
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
