@@ -28,6 +28,9 @@ class OnnxConverter(Experiment):
         self.path_classifier = path_classifier
         self.verify_within_dist = verify_within_dist
         self.verify_full_UDL = verify_full_UDL
+        self.single_dimensions = 28
+        self.total_dimensions = self.single_dimensions * self.single_dimensions
+        self.target_class = 3
 
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
@@ -99,7 +102,7 @@ class OnnxConverter(Experiment):
             print(f'did not solve experiment {confidence_threshold} without flow')
             return numpy.asarray([]), True
 
-        assignments = [vals[1][i] for i in range(100)]
+        assignments = [vals[1][i] for i in range(self.total_dimensions)]
         return numpy.asarray(assignments).astype(numpy.float32), False
 
     def verify_with_flow(self, combined_model_path, maraboupy, directory, target_class, confidence_threshold, p_lower, p_upper, post_condition_func):
@@ -108,7 +111,7 @@ class OnnxConverter(Experiment):
         threshold_input_upper = self.quantile_log_normal(p=p_upper)
         if self.verify_full_UDL:
             num_vars = network.numVars
-            redundant_var_count = 100  # number of input vars to the network. in our case 10*10.
+            redundant_var_count = self.total_dimensions  # number of input vars to the network. in our case 28*28.
             redundant_vars = [i for i in range(num_vars, num_vars + redundant_var_count)]
             ones = [1.0 for i in range(len(redundant_vars))]
             neg_ones = [-1.0 for i in range(len(redundant_vars))]
@@ -121,14 +124,14 @@ class OnnxConverter(Experiment):
             network.addInequality(redundant_vars, neg_ones, -1*threshold_input_lower)
             network.addInequality(redundant_vars, ones, threshold_input_upper)
         else:
-            for i in range(100): # the 100 input variables.
+            for i in range(self.total_dimensions): # the 784 input variables.
                 network.setLowerBound(i, -0.01)  # 0.0025 takes 521 seconds
                 network.setUpperBound(i, 0.01) #0.01  0.00215 was sat?!
 
         post_condition_func(network, target_class, maraboupy, confidence_threshold)
         start_time = time.time()
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=100))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=180))
         print(f'Runtime: {time.time()-start_time}')
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} with flow')
@@ -137,7 +140,7 @@ class OnnxConverter(Experiment):
             print(f'proof certificate with flow')
             return numpy.asarray([]), True
 
-        assignments = [vals[1][i] for i in range(100)]
+        assignments = [vals[1][i] for i in range(self.total_dimensions)]
         if self.verify_full_UDL:
             sum_of_assignments = sum([abs(ele) for ele in assignments])
             if sum_of_assignments > threshold_input_upper + 0.001:
@@ -207,7 +210,7 @@ class OnnxConverter(Experiment):
         sample = image
         sample = numpy.uint8(numpy.clip(sample, 0, 1) * 255)
         plt.axis('off')
-        plt.imshow(torch.tensor(sample).view(10, 10), cmap='gray')
+        plt.imshow(torch.tensor(sample).view(self.single_dimensions, self.single_dimensions), cmap='gray')
         plt.savefig(f'{directory}/counterexample.png')
         numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
         numpy.savetxt(f'{directory}/counter_example.txt', counter_example)
@@ -228,9 +231,9 @@ class OnnxConverter(Experiment):
     def run_within_distribution_verification(self, directory_with_flow, combined_model_path, maraboupy, target_class,
                                              unmodified_model_path, classifier_path, directory_without_flow):
 
-        for confidence_threshold in range(8, 20, 1):
+        for confidence_threshold in range(100, 130, 1):
             #confidence_threshold = 16.5
-            print(f'experiment no {confidence_threshold} of 20')
+            print(f'experiment no {confidence_threshold}')
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
             counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy,
                                                                  experiment_directory_with_flow, target_class,
@@ -309,15 +312,14 @@ class OnnxConverter(Experiment):
             Marabou = None
         if Marabou:
             print(f'Marabou available! {Marabou}')
-            target_class = 0
             if combined_model:
                 if self.verify_within_dist:
                     self.run_within_distribution_verification(directory_with_flow, combined_model_path, maraboupy,
-                                                              target_class, unmodified_model_path, classifier_path,
+                                                              self.target_class, unmodified_model_path, classifier_path,
                                                               directory_without_flow)
                 else:
                     self.run_epistemic_uncertainty_verification(directory_with_flow, combined_model_path, maraboupy,
-                                                              target_class, unmodified_model_path, classifier_path,
+                                                              self.target_class, unmodified_model_path, classifier_path,
                                                               directory_without_flow)
             else:
                 print(Fore.RED + 'Error combining models has failed')
