@@ -27,7 +27,7 @@ experiments:
           "image_shape": [28, 28]
         dataset: &dataset
           __object__: src.explib.datasets.MnistSplit
-          digit: 3
+          digit: 0
           device: *device
         epochs: &epochs 200000
         patience: &patience 20
