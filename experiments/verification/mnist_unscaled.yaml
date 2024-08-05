@@ -1,0 +1,7 @@
+---
+__object__: src.explib.OnnxConverter.OnnxConverter
+name: convert_onnx
+path_flow: &path_flow "/home/mustafa/repos/VeriFlow/experiments/verification/resources/unscaled_mnist/forward_full_mnist_3.onnx"
+path_classifier: &path_classifier "/home/mustafa/repos/VeriFlow/experiments/verification/resources/unscaled_mnist/mnist_unscaled.onnx"
+verify_within_dist: True
+verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
