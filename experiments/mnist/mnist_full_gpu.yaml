@@ -1,13 +1,13 @@
 __object__: src.explib.base.ExperimentCollection
 name: mnist_ablation
 experiments:
-  - &digit_0
+  - &digit_9
     __object__: src.explib.base.ExperimentCollection
     name: mnist_basedist_comparison
     experiments:
     - &exp_laplace
       __object__: src.explib.hyperopt.HyperoptExperiment
-      name: mnist_3_laplace
+      name: mnist_9_laplace
       device: &device cuda
       scheduler: &scheduler
         __object__: ray.tune.schedulers.ASHAScheduler
@@ -27,7 +27,7 @@ experiments:
           "image_shape": [28, 28]
         dataset: &dataset
           __object__: src.explib.datasets.MnistSplit
-          digit: 0
+          digit: 9
           device: *device
         epochs: &epochs 200000
         patience: &patience 20
@@ -67,57 +67,3 @@ experiments:
               scale:
                 __eval__: torch.ones(784).to("cuda")
             use_lu: true
-  - &digit_1
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 1
-  - &digit_2
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 2
-  - &digit_3
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 3
-  - &digit_4
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 4
-  - &digit_5
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 5
-  - &digit_6
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 6
-  - &digit_7
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 7
-  - &digit_8
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 8
-  - &digit_9
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          digit: 9
