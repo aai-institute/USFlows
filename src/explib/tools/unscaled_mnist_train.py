@@ -329,7 +329,7 @@ def show_predictions(images, labels, predictions):
 
 
 if __name__ == '__main__':
-    nets = [SimpleNN(), SimpleNN3(), SimpleNN6(), SimpleNN12(), SimpleNN15()]
+    nets = [SimpleNN(), SimpleNN3(), SimpleNN6(),SimpleNN9(), SimpleNN12(), SimpleNN15()]
     for idx, net in enumerate(nets):
         trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transforms.ToTensor())
         testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transforms.ToTensor())
