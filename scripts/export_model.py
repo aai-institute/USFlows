@@ -6,6 +6,7 @@ if __name__ == '__main__':
     PATHS = [
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/0_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/1_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
+        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/2_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/3_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/4_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/5_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
