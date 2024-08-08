@@ -13,6 +13,7 @@ if __name__ == '__main__':
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/6_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/7_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
         "/home/mustafa/Documents/midas/all_digits/mnist_ablation/8_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
+        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/digit9/experiment/"
     ]
     for PATH in PATHS:
         pkl = [f for f in os.listdir(PATH) if f.endswith("pkl")]
