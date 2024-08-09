@@ -432,7 +432,6 @@ class HelocData(SimpleSplit):
                  dataloc: os.PathLike,
                  train: bool = True
                  ):
-        print("fetching heloc data")
         path = dataloc
         if not os.path.exists(path):
             print(f'Dataset not found {path}')
@@ -448,12 +447,4 @@ class HelocData(SimpleSplit):
             self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float()
             self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float()
             self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float()
-
-            print("-------train-------------")
-            print(self.train)
-            print("-------val-------------")
-            print(self.val)
-            print("-------test-------------")
-            print(self.test)
-            print("--------------------")
 
