@@ -90,7 +90,7 @@ class HyperoptExperiment(Experiment):
                 device = torch.device("cuda")
             else:
                 device = torch.device("cpu")
-
+       
         dataset = config["dataset"]
         data_train = dataset.get_train()
         data_test = dataset.get_test()
@@ -112,9 +112,11 @@ class HyperoptExperiment(Experiment):
             )[-1]
 
             val_loss = 0
+
             for i in range(0, len(data_val), config["batch_size"]):
                 j = min([len(data_test), i + config["batch_size"]])
-                val_loss += float(-flow.log_prob(data_val[i:j][0].to(device)).sum())
+                #val_loss += float(-flow.log_prob(data_val[i:j][0].to(device)).sum())
+                val_loss += float(-flow.log_prob(data_val[i:j][0]).sum()) # data val are already on device
             val_loss /= len(data_val)
 
             session.report(
@@ -252,13 +254,15 @@ class HyperoptExperiment(Experiment):
             os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
             os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
         )
-        
+        best_model = best_model.to(self.device)
+        print(f"best model device {best_model.device}")
         data_test = self.trial_config["dataset"].get_test()
+        print(f"test data device {data_test[:10][0].device}")
         test_loss = 0
         for i in range(0, len(data_test), 100):
             j = min([len(data_test), i + 100])
             test_loss += float(
-                -best_model.log_prob(data_test[i:j][0].to(device)).sum()
+                -best_model.log_prob(data_test[i:j][0]).sum()
             )
         test_loss /= len(data_test)
         
