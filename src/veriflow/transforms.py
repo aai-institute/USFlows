@@ -59,7 +59,7 @@ class ScaleTransform(BaseTransform):
         """ Initializes the scale transform."""
         super().__init__(*args, **kwargs)
         self.dim = dim
-        self.scale = torch.nn.Parameter(torch.empty(dim)).to("cuda")
+        self.scale = torch.nn.Parameter(torch.empty(dim))
         self.jacobian = 0
         self.init_params()
 
