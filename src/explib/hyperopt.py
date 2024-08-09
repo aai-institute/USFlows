@@ -187,7 +187,7 @@ class HyperoptExperiment(Experiment):
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
-        ray.init(local_mode=True,
+        ray.init(local_mode=False,
                  #configure_logging=True,
                  #logging_level=logging.DEBUG,
                  _temp_dir=f"{storage_path}/temp/")
@@ -270,7 +270,7 @@ class HyperoptExperiment(Experiment):
         best_result.to_csv(
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
-
+        best_model.simplify()
         best_model.to_onnx(f'{report_dir}/model_heloc_forward.onnx', export_mode='forward')
         best_model.to_onnx(f'{report_dir}/model_heloc_backward.onnx', export_mode="backward")
         return best_result

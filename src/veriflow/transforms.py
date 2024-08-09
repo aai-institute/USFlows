@@ -72,7 +72,6 @@ class ScaleTransform(BaseTransform):
         dim = self.dim
         bound = 1 / math.sqrt(dim) if dim > 0 else 0
         init.uniform_(self.scale, -bound, bound)
-        self.jacobian = self.scale.abs().log().sum().detach()
 
 
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
@@ -114,7 +113,7 @@ class ScaleTransform(BaseTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform $\mathbf{scale}x$
         """
-        return self.jacobian
+        return self.scale.abs().log().sum()
 
     def sign(self) -> int:
         """ Computes the sign of the determinant of the Jacobian of the transform $\mathbf{scale}x$."""
