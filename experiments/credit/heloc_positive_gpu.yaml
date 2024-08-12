@@ -23,7 +23,7 @@ experiments:
         "image_shape": [21, 1]
       dataset: 
         __object__: src.explib.datasets.HelocData
-        dataloc: "/home/mustafa.yalciner/repos/USFlows/heloc_positive_original_no_target.csv"
+        dataloc: "/home/mustafa.yalciner/repos/USFlows/heloc_negative_original_no_target.csv"
         device: *device
       epochs:  10000  # 200000
       patience: 50
