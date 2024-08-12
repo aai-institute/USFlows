@@ -11,7 +11,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 2
+    num_hyperopt_samples: 6
     gpus_per_trial: 1
     cpus_per_trial: 0
     tuner_params: 
@@ -20,12 +20,12 @@ experiments:
     trial_config:
       logging:
         images: false
-        "image_shape": [22, 1]
+        "image_shape": [21, 1]
       dataset: 
         __object__: src.explib.datasets.HelocData
-        dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_original_no_target.csv"
+        dataloc: "/home/mustafa.yalciner/repos/USFlows/heloc_positive_original_no_target.csv"
         device: *device
-      epochs:  20  # 200000
+      epochs:  10000  # 200000
       patience: 50
       batch_size:
         __eval__: tune.choice([16])
