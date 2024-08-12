@@ -24,6 +24,7 @@ experiments:
       dataset: 
         __object__: src.explib.datasets.HelocData
         dataloc: "/home/mustafa/repos/VeriFlow/experiments/credit/dataset/heloc/heloc_positive_original_no_target.csv"
+        device: *device
       epochs:  20  # 200000
       patience: 50
       batch_size:

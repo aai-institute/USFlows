@@ -397,7 +397,8 @@ class Cifar10Dequantized(DequantizedDataset):
 class CreditData(SimpleSplit):
     def __init__(self,
                  dataloc: os.PathLike,
-                 train: bool = True
+                 train: bool = True,
+                 device: torch.device = None
                  ):
         print("fetching credit data")
         path = dataloc
@@ -414,9 +415,9 @@ class CreditData(SimpleSplit):
                 np.split(cred_data.sample(frac=1, random_state=42),
                          [int(.6 * len(cred_data)), int(.8 * len(cred_data))])
 
-            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float()
-            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float()
-            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float()
+            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
 
             print("-------train-------------")
             print(self.train)
@@ -430,7 +431,8 @@ class CreditData(SimpleSplit):
 class HelocData(SimpleSplit):
     def __init__(self,
                  dataloc: os.PathLike,
-                 train: bool = True
+                 train: bool = True,
+                 device: torch.device = None
                  ):
         path = dataloc
         if not os.path.exists(path):
@@ -444,7 +446,7 @@ class HelocData(SimpleSplit):
                 np.split(cred_data.sample(frac=1, random_state=42),
                          [int(.6 * len(cred_data)), int(.8 * len(cred_data))])
 
-            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float()
-            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float()
-            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float()
+            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
 
