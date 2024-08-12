@@ -37,7 +37,7 @@ class HyperoptExperiment(Experiment):
         cpus_per_trial: int,
         scheduler: tune.schedulers.FIFOScheduler,
         tuner_params: T.Dict[str, T.Any],
-        device: str = "cuda",
+        device: str = "cpu", 
         skip: bool = False,
         *args,
         **kwargs,
@@ -116,7 +116,7 @@ class HyperoptExperiment(Experiment):
             for i in range(0, len(data_val), config["batch_size"]):
                 j = min([len(data_test), i + config["batch_size"]])
                 #val_loss += float(-flow.log_prob(data_val[i:j][0].to(device)).sum())
-                val_loss += float(-flow.log_prob(data_val[i:j][0]).sum())  # data val are already on device
+                val_loss += float(-flow.log_prob(data_val[i:j][0]).sum()) # data val are already on device
             val_loss /= len(data_val)
 
             session.report(
