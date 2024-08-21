@@ -290,7 +290,7 @@ class HyperoptExperiment(Experiment):
         model.decoder.load_state_dict(state_dict_dec)
         
         state_dict_flow = torch.load(flow_path)
-        model.flow.load_state_dict(state_dict_flow
+        model.flow.load_state_dict(state_dict_flow)
                                    
         best_model = best_model.to(self.device)
         print(f"best model device {best_model.device}")
