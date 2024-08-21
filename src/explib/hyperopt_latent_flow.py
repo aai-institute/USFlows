@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
-from pickle import dump
+from pickle import dump, load
 from PIL import Image
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -252,37 +252,57 @@ class HyperoptExperiment(Experiment):
     # This method is not working anymore since it is looking only for a single checkpoint. 
     # Change how we save the model during training or how we load it here (do the same in the eval module)
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
-        print("HERE")
         trial_id = best_result.trial_id
         id = f"exp_{exp_id}_{trial_id}"
+        enc_path = os.path.join(report_dir, f"{self.name}_{id}_best_model_encoder.pt")
+        dec_path = os.path.join(report_dir, f"{self.name}_{id}_best_model_decoder.pt")
+        flow_path = os.path.join(report_dir, f"{self.name}_{id}_best_model_flow.pt")
+        param_path = os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
+        
         for d in os.listdir(expdir):
             if trial_id in d:
                 
                 shutil.copyfile(
-                    os.path.join(expdir, d, f"checkpoint.pt"), 
-                    os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
+                    os.path.join(expdir, d, f"checkpoint_encoder.pt"), 
+                    enc_path
+                )
+                shutil.copyfile(
+                    os.path.join(expdir, d, f"checkpoint_decoder.pt"), 
+                    dec_path
+                )
+                shutil.copyfile(
+                    os.path.join(expdir, d, f"checkpoint_flow.pt"), 
+                    flow_path
                 )
                 
                 shutil.copyfile(
                     os.path.join(expdir, d, "params.pkl"), 
-                    os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
+                    param_path
                 )
         
-        best_model = from_checkpoint(
-            os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
-            os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
-        )
+        spec = load(open(param_path, "rb"))["model_cfg"]
+        model = spec["type"](**spec["params"])
+        
+        state_dict_enc = torch.load(enc_path)
+        model.encoder.load_state_dict(state_dict_enc)
+        
+        state_dict_dec = torch.load(dec_path)
+        model.decoder.load_state_dict(state_dict_dec)
+        
+        state_dict_flow = torch.load(flow_path)
+        model.flow.load_state_dict(state_dict_flow
+                                   
         best_model = best_model.to(self.device)
         print(f"best model device {best_model.device}")
         data_test = self.trial_config["dataset"].get_test()
         print(f"test data device {data_test[:10][0].device}")
-        test_loss = 0
-        for i in range(0, len(data_test), 100):
-            j = min([len(data_test), i + 100])
-            test_loss += float(
-                -best_model.log_prob(data_test[i:j][0]).sum()
-            )
-        test_loss /= len(data_test)
+        #test_loss = 0
+        #for i in range(0, len(data_test), 100):
+        #    j = min([len(data_test), i + 100])
+        #    test_loss += float(
+        #        -best_model.log_prob(data_test[i:j][0]).sum()
+        #    )
+        #test_loss /= len(data_test)
         
         best_result["test_loss"] = test_loss
         best_result.to_csv(
