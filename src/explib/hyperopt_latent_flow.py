@@ -232,7 +232,7 @@ class HyperoptExperiment(Experiment):
 
         # TODO: hacky way to determine the last experiment
         exppath = (
-            storage_path
+            storage_path + "/local" +
             + [
                 "/" + f
                 for f in sorted(os.listdir(storage_path))
@@ -263,15 +263,15 @@ class HyperoptExperiment(Experiment):
             if trial_id in d:
                 
                 shutil.copyfile(
-                    os.path.join(expdir, "local", d, f"checkpoint_encoder.pt"), 
+                    os.path.join(expdir,  d, f"checkpoint_encoder.pt"), 
                     enc_path
                 )
                 shutil.copyfile(
-                    os.path.join(expdir, "local", d, f"checkpoint_decoder.pt"), 
+                    os.path.join(expdir,  d, f"checkpoint_decoder.pt"), 
                     dec_path
                 )
                 shutil.copyfile(
-                    os.path.join(expdir, "local", d, f"checkpoint_flow.pt"), 
+                    os.path.join(expdir,  d, f"checkpoint_flow.pt"), 
                     flow_path
                 )
                 
