@@ -102,7 +102,7 @@ class HyperoptExperiment(Experiment):
         encoder_params = config["model_cfg"]["params"]["encoder"]["params"]
         encoder = config["model_cfg"]["params"]["encoder"]["type"](**encoder_params)
         decoder_params = config["model_cfg"]["params"]["decoder"]["params"]
-        decoder = config["model_cfg"]["params"]["decoder"]["type"](**encoder_params)
+        decoder = config["model_cfg"]["params"]["decoder"]["type"](**decoder_params)
         flow_hparams = config["model_cfg"]["params"]["flow"]["params"]
         flow = config["model_cfg"]["params"]["flow"]["type"](**flow_hparams)
         
@@ -235,7 +235,7 @@ class HyperoptExperiment(Experiment):
             storage_path + "/local/" 
             + [
                 "/" + f
-                for f in sorted(os.listdir(storage_path))
+                for f in sorted(os.listdir(storage_path + "/local"))
                 if f.startswith("_trial")
             ][-1]
         )
@@ -281,16 +281,20 @@ class HyperoptExperiment(Experiment):
                 )
         
         spec = load(open(param_path, "rb"))["model_cfg"]
-        model = spec["type"](**spec["params"])
+        # pre-instantiate subnetworks
+        spec["params"]["encoder"] = spec["params"]["encoder"]["type"](**spec["params"]["encoder"]["params"])
+        spec["params"]["decoder"] = spec["params"]["decoder"]["type"](**spec["params"]["decoder"]["params"])
+        spec["params"]["flow"] = spec["params"]["flow"]["type"](**spec["params"]["flow"]["params"])
+        best_model = spec["type"](**spec["params"])
         
         state_dict_enc = torch.load(enc_path)
-        model.encoder.load_state_dict(state_dict_enc)
+        best_model.encoder.load_state_dict(state_dict_enc)
         
         state_dict_dec = torch.load(dec_path)
-        model.decoder.load_state_dict(state_dict_dec)
+        best_model.decoder.load_state_dict(state_dict_dec)
         
         state_dict_flow = torch.load(flow_path)
-        model.flow.load_state_dict(state_dict_flow)
+        best_model.flow.load_state_dict(state_dict_flow)
                                    
         best_model = best_model.to(self.device)
         print(f"best model device {best_model.device}")
@@ -304,7 +308,7 @@ class HyperoptExperiment(Experiment):
         #    )
         #test_loss /= len(data_test)
         
-        best_result["test_loss"] = test_loss
+        #best_result["test_loss"] = test_loss
         best_result.to_csv(
             os.path.join(report_dir, f"{self.name}_best_result.csv")
         )
