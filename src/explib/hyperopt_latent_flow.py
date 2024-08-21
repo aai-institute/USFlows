@@ -232,7 +232,7 @@ class HyperoptExperiment(Experiment):
 
         # TODO: hacky way to determine the last experiment
         exppath = (
-            storage_path + "/local/" +
+            storage_path + "/local/" 
             + [
                 "/" + f
                 for f in sorted(os.listdir(storage_path))
