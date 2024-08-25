@@ -24,7 +24,7 @@ class Flow(torch.nn.Module):
     export: export_modes = "log_prob"
     device = "cpu"  
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Dummy implementation of forward method for onnx export. The self.export attribute
         determines whether the log_prob or the sample function is exported to onnx"""
         if self.export == "log_prob":
@@ -32,15 +32,32 @@ class Flow(torch.nn.Module):
         elif self.export == "sample":
             return self.sample()
         elif self.export == "forward":
-            for layer in self.layers:
-                x = layer.forward(x)
-            return x
+            return self.transform(x)
         elif self.export == "backward":
-            for layer in reversed(self.layers):
-                x = layer.backward(x)
-            return x
+            return self.inverse_transform(x)
         else:
             raise ValueError(f"Unknown export mode {self.export}")
+    
+    def transform(self, x: torch.Tensor) -> torch.Tensor:
+        """Transforms the input tensor x through the flow
+        
+        Args:
+            x: input tensor
+        """
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
+    
+    def inverse_transform(self, x: torch.Tensor) -> torch.Tensor:
+        """Transforms the input tensor x through the flow
+        
+        Args:
+            x: input tensor
+        """
+        for layer in reversed(self.layers):
+            x = layer.backward(x)
+        return x
+    
 
     def __init__(
         self,
@@ -50,7 +67,7 @@ class Flow(torch.nn.Module):
         training_noise_prior=dist.Uniform(0, 1e-6),
         *args,
         **kwargs,
-    ) -> None:
+    ):
         super().__init__(*args, **kwargs)
 
         self.soft_training = soft_training
