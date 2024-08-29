@@ -177,6 +177,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
         self,
         generator: T.Union[T.Callable[..., np.ndarray], str],
         params: T.Dict[str, T.Any],
+        device: torch.device = None,
         *args,
         **kwargs
     ):
@@ -189,7 +190,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
         super().__init__(*args, **kwargs)
         if isinstance(generator, str):
             generator = GENERATORS[generator]
-
+        self.device = device
         self.dataset = generator(**params)[0]
 
     def __getitem__(self, index: int):
@@ -199,6 +200,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
             x = self.dataset[index]
         if not isinstance(x, Tensor):
             x = Tensor(x)
+        x = x.to(self.device)
         return x, torch.zeros_like(x)
 
     def __len__(self):

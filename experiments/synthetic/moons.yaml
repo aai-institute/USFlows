@@ -10,12 +10,13 @@ experiments:
         - &main_normal
           __object__:  src.explib.hyperopt.HyperoptExperiment
           name: normal
+          device: &device cpu
           scheduler: &scheduler
             __object__: ray.tune.schedulers.ASHAScheduler
             max_t: 10000
             grace_period: 10000
             reduction_factor: 2
-          num_hyperopt_samples: &num_hyperopt_samples 2
+          num_hyperopt_samples: &num_hyperopt_samples 1
           gpus_per_trial: &gpus_per_trial 0
           cpus_per_trial: &cpus_per_trial 1
           tuner_params: &tuner_params
@@ -34,7 +35,7 @@ experiments:
                 n_samples: 20000
               params_val: &params_val
                 n_samples: 20000
-            epochs: &epochs 10000
+            epochs: &epochs 2
             patience: &patience 3
             batch_size: &batch_size
               __eval__: tune.choice([64])
