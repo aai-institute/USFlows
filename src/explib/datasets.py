@@ -341,7 +341,7 @@ class MnistDequantized(DequantizedDataset):
     """
     def __init__(
         self,
-        dataloc: os.PathLike = None,
+        dataloc: os.PathLike = "./",
         train: bool = True,
         digit: T.Optional[int] = None,
         flatten=True,
