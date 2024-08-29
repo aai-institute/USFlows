@@ -1,6 +1,7 @@
 import os
 import typing as T
 from abc import abstractmethod
+import math
 
 import idx2numpy
 import numpy as np
@@ -323,6 +324,21 @@ class FashionMnistSplit(DataSplit):
 
 # MNIST
 class MnistDequantized(DequantizedDataset):
+    """Dequantized MNIST dataset
+    
+    Args:
+        dataloc (os.PathLike, optional): location of dataset. Defaults to None.
+        train (bool, optional): if True, use training set. Defaults to True.
+        digit (int, optional): if not None, only return images of this digit. 
+        Defaults to None. If a negative number is given as, return all digits
+        except this one. Note that in order to obtain the digit 0, the digit 
+        "-0" must be given as a float value since python does not define 
+        negative zero for integers. Defaults to None.
+        
+        flatten (bool, optional): if True, flatten images. Defaults to True.
+        scale (bool, optional): if True, downsample images by a factor of 3.
+        device (torch.device, optional): device to use. Defaults to "cpu".
+    """
     def __init__(
         self,
         dataloc: os.PathLike = None,
@@ -355,8 +371,9 @@ class MnistDequantized(DequantizedDataset):
         labels = idx2numpy.convert_from_file(path)
         
         if digit is not None:
-            dataset = dataset[labels == digit]
-            labels = labels[labels == digit]
+            comp = lambda x,y : x == y if math.copysign(1, y) == 1 else x !=  -y
+            dataset = dataset[comp(labels, digit)]
+            labels = labels[comp(labels == digit)]
             
         super().__init__(torch.Tensor(dataset), torch.Tensor(labels), num_bits=8, device=device)
 
