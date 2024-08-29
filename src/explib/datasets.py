@@ -373,7 +373,7 @@ class MnistDequantized(DequantizedDataset):
         if digit is not None:
             comp = lambda x,y : x == y if math.copysign(1, y) == 1 else x !=  int(-y)
             dataset = dataset[comp(labels, digit)]
-            labels = labels[comp(labels == digit)]
+            labels = labels[comp(labels, digit)]
             
         super().__init__(torch.Tensor(dataset), torch.Tensor(labels), num_bits=8, device=device)
 
