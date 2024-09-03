@@ -452,3 +452,36 @@ class HelocData(SimpleSplit):
             self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
             self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
 
+
+class WineData(SimpleSplit):
+    def __init__(self,
+                 dataloc: os.PathLike,
+                 save_split_dir: os.PathLike,
+                 drop_columns,
+                 train: bool = True,
+                 device: torch.device = None
+                 ):
+        path = dataloc
+        if not os.path.exists(path):
+            print(f'Dataset not found {path}')
+        else:
+            wine_data = pd.read_csv(path, delimiter=";")
+            wine_data = wine_data.drop(columns = drop_columns)
+
+            if wine_data is None:
+                print(f'Heloc data is none')
+            self.dataloc = dataloc
+            train_nd, val_nd, test_nd = \
+                np.split(wine_data.sample(frac=1, random_state=42),
+                         [int(.6 * len(wine_data)), int(.8 * len(wine_data))])
+
+            train_df = pd.DataFrame(train_nd)
+            val_df = pd.DataFrame(val_nd)
+            test_df = pd.DataFrame(test_nd)
+            train_df.to_csv(f'{save_split_dir}/train.csv')
+            val_df.to_csv(f'{save_split_dir}/val.csv')
+            test_df.to_csv(f'{save_split_dir}/test.csv')
+
+            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
+            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
