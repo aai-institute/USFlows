@@ -458,29 +458,37 @@ class WineData(SimpleSplit):
                  dataloc: os.PathLike,
                  save_split_dir: os.PathLike,
                  drop_columns,
+                 first_run: bool = False,
                  train: bool = True,
                  device: torch.device = None
                  ):
         path = dataloc
         if not os.path.exists(path):
             print(f'Dataset not found {path}')
-        else:
+            return
+        train_split_directory = f'{save_split_dir}/train.csv'
+        val_split_directory = f'{save_split_dir}/val.csv'
+        test_split_directory = f'{save_split_dir}/test.csv'
+        if first_run:
             wine_data = pd.read_csv(path, delimiter=";")
             wine_data = wine_data.drop(columns = drop_columns)
 
             if wine_data is None:
-                print(f'Heloc data is none')
+                print(f'Wine data is none')
             self.dataloc = dataloc
             train_nd, val_nd, test_nd = \
                 np.split(wine_data.sample(frac=1, random_state=42),
                          [int(.6 * len(wine_data)), int(.8 * len(wine_data))])
-
             train_df = pd.DataFrame(train_nd)
             val_df = pd.DataFrame(val_nd)
             test_df = pd.DataFrame(test_nd)
-            train_df.to_csv(f'{save_split_dir}/train.csv')
-            val_df.to_csv(f'{save_split_dir}/val.csv')
-            test_df.to_csv(f'{save_split_dir}/test.csv')
+            train_df.to_csv(train_split_directory, index=False)
+            val_df.to_csv(val_split_directory, index=False)
+            test_df.to_csv(test_split_directory, index=False)
+        else:
+            train_nd = pd.read_csv(train_split_directory)
+            val_nd = pd.read_csv(val_split_directory)
+            test_nd = pd.read_csv(test_split_directory)
 
             self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
             self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
