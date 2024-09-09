@@ -25,9 +25,10 @@ experiments:
         dataloc: "/home/mustafa/repos/VeriFlow/experiments/wine/data/winequality-white.csv"
         save_split_dir: "/home/mustafa/repos/VeriFlow/experiments/wine/data/save_split_dir"
         drop_columns: ["quality"]
+        first_run: false
         device: "cpu"
-      epochs:  1000  # 200000
-      patience: 50
+      epochs:  50  # 200000
+      patience: 5
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg: 

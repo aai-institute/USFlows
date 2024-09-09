@@ -26,6 +26,7 @@ experiments:
         dataloc: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/winequality-white.csv"
         save_split_dir: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/save_split_dir"
         drop_columns: ["quality"]
+        first_run: true
         device: "cuda"
       epochs:  100000  # 200000
       patience: 50
