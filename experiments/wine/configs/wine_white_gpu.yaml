@@ -11,8 +11,8 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 1
-    gpus_per_trial: 1
+    num_hyperopt_samples: 20
+    gpus_per_trial: 4
     cpus_per_trial: 0
     tuner_params: 
       metric: val_loss
@@ -27,7 +27,7 @@ experiments:
         save_split_dir: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/save_split_dir"
         drop_columns: ["quality"]
         device: "cuda"
-      epochs:  1000  # 200000
+      epochs:  100000  # 200000
       patience: 50
       batch_size:
         __eval__: tune.choice([16])
@@ -52,7 +52,7 @@ experiments:
               __eval__: torch.ones(11).to("cuda")
           prior_scale: 1.0
           coupling_layers: 
-            __eval__: tune.choice([l for l in range(2, 4)])
+            __eval__: tune.choice([l for l in range(1, 4)])
           coupling_nn_layers:
             __eval__: tune.choice([[11] * l for l in range(1, 5)])
           nonlinearity: 
