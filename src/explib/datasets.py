@@ -490,6 +490,6 @@ class WineData(SimpleSplit):
             val_nd = pd.read_csv(val_split_directory)
             test_nd = pd.read_csv(test_split_directory)
 
-            self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
-            self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
-            self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
+        self.train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device)
+        self.val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device)
+        self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
