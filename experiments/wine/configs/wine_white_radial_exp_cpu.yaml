@@ -1,0 +1,71 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: credit
+experiments:
+  - &exp_nice_lu_laplace
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: credit_1
+    device: &device "cpu"
+    scheduler:  
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: 1
+    gpus_per_trial: 0
+    cpus_per_trial: 1
+    tuner_params: 
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [11, 1]
+      dataset: 
+        __object__: src.explib.datasets.WineData
+        dataloc: "/home/mustafa/repos/VeriFlow/experiments/wine/data/winequality-white.csv"
+        save_split_dir: "/home/mustafa/repos/VeriFlow/experiments/wine/data/save_split_dir"
+        drop_columns: ["quality"]
+        first_run: false
+        device: "cpu"
+      epochs:  60  # 200000
+      patience: 50
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg: 
+        optimizer:
+          __class__: torch.optim.Adam 
+        params:
+          lr:
+            __eval__: tune.loguniform(1e-5, 1e-2)
+          weight_decay: 0.0
+      model_cfg: 
+        type:
+          __class__:  src.veriflow.flows.NiceFlow
+        params:
+          masktype: alternate
+          soft_training: false
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(11).to("cpu")
+            scale:
+              __eval__: torch.ones(11).to("cpu")
+          prior_scale: 1.0
+          coupling_layers: 
+            __eval__: tune.choice([l for l in range(1, 4)])
+          coupling_nn_layers:
+            __eval__: tune.choice([[11] * l for l in range(1, 5)])
+          nonlinearity: 
+            __eval__: tune.choice([torch.nn.ReLU()])
+          split_dim: 10
+          base_distribution: 
+            __object__: src.veriflow.distributions.RadialDistribution
+            p: 1.0
+            loc:
+              __eval__: torch.zeros(11).to("cpu")
+            norm_distribution:
+              __object__: pyro.distributions.Exponential
+              rate:
+                __eval__: torch.ones(1).to("cpu")
+          use_lu: true
