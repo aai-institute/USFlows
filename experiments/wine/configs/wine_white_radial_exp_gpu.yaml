@@ -69,4 +69,4 @@ experiments:
               __object__: pyro.distributions.Exponential
               rate:
                 __eval__: torch.ones(1).to("cuda")
-          use_lu: true
+          use_lu: false
