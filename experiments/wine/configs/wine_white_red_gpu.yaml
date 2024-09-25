@@ -5,13 +5,12 @@ experiments:
   - &exp_nice_lu_laplace
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: credit_1
-    device: &device "cuda"
     scheduler:  
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 20
+    num_hyperopt_samples: 10
     gpus_per_trial: 1
     cpus_per_trial: 0
     tuner_params: 
@@ -20,16 +19,16 @@ experiments:
     trial_config:
       logging:
         images: false
-        "image_shape": [11, 1]
+        "image_shape": [13, 1]
       dataset: 
         __object__: src.explib.datasets.WineData
-        dataloc: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/winequality-white.csv"
+        dataloc: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/winequality_red_white.csv"
         save_split_dir: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/save_split_dir"
-        drop_columns: ["quality"]
+        drop_columns: []
         first_run: false
         device: "cuda"
       epochs:  100000  # 200000
-      patience: 50
+      patience: 5
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg: 
@@ -48,25 +47,21 @@ experiments:
           training_noise_prior:
             __object__: pyro.distributions.Laplace
             loc:
-              __eval__: torch.zeros(11).to("cuda")
+              __eval__: torch.zeros(13).to("cuda")
             scale:
-              __eval__: torch.ones(11).to("cuda")
+              __eval__: torch.ones(13).to("cuda")
           prior_scale: 1.0
           coupling_layers: 
-            __eval__: tune.choice([l for l in range(1, 4)])
+            __eval__: tune.choice([l for l in range(2, 4)])
           coupling_nn_layers:
-            __eval__: tune.choice([[11] * l for l in range(1, 5)])
+            __eval__: tune.choice([[13] * l for l in range(1, 5)])
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 10
           base_distribution: 
-            __object__: src.veriflow.distributions.RadialDistribution
-            p: 1.0
-            device: "cuda"
+            __object__: pyro.distributions.Laplace
             loc:
-              __eval__: torch.zeros(11).to("cuda")
-            norm_distribution:
-              __object__: pyro.distributions.Exponential
-              rate:
-                __eval__: torch.ones(1).to("cuda")
+              __eval__: torch.zeros(13).to("cuda")
+            scale:
+              __eval__: torch.ones(13).to("cuda")
           use_lu: false

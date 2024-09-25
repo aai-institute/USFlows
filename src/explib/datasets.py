@@ -470,7 +470,7 @@ class WineData(SimpleSplit):
         val_split_directory = f'{save_split_dir}/val.csv'
         test_split_directory = f'{save_split_dir}/test.csv'
         if first_run:
-            wine_data = pd.read_csv(path, delimiter=";")
+            wine_data = pd.read_csv(path, delimiter=",")
             wine_data = wine_data.drop(columns = drop_columns)
 
             if wine_data is None:
