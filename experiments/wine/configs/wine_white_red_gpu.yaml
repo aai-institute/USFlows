@@ -28,7 +28,7 @@ experiments:
         first_run: false
         device: "cuda"
       epochs:  100000  # 200000
-      patience: 5
+      patience: 50
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg: 
