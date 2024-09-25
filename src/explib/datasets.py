@@ -463,13 +463,13 @@ class WineData(SimpleSplit):
                  device: torch.device = None
                  ):
         path = dataloc
-        if not os.path.exists(path):
-            print(f'Dataset not found {path}')
-            return
         train_split_directory = f'{save_split_dir}/train.csv'
         val_split_directory = f'{save_split_dir}/val.csv'
         test_split_directory = f'{save_split_dir}/test.csv'
         if first_run:
+            if not os.path.exists(path):
+                print(f'Dataset not found {path}')
+                exit(-1)
             wine_data = pd.read_csv(path, delimiter=",")
             wine_data = wine_data.drop(columns = drop_columns)
 
@@ -486,6 +486,10 @@ class WineData(SimpleSplit):
             val_df.to_csv(val_split_directory, index=False)
             test_df.to_csv(test_split_directory, index=False)
         else:
+            if not (os.path.exists(train_split_directory) and os.path.exists(val_split_directory)
+            and os.path.exists(test_split_directory)):
+                print(f'Dataset not found {train_split_directory} or {val_split_directory} or {test_split_directory}')
+                exit(-1)
             train_nd = pd.read_csv(train_split_directory)
             val_nd = pd.read_csv(val_split_directory)
             test_nd = pd.read_csv(test_split_directory)
