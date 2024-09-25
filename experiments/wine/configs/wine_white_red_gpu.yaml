@@ -4,7 +4,8 @@ name: credit
 experiments:
   - &exp_nice_lu_laplace
     __object__: src.explib.hyperopt.HyperoptExperiment
-    name: credit_1
+    name: red_white_wine
+    device: &device "cuda"
     scheduler:  
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
