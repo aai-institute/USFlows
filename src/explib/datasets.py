@@ -393,3 +393,38 @@ class Cifar10Dequantized(DequantizedDataset):
         if not os.path.exists(path):
             CIFAR10(dataloc, train=train, download=True)
             
+class Cifar10Split(DataSplit):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        val_split: float = 0.1,
+        label: T.Optional[int] = None,
+    ):
+        self.label = label
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+        self.dataloc = dataloc
+        self.train = Cifar10Dequantized(self.dataloc, train=True, label=label)
+        shuffle = torch.randperm(len(self.train))
+        self.val = torch.utils.data.Subset(
+            self.train, shuffle[: int(len(self.train) * val_split)]
+        )
+        self.train = torch.utils.data.Subset(
+            self.train, shuffle[int(len(self.train) * val_split) :]
+        )
+        self.test = Cifar10Dequantized(self.dataloc, train=False, label=label)
+
+    def get_train(self) -> torch.utils.data.Dataset:
+        return self.train
+
+    def get_test(self) -> torch.utils.data.Dataset:
+        return self.test
+
+    def get_val(self) -> torch.utils.data.Dataset:
+        return self.val
+    
+
+            
+
+
+            
