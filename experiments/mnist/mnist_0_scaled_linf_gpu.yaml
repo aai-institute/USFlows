@@ -27,7 +27,7 @@ experiments:
         digit: 0
         device: *device
       epochs: &epochs 200000
-      patience: &patience 20
+      patience: &patience 40
       batch_size: &batch_size 
         __eval__: tune.choice([16, 32, 64])
       optim_cfg: &optim 
