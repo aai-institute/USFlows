@@ -94,7 +94,7 @@ class ScaleTransform(BaseTransform):
         Returns:
             torch.Tensor: transformed tensor $\mathbf{scale}^{-1}x$
         """
-        return x.to(self.scale.device) / self.scale
+        return x / self.scale
 
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         """ Alias for :func:`forward`"""
