@@ -25,7 +25,7 @@ experiments:
         __object__: src.explib.datasets.MnistSplit
         scale: true
         digit: 0
-        device: &device
+        device: *device
       epochs: &epochs 200000
       patience: &patience 20
       batch_size: &batch_size 
