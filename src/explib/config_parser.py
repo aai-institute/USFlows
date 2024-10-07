@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union
 from pickle import load
 
 import yaml
+import math
 
 # Convenience import for direct access in config files via "__eval__"
 from ray import tune
