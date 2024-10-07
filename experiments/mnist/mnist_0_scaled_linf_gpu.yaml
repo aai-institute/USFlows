@@ -71,13 +71,6 @@ experiments:
                 __eval__: torch.zeros(1).to("cuda")
               scale:
                 __eval__: (.5 * torch.ones(1)).to("cuda")
-          use_lu: true
-  - &exp_nice_no_lu_radial
-    __overwrites__: *exp_nice_lu_radial
-    name: exp_nice_no_lu_radial
-    trial_config:
-      model_cfg:
-        params:
           use_lu: false
   - &exp_nice_rand_lu_radial_scale_1
     __overwrites__: *exp_nice_lu_radial
