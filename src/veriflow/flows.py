@@ -134,7 +134,8 @@ class Flow(torch.nn.Module):
                 try:
                     sample = data_train_shuffle[idx:end]
                     if not isinstance(sample, torch.Tensor):
-                        sample = torch.Tensor(sample)  
+                        sample = torch.Tensor(sample)
+                    sample = sample.to(device)
                 except:
                     continue
                  
@@ -143,6 +144,7 @@ class Flow(torch.nn.Module):
 
                     # Repeat noise for all data dimensions
                     sigma = noise
+                    sigma = sigma.to(device)
              
                     r = list(sample.shape[1:])
                     if not isinstance(r, torch.Tensor):
