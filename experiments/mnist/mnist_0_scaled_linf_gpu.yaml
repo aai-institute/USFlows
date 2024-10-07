@@ -57,7 +57,8 @@ experiments:
           split_dim: 
             __eval__: tune.choice([i for i in range(50, 393)])
           base_distribution: 
-            __object__: src.veriflow.distributions.RadialDistribution       
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: *device
             p:
               __eval__: math.inf
             loc: 
@@ -73,6 +74,7 @@ experiments:
     __overwrites__: *exp_nice_lu_radial
     name: mnist_nice_rand_radial
     trial_config:
+      device: *device
       model_cfg:
         params:
           base_distribution:
