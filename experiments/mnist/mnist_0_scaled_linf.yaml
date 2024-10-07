@@ -61,7 +61,7 @@ experiments:
               __eval__: math.inf
             loc: 
               __eval__: torch.zeros(100).to("cpu")
-            radial_distribution:
+            norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
                 __eval__: torch.zeros(1).to("cpu")
