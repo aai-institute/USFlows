@@ -16,7 +16,7 @@ experiments:
     tuner_params: &tuner_params
       metric: val_loss
       mode: min
-    device: &device "cuda"
+    device: &device cuda
     trial_config:
       logging:
         images: true
