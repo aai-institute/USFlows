@@ -10,13 +10,13 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: &num_hyperopt_samples 8
-    gpus_per_trial: &gpus_per_trial 0
-    cpus_per_trial: &cpus_per_trial 1
+    num_hyperopt_samples: &num_hyperopt_samples 3
+    gpus_per_trial: &gpus_per_trial 1
+    cpus_per_trial: &cpus_per_trial 0
     tuner_params: &tuner_params
       metric: val_loss
       mode: min
-    device: &device "cpu"
+    device: &device "cuda"
     trial_config:
       logging:
         images: true
@@ -61,13 +61,13 @@ experiments:
             p:
               __eval__: math.inf
             loc: 
-              __eval__: torch.zeros(100).to("cpu")
+              __eval__: torch.zeros(100).to("cuda")
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
-                __eval__: torch.zeros(1).to("cpu")
+                __eval__: torch.zeros(1).to("cuda")
               scale: 
-                __eval__: (.5 * torch.ones(1)).to("cpu")
+                __eval__: (.5 * torch.ones(1)).to("cuda")
           use_lu: true
   - &exp_nice_rand_radial
     __overwrites__: *exp_nice_lu_radial
@@ -87,9 +87,9 @@ experiments:
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc:
-                __eval__: torch.zeros(1).to("cpu")
+                __eval__: torch.zeros(1).to("cuda")
               scale:
-                __eval__: (torch.ones(1)).to("cpu")
+                __eval__: (torch.ones(1)).to("cuda")
   - &exp_nice_rand_lu_radial_scale_2
     __overwrites__: *exp_nice_lu_radial
     name: mnist_nice_rand_radial
@@ -100,6 +100,8 @@ experiments:
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc:
-                __eval__: torch.zeros(1).to("cpu")
+                __eval__: torch.zeros(1).to("cuda")
               scale:
-                __eval__: (2 * torch.ones(1)).to("cpu")
+                __eval__: (2 * torch.ones(1)).to("cuda")
+
+
