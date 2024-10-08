@@ -56,8 +56,7 @@ experiments:
             __eval__: "tune.choice([[w] * l for l in [1, 2, 3] for w in [100, 200, 300, 400, 500]])" # tune.choice([[c*32, c*16, c*8, c*16, c*32] for c in [1, 2, 3, 4]] + [[c*64, c*32, c*64]  for c in range(1,5)] + [[c*128] * 2 for c in range(1,5)] + [[c*256] for c in range(1,5)])
           nonlinearity: &nonlinearity
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim:
-            __eval__: tune.choice([i for i in range(50, 393)])
+          split_dim: &split_dim 50
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: *device
