@@ -22,7 +22,8 @@ class DequantizedDataset(torch.utils.data.Dataset):
         self,
         dataset: T.Union[os.PathLike, torch.utils.data.Dataset, np.ndarray],
         num_bits: int = 8,
-        device: torch.device = None, 
+        device: torch.device = None,
+        label: T.Optional[int] = None
     ):
         if isinstance(dataset, torch.utils.data.Dataset) or isinstance(
             dataset, np.ndarray
@@ -31,7 +32,6 @@ class DequantizedDataset(torch.utils.data.Dataset):
         else:
             self.dataset = pd.read_csv(dataset).values
 
-        #
         self.dataset = self.dataset.to(device)
         self.num_bits = num_bits
         self.num_levels = 2**num_bits
@@ -41,11 +41,17 @@ class DequantizedDataset(torch.utils.data.Dataset):
                 transforms.Lambda(lambda x: x + torch.rand_like(x) / self.num_levels),
             ]
         )
+        self.label = label
 
     def __getitem__(self, index: int):
-        x, y = self.dataset[index]
-        x = Tensor(self.transform(x))
-        return x, y
+        if not self.label is None:
+            x= self.dataset[index]
+            x = Tensor(self.transform(x))
+            return x, self.label
+        else:
+            x, y = self.dataset[index]
+            x = Tensor(self.transform(x))
+            return x, y
 
     def __len__(self):
         return len(self.dataset)
@@ -384,14 +390,20 @@ class Cifar10Dequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
+        device: torch.device = None
     ):
         if train:
-            rel_path = "CIFAR10/raw/data_batch_1"
+            rel_path = "cifar-10-batches-py/data_batch_1"
         else:
-            rel_path = "CIFAR10/raw/test_batch"
+            rel_path = "cifar-10-batches-py/test_batch"
         path = os.path.join(dataloc, rel_path)
-        if not os.path.exists(path):
-            CIFAR10(dataloc, train=train, download=True)
+        cifar = CIFAR10(dataloc, train=train, download=True)
+        data = cifar.data
+        labels = cifar.targets
+        data = data[label == np.array(labels)]
+        # TODO: check whether the dequantization actually works correctly on three-channel images
+        # (0-255 red, 0-255 green, 0-255 blue channel, i.e., each channel 8 bit)
+        super().__init__(torch.Tensor(data), num_bits=8, device=device, label=label)
             
 class Cifar10Split(DataSplit):
     def __init__(
@@ -399,6 +411,7 @@ class Cifar10Split(DataSplit):
         dataloc: os.PathLike = None,
         val_split: float = 0.1,
         label: T.Optional[int] = None,
+        device: torch.device = None,
     ):
         self.label = label
         if dataloc is None:

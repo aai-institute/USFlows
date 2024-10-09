@@ -22,8 +22,10 @@ experiments:
         "image_shape": [32, 32, 3]
       dataset: &dataset
         __object__: src.explib.datasets.Cifar10Split
-      epochs: &epochs 200000
-      patience: &patience 2
+        dataloc: "/home/mustafa/local/dataset/cifar/"
+        label: 0
+      epochs: &epochs 2
+      patience: &patience 1
       batch_size: &batch_size 
         __eval__: tune.choice([32])
       optim_cfg: &optim 
@@ -57,7 +59,7 @@ experiments:
               __eval__: math.inf
             loc: 
               __eval__: torch.zeros(784).to("cpu")
-            radial_distribution:
+            norm_distribution:
               __object__: pyro.distributions.Exponential
               rate:
                 __eval__: 1  * torch.ones(1).to("cpu")
