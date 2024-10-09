@@ -111,6 +111,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
         if self.p == 1: 
             self.log_surface_area_unit_ball = (3/2) * math.log(self.dim) + math.log(2) * self.dim  -  torch.log(torch.arange(1, self.dim + 1)).sum() 
         elif self.p == 2:
+            # see page 8 in https://www.cs.cmu.edu/~venkatg/teaching/CStheory-infoage/chap1-high-dim-space.pdf
             self.log_surface_area_unit_ball = math.log(2) + (self.dim / 2) * math.log(math.pi) - math.lgamma(self.dim / 2)
         elif self.p == math.inf:
             self.log_surface_area_unit_ball = math.log(2) * self.dim + math.log(self.dim) 
