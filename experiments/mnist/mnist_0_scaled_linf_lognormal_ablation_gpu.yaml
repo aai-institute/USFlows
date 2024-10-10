@@ -37,7 +37,6 @@ experiments:
           lr:
             __eval__: tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
-
       model_cfg:
         type:
           __class__: &model src.veriflow.flows.NiceFlow
@@ -109,7 +108,17 @@ experiments:
             __exact__:
               __object__: pyro.distributions.Normal
               loc:
-                __eval__: torch.zeros(100)
+                __eval__: torch.zeros(100).to("cuda")
               scale:
-                __eval__: torch.ones(100)
-
+                __eval__: torch.ones(100).to("cuda")
+  - &mnist_exp_cmp
+    __overwrites__: *mnist_logNormal_linf_loc_0_scale_1
+    name: mnist_exp_cmp
+    trial_config:
+      model_cfg:
+        params:
+          base_distribution:
+            norm_distribution:
+              __object__: pyro.distributions.Exponential
+              rate:
+                __eval__: 2 * torch.ones(1).to("cuda")
