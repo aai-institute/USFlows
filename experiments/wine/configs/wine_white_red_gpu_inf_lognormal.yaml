@@ -11,7 +11,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 10
+    num_hyperopt_samples: 6
     gpus_per_trial: 1
     cpus_per_trial: 0
     tuner_params: 
