@@ -1,10 +1,10 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: credit
+name: wine
 experiments:
   - &exp_nice_lu_laplace
     __object__: src.explib.hyperopt.HyperoptExperiment
-    name: red_white_wine
+    name: red_white_wine_loc_1_scale_05
     device: &device "cuda"
     scheduler:  
       __object__: ray.tune.schedulers.ASHAScheduler
@@ -69,7 +69,7 @@ experiments:
             norm_distribution:
               __object__: pyro.distributions.LogNormal # loc=0, scale=1
               loc:
-                __eval__: torch.zeros(1).to("cuda")
-              scale:
                 __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
