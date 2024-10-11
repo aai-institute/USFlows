@@ -1,6 +1,6 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_logNormal_linf_loc_0_scale_1
+name: mnist_logNormal_ablation_small
 experiments:
   - &mnist_logNormal_linf_loc_0_scale_1
     __object__: src.explib.hyperopt.HyperoptExperiment
