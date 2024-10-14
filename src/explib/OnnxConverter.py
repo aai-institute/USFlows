@@ -237,7 +237,7 @@ class OnnxConverter(Experiment):
     def run_within_distribution_verification(self, directory_with_flow, combined_model_path, maraboupy,
                                              unmodified_model_path, classifier_path, directory_without_flow):
 
-        for confidence_threshold in range(100, 102, 1):
+        for confidence_threshold in range(self.confidence_threshold_lower, self.confidence_threshold_upper, 1):
             print(f'experiment no {confidence_threshold}')
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
             counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy,
