@@ -39,7 +39,6 @@ class OnnxConverter(Experiment):
         self.confidence_threshold_lower = confidence_threshold_lower
         self.confidence_threshold_upper = confidence_threshold_upper
 
-
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
 
@@ -111,10 +110,10 @@ class OnnxConverter(Experiment):
         assignments = [vals[1][i] for i in range(self.total_dimensions)]
         return numpy.asarray(assignments).astype(numpy.float32), False
 
-    def verify_with_flow(self, combined_model_path, maraboupy, directory, confidence_threshold, p_lower, p_upper, post_condition_func):
+    def verify_with_flow(self, combined_model_path, maraboupy, directory, confidence_threshold, post_condition_func):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
-        threshold_input_lower = self.quantile_log_normal(p=p_lower)
-        threshold_input_upper = self.quantile_log_normal(p=p_upper)
+        threshold_input_lower = self.quantile_log_normal(p=self.p_threshold_lower)
+        threshold_input_upper = self.quantile_log_normal(p=self.p_threshold_upper)
         if self.verify_full_UDL:
             num_vars = network.numVars
             redundant_var_count = self.total_dimensions  # number of input vars to the network. in our case 28*28.
@@ -161,8 +160,8 @@ class OnnxConverter(Experiment):
 
 
     def verify_merged_model(self, combined_model_path, maraboupy, directory , confidence_threshold):
-        return self.verify_with_flow(combined_model_path, maraboupy, directory, confidence_threshold,
-                                     0.0, 0.0000000000001, self.add_low_confidence_post_cond)
+        return self.verify_with_flow(combined_model_path, maraboupy, directory,
+                                     confidence_threshold, self.add_low_confidence_post_cond)
 
 
     @staticmethod
@@ -269,7 +268,7 @@ class OnnxConverter(Experiment):
 
     def verify_epistemic_uncertainty(self, combined_model_path, maraboupy, directory, confidence_threshold):
         return self.verify_with_flow(combined_model_path, maraboupy, directory, confidence_threshold,
-                                     0.9,0.99, self.add_epistemic_postcond)
+                                     self.add_epistemic_postcond)
 
 
     def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy,
