@@ -12,6 +12,6 @@ target_class: 0 # Indicates the target class used for verification (see comment 
 p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
 p_threshold_upper: 0.0001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
 confidence_threshold_lower: 100  # indicates the lower end of the confidence threshold level to verify
-confidence_threshold_upper: 120  # indicates the upper end of the confidence threshold level to verify
+confidence_threshold_upper: 102  # indicates the upper end of the confidence threshold level to verify
 
 # threshold lower - confidence threshold upper

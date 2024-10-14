@@ -43,7 +43,7 @@ class OnnxConverter(Experiment):
         return math.exp(mu + sigma * norm.ppf(p))
 
     def add_post_condition(self, network, maraboupy, confidence_threshold, sign):
-        if self.verify_full_UDL:
+        if self.verify_confidence:
             var = maraboupy.MarabouPythonic.Var
             output_vars = network.outputVars[0][0]
             # Add inequalities that ensure that the input is classified as target_class
@@ -69,11 +69,12 @@ class OnnxConverter(Experiment):
                     # Actually in abstract interpretation we check both, whether the whole input space is
                     # classified as target and then if everything is classified as target,
                     # we check the guaranteed confidence threshold.
-                    # Latter is still missing in the implementation here. TODO.
+                    # Latter is still missing in the implementation here.
+                    # https://neuralnetworkverification.github.io/Marabou/API/5_MarabouUtils.html#maraboupy.MarabouUtils.Equation
                     eq = maraboupy.Marabou.Equation(maraboupy.MarabouCore.Equation.LE)
-                    eq.addAddend(1, output_vars[self.target_class])
-                    eq.addAddend(-1, output_vars[i])
-                    eq.setScalar(-0.001)
+                    eq.addAddend(1, output_vars[self.target_class]) # 1 * outputvars[target_class]
+                    eq.addAddend(-1, output_vars[i])  # + (-1* output_vars[i])
+                    eq.setScalar(-0.001)  #  <= -0.001  ensure that the instance is classified as non-target
                     disjunction.append([eq])
                     #disjunction.append([var(output_vars[self.target_class]) - var(output_vars[i]) <= 0.001])
             network.addDisjunctionConstraint(disjunction)
@@ -238,7 +239,7 @@ class OnnxConverter(Experiment):
                                              unmodified_model_path, classifier_path, directory_without_flow):
 
         for confidence_threshold in range(self.confidence_threshold_lower, self.confidence_threshold_upper, 1):
-            print(f'experiment no {confidence_threshold}')
+            print(f'experiment with confidence: {confidence_threshold}')
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence_threshold)
             counter_example, is_error = self.verify_merged_model(combined_model_path, maraboupy,
                                                                  experiment_directory_with_flow,
