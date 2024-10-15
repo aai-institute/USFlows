@@ -13,5 +13,6 @@ p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this v
 p_threshold_upper: 0.0001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
 confidence_threshold_lower: 100  # indicates the lower end of the confidence threshold level to verify
 confidence_threshold_upper: 102  # indicates the upper end of the confidence threshold level to verify
+timeout: 1000  # Timeout for Marabou in seconds
 
 # threshold lower - confidence threshold upper

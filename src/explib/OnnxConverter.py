@@ -19,7 +19,7 @@ class OnnxConverter(Experiment):
 
     def __init__(self, path_flow: str, path_classifier: str, verify_within_dist: bool, verify_full_UDL: bool,
                  verify_confidence: bool, target_class: int, p_threshold_lower: float, p_threshold_upper: float,
-                 confidence_threshold_lower: int, confidence_threshold_upper:int, *args, **kwargs,) -> None:
+                 confidence_threshold_lower: int, confidence_threshold_upper:int, timeout: int, *args, **kwargs,) -> None:
         """Initialize verification experiment.
         Args:
             path_flow (string): The path to the flow model used for the verification experiment in ONNX format.
@@ -38,6 +38,7 @@ class OnnxConverter(Experiment):
         self.p_threshold_upper = p_threshold_upper
         self.confidence_threshold_lower = confidence_threshold_lower
         self.confidence_threshold_upper = confidence_threshold_upper
+        self.timeout = timeout
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
@@ -103,7 +104,7 @@ class OnnxConverter(Experiment):
         else:
             self.add_low_confidence_post_cond(network, maraboupy, confidence_threshold)
         vals = network.solve(filename=f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=60))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=self.timeout))
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} without flow')
             return numpy.asarray([]), True
@@ -137,7 +138,7 @@ class OnnxConverter(Experiment):
         post_condition_func(network, maraboupy, confidence_threshold)
         start_time = time.time()
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=180))
+                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=self.timeout))
         print(f'Runtime: {time.time()-start_time}')
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} with flow')
