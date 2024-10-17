@@ -319,7 +319,8 @@ class MnistDequantized(DequantizedDataset):
         digit: T.Optional[int] = None,
         flatten=True,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        scale_factor: int = 3
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -331,7 +332,7 @@ class MnistDequantized(DequantizedDataset):
 
         dataset = idx2numpy.convert_from_file(path)
         if scale:
-            dataset = dataset[:, ::3, ::3]
+            dataset = dataset[:, ::scale_factor, ::scale_factor]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
         if digit is not None:
@@ -368,12 +369,13 @@ class MnistSplit(DataSplit):
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        scale_factor: int = 3
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale, device=device)
+        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale, device=device, scale_factor=scale_factor)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -381,7 +383,7 @@ class MnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale, device=device)
+        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale, device=device, scale_factor=scale_factor)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
