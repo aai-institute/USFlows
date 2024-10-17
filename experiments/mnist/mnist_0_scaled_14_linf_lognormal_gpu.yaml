@@ -1,8 +1,8 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_logNormal_linf_medium_better
+name: mnist_logNormal_linf_loc_1_scale_05_mnist_14
 experiments:
-  - &mnist_logNormal_linf_loc_1_scale_05_medium_sized
+  - &mnist_logNormal_linf_loc_1_scale_05_mnist_14
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: mnist_logNormal_linf_loc_1_scale_05_medium_sized
     scheduler: &scheduler 
@@ -67,7 +67,7 @@ experiments:
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc:
-                __eval__: (1.2 * torch.ones(1)).to("cuda")
+                __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
