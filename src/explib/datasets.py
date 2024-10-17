@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 from sklearn.datasets import make_blobs, make_checkerboard, make_circles, make_moons
 from torch import Tensor
 from torchvision.datasets import MNIST, FashionMNIST, CIFAR10
+import PIL
 
 
 # Base dataset classes
@@ -350,6 +351,15 @@ class MnistDequantized(DequantizedDataset):
             x = self.dataset[index]
         x = self.transform(x)
         return x, 0
+
+    def save_dataset_samples(self, dataset, resolution = (10,10),
+                             image_folder = "./experimental_results/data_image_samples"):
+        for i in range(50):
+            # See doc for various resampling options: https://pillow.readthedocs.io/en/stable/reference/Image.html
+            img = dataset[i][0].resize(size=resolution, resample=PIL.Image.Resampling.NEAREST)
+            os.makedirs(image_folder, exist_ok=True)
+            img.save(os.path.join(image_folder, f"image_{i}NEAREST.png"))
+
 
 class MnistSplit(DataSplit):
     def __init__(
