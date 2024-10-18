@@ -51,7 +51,7 @@ experiments:
                 __eval__: 0.001 * torch.ones(1).to("cuda") #0.01
           prior_scale: 5.0
           coupling_layers: &coupling_layers
-            __eval__: tune.choice([i for i in range(3, 4, 5, 6)])
+            __eval__: tune.choice([i for i in range(3, 6)])
           coupling_nn_layers: &coupling_nn_layers
             __eval__: "tune.choice([[w] * l for l in [1, 2, 3, 4] for w in [196, 300, 400]])"
           nonlinearity: &nonlinearity
