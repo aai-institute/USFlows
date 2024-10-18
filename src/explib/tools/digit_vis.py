@@ -10,7 +10,7 @@ from typing import Dict, Iterable, Literal
 import numpy as np
 
 Norm = Literal[-1, 1, 2]
-RESOLUTION = [10,10]
+RESOLUTION = [14,14]
 RESHAPE = (RESOLUTION[0],RESOLUTION[1])
 
 def nsample(model, n, reshape=RESOLUTION):

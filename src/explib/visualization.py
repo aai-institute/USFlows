@@ -90,7 +90,7 @@ def udl_multisample(
     sample_type: SampleType,
     p: Norm, 
     sqrtn: int, 
-    reshape: Iterable[int] = (10, 10)
+    reshape: Iterable[int] = (14, 14)
 ):
     """Samples from models's base distribution conditioned on the the specified radius. Depending on the sample_type, different conditional distributions are drawn.
     
