@@ -36,7 +36,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-7, 1e-4)
+            __eval__: tune.loguniform(1e-5, 1e-2)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -51,9 +51,9 @@ experiments:
                 __eval__: 0.001 * torch.ones(1).to("cuda") #0.01
           prior_scale: 5.0
           coupling_layers: &coupling_layers
-            __eval__: tune.choice([i for i in range(3, 4)])
+            __eval__: tune.choice([i for i in range(3, 4, 5, 6)])
           coupling_nn_layers: &coupling_nn_layers
-            __eval__: "tune.choice([[w] * l for l in [1, 2, 3, 4] for w in [196, 392, 588]])"
+            __eval__: "tune.choice([[w] * l for l in [1, 2, 3, 4] for w in [196, 300, 400]])"
           nonlinearity: &nonlinearity
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 98
