@@ -28,7 +28,7 @@ experiments:
         device: *device
         scale_factor: 2
       epochs: &epochs 200000
-      patience: &patience 50
+      patience: &patience 150
       batch_size: &batch_size
         __eval__: tune.choice([16, 32, 64])
       optim_cfg: &optim
