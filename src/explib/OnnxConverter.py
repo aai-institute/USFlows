@@ -30,7 +30,7 @@ class OnnxConverter(Experiment):
         self.path_classifier = path_classifier
         self.verify_within_dist = verify_within_dist
         self.verify_full_UDL = verify_full_UDL
-        self.single_dimensions = 10  # TODO automatically detect single dimension as sqrt of input dimension of classifier.
+        self.single_dimensions = 14  # TODO automatically detect single dimension as sqrt of input dimension of classifier.
         self.total_dimensions = self.single_dimensions * self.single_dimensions
         self.verify_confidence = verify_confidence
         self.target_class = target_class
@@ -104,7 +104,7 @@ class OnnxConverter(Experiment):
         else:
             self.add_low_confidence_post_cond(network, maraboupy, confidence_threshold)
         vals = network.solve(filename=f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=self.timeout))
+                             options=maraboupy.Marabou.createOptions(verbosity=3, timeoutInSeconds=self.timeout))
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} without flow')
             return numpy.asarray([]), True
@@ -138,13 +138,16 @@ class OnnxConverter(Experiment):
         post_condition_func(network, maraboupy, confidence_threshold)
         start_time = time.time()
         vals = network.solve(filename =f'{directory}/marabou-output.txt',
-                             options=maraboupy.Marabou.createOptions(verbosity=1, timeoutInSeconds=self.timeout))
+                             options=maraboupy.Marabou.createOptions(verbosity=3, timeoutInSeconds=self.timeout))
         print(f'Runtime: {time.time()-start_time}')
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} with flow')
             return numpy.asarray([]), True
         if vals[0] == 'unsat':
             print(f'proof certificate with flow')
+            return numpy.asarray([]), True
+        if vals[0] == 'ERROR':
+            print(f'error {vals}')
             return numpy.asarray([]), True
 
         assignments = [vals[1][i] for i in range(self.total_dimensions)]

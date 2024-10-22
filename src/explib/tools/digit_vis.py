@@ -106,7 +106,7 @@ def plot_digits_UDL(models: Dict[str, Flow], sqrtn: int, save_to=None, res=RESOL
             if idx < num_experiments:
                 model = models[digit]
                 with torch.no_grad():
-                    radius = norm(model.base_distribution.sample((n_udl_estimation,)), -1).quantile(0.1)
+                    radius = norm(model.base_distribution.sample((n_udl_estimation,)), -1).quantile(0.001)
                 sample = udl_multisample(model, radius, "conditional", -1, 3, RESHAPE)
                 ax.imshow(sample, cmap="gray")
                 ax.set_xticks([])
@@ -124,9 +124,7 @@ def plot_digits_UDL(models: Dict[str, Flow], sqrtn: int, save_to=None, res=RESOL
 def evaluate(res=RESOLUTION, save_to="./"):
     models = dict()
     PATHS = [ # Adjust the paths accordingly.
-        "/home/mustafa/repos/VeriFlow/experimental_results/rescaled_mnist/l_inf/best_radial_scale_2",
-        "/home/mustafa/repos/VeriFlow/experimental_results/rescaled_mnist/l_inf/best_scale_1",
-        "/home/mustafa/repos/VeriFlow/experimental_results/rescaled_mnist/l_inf/best_scale_05"
+        "/home/mustafa/Documents/midas/model_to_test_pat_150/best_model_14_14_patience_150",
     ]
     for exp in PATHS:
         exp_name = exp.split("/")[-1]

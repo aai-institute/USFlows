@@ -4,16 +4,7 @@ from src.explib.config_parser import from_checkpoint
 if __name__ == '__main__':
     print("Exporting model")
     PATHS = [
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/0_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/1_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/2_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/3_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/4_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/5_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/6_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/7_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/8_mnist_basedist_comparison/mnist_basedist_comparison/0_mnist_3_laplace/",
-        "/home/mustafa/Documents/midas/all_digits/mnist_ablation/digit9/experiment/"
+        "/home/mustafa/Documents/midas/model_to_test_pat_150/best_model_14_14_patience_150/"
     ]
     for PATH in PATHS:
         pkl = [f for f in os.listdir(PATH) if f.endswith("pkl")]
