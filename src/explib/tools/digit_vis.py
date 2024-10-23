@@ -124,7 +124,7 @@ def plot_digits_UDL(models: Dict[str, Flow], sqrtn: int, save_to=None, res=RESOL
 def evaluate(res=RESOLUTION, save_to="./"):
     models = dict()
     PATHS = [ # Adjust the paths accordingly.
-        "/home/mustafa/Documents/midas/model_to_test_pat_150/best_model_14_14_patience_150",
+        "/home/mustafa/Documents/midas/aaaaaaaa/smaller_14_14_final_model",
     ]
     for exp in PATHS:
         exp_name = exp.split("/")[-1]
