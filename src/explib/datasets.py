@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 from sklearn.datasets import make_blobs, make_checkerboard, make_circles, make_moons
 from torch import Tensor
 from torchvision.datasets import MNIST, FashionMNIST, CIFAR10
+import PIL
 
 
 # Base dataset classes
@@ -22,7 +23,8 @@ class DequantizedDataset(torch.utils.data.Dataset):
         self,
         dataset: T.Union[os.PathLike, torch.utils.data.Dataset, np.ndarray],
         num_bits: int = 8,
-        device: torch.device = None, 
+        device: torch.device = None,
+        label: T.Optional[int] = None
     ):
         if isinstance(dataset, torch.utils.data.Dataset) or isinstance(
             dataset, np.ndarray
@@ -31,7 +33,6 @@ class DequantizedDataset(torch.utils.data.Dataset):
         else:
             self.dataset = pd.read_csv(dataset).values
 
-        #
         self.dataset = self.dataset.to(device)
         self.num_bits = num_bits
         self.num_levels = 2**num_bits
@@ -41,11 +42,17 @@ class DequantizedDataset(torch.utils.data.Dataset):
                 transforms.Lambda(lambda x: x + torch.rand_like(x) / self.num_levels),
             ]
         )
+        self.label = label
 
     def __getitem__(self, index: int):
-        x, y = self.dataset[index]
-        x = Tensor(self.transform(x))
-        return x, y
+        if not self.label is None:
+            x= self.dataset[index]
+            x = Tensor(self.transform(x))
+            return x, self.label
+        else:
+            x, y = self.dataset[index]
+            x = Tensor(self.transform(x))
+            return x, y
 
     def __len__(self):
         return len(self.dataset)
@@ -312,7 +319,8 @@ class MnistDequantized(DequantizedDataset):
         digit: T.Optional[int] = None,
         flatten=True,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        scale_factor: int = 3
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -324,7 +332,7 @@ class MnistDequantized(DequantizedDataset):
 
         dataset = idx2numpy.convert_from_file(path)
         if scale:
-            dataset = dataset[:, ::3, ::3]
+            dataset = dataset[:, ::scale_factor, ::scale_factor]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
         if digit is not None:
@@ -345,6 +353,15 @@ class MnistDequantized(DequantizedDataset):
         x = self.transform(x)
         return x, 0
 
+    def save_dataset_samples(self, dataset, resolution = (10,10),
+                             image_folder = "./experimental_results/data_image_samples"):
+        for i in range(50):
+            # See doc for various resampling options: https://pillow.readthedocs.io/en/stable/reference/Image.html
+            img = dataset[i][0].resize(size=resolution, resample=PIL.Image.Resampling.NEAREST)
+            os.makedirs(image_folder, exist_ok=True)
+            img.save(os.path.join(image_folder, f"image_{i}NEAREST.png"))
+
+
 class MnistSplit(DataSplit):
     def __init__(
         self,
@@ -352,12 +369,13 @@ class MnistSplit(DataSplit):
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        scale_factor: int = 3
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale, device=device)
+        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale, device=device, scale_factor=scale_factor)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -365,7 +383,7 @@ class MnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale, device=device)
+        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale, device=device, scale_factor=scale_factor)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
@@ -384,12 +402,54 @@ class Cifar10Dequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
+        device: torch.device = None
     ):
         if train:
-            rel_path = "CIFAR10/raw/data_batch_1"
+            rel_path = "cifar-10-batches-py/data_batch_1"
         else:
-            rel_path = "CIFAR10/raw/test_batch"
+            rel_path = "cifar-10-batches-py/test_batch"
         path = os.path.join(dataloc, rel_path)
-        if not os.path.exists(path):
-            CIFAR10(dataloc, train=train, download=True)
+        cifar = CIFAR10(dataloc, train=train, download=True)
+        data = cifar.data
+        labels = cifar.targets
+        data = data[label == np.array(labels)]
+        # TODO: check whether the dequantization actually works correctly on three-channel images
+        # (0-255 red, 0-255 green, 0-255 blue channel, i.e., each channel 8 bit)
+        super().__init__(torch.Tensor(data), num_bits=8, device=device, label=label)
+            
+class Cifar10Split(DataSplit):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        val_split: float = 0.1,
+        label: T.Optional[int] = None,
+        device: torch.device = None,
+    ):
+        self.label = label
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+        self.dataloc = dataloc
+        self.train = Cifar10Dequantized(self.dataloc, train=True, label=label)
+        shuffle = torch.randperm(len(self.train))
+        self.val = torch.utils.data.Subset(
+            self.train, shuffle[: int(len(self.train) * val_split)]
+        )
+        self.train = torch.utils.data.Subset(
+            self.train, shuffle[int(len(self.train) * val_split) :]
+        )
+        self.test = Cifar10Dequantized(self.dataloc, train=False, label=label)
+
+    def get_train(self) -> torch.utils.data.Dataset:
+        return self.train
+
+    def get_test(self) -> torch.utils.data.Dataset:
+        return self.test
+
+    def get_val(self) -> torch.utils.data.Dataset:
+        return self.val
+    
+
+            
+
+
             
