@@ -70,7 +70,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_9
     name: mnist_logNormal_linf_digit_9
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -123,7 +123,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_8
     name: mnist_logNormal_linf_digit_8
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -176,7 +176,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_7
     name: mnist_logNormal_linf_digit_7
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -229,7 +229,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_6
     name: mnist_logNormal_linf_digit_6
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -282,7 +282,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_5
     name: mnist_logNormal_linf_digit_5
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -335,7 +335,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_4
     name: mnist_logNormal_linf_digit_4
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -388,7 +388,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_3
     name: mnist_logNormal_linf_digit_3
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -441,7 +441,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_2
     name: mnist_logNormal_linf_digit_2
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -494,7 +494,7 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
   - &mnist_logNormal_linf_digit_1
     name: mnist_logNormal_linf_digit_1
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -547,4 +547,4 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
