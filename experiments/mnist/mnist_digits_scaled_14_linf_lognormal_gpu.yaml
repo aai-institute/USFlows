@@ -28,7 +28,7 @@ experiments:
         device: *device
         scale_factor: 2
       epochs: &epochs 200000
-      patience: &patience 150
+      patience: &patience 80
       batch_size: &batch_size
         __eval__: tune.choice([16, 32])
       optim_cfg: &optim
@@ -51,7 +51,7 @@ experiments:
                 __eval__: 0.001 * torch.ones(1).to("cuda") #0.01
           prior_scale: 5.0
           coupling_layers: &coupling_layers
-            __eval__: tune.choice([i for i in range(3, 4)])
+            __eval__: tune.choice([i for i in range(2, 3)])
           coupling_nn_layers: &coupling_nn_layers
             __eval__: "tune.choice([[w] * l for l in [1] for w in [294]])"
           nonlinearity: &nonlinearity
