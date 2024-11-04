@@ -225,10 +225,12 @@ class OnnxConverter(Experiment):
         plt.savefig(f'{directory}/counterexample.png')
         numpy.save(file=f'{directory}/counter_example.npy', arr=counter_example)
         numpy.savetxt(f'{directory}/counter_example.txt', counter_example)
+
+        input_name = onnx.load(classifier_path).graph.input[0].name
         ort_sess_classifier = ort.InferenceSession(classifier_path)
         outputs_classifier = ort_sess_classifier.run(
             None,
-            {'onnx::MatMul_0': numpy.array(image)})
+            {input_name: numpy.array(image)})
         logits = numpy.asarray(outputs_classifier[0]).astype(numpy.float32)
         confidence = (len(logits) * logits[self.target_class] - (numpy.sum(logits) - logits[self.target_class])) / len(logits)
         classified_as = numpy.argmax(logits)
@@ -251,9 +253,11 @@ class OnnxConverter(Experiment):
             if is_error:
                 continue
                 #return
+
+            input_name = onnx.load(unmodified_model_path).graph.input[0].name
             outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
                 None,
-                {'x.1': counter_example})
+                {input_name: counter_example})
             self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path)
 
             experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow,
@@ -284,9 +288,11 @@ class OnnxConverter(Experiment):
                                                                           experiment_directory_with_flow,confidence)
             if is_error:
                 continue
+
+            input_name = onnx.load(unmodified_model_path).graph.input[0].name
             outputs_flow_image = ort.InferenceSession(unmodified_model_path).run(
                 None,
-                {'onnx::MatMul_0': counter_example})
+                {input_name: counter_example})
             self.fill_report(outputs_flow_image[0], counter_example, experiment_directory_with_flow, classifier_path)
 
             experiment_directory_without_flow = self.create_experiment_subdir(directory_without_flow,
