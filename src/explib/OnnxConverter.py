@@ -132,7 +132,7 @@ class OnnxConverter(Experiment):
             network.addInequality(redundant_vars, ones, threshold_input_upper)
         else:
             for i in range(self.total_dimensions): # the 784 input variables.
-                network.setLowerBound(i, threshold_input_lower)
+                network.setLowerBound(i, -1*threshold_input_upper)
                 network.setUpperBound(i, threshold_input_upper)
 
         post_condition_func(network, maraboupy, confidence_threshold)
