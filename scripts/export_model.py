@@ -4,7 +4,11 @@ from src.explib.config_parser import from_checkpoint
 if __name__ == '__main__':
     print("Exporting model")
     PATHS = [
-        "/home/mustafa/Documents/midas/aaaaaaaa/smaller_14_14_final_model/"
+        "/home/mustafa/Documents/midas/all_digits_lu_small/1_mnist_logNormal_linf_digit_9/",
+        "/home/mustafa/Documents/midas/all_digits_lu_small/2_mnist_logNormal_linf_digit_8/",
+        "/home/mustafa/Documents/midas/all_digits_lu_small/4_mnist_logNormal_linf_digit_6/",
+        "/home/mustafa/Documents/midas/all_digits_lu_small/5_mnist_logNormal_linf_digit_5/"
+
     ]
     for PATH in PATHS:
         pkl = [f for f in os.listdir(PATH) if f.endswith("pkl")]
