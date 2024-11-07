@@ -28,7 +28,7 @@ experiments:
         device: *device
         scale_factor: 2
       epochs: &epochs 200000
-      patience: &patience 80
+      patience: &patience 160
       batch_size: &batch_size
         __eval__: tune.choice([32])
       optim_cfg: &optim
@@ -36,7 +36,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-4, 1e-3)
+            __eval__: tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
       model_cfg:
         type:
