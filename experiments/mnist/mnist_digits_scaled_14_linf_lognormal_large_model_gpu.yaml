@@ -36,7 +36,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-5, 1e-3)
+            __eval__: tune.loguniform(3e-5, 1e-4)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -67,7 +67,7 @@ experiments:
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc:
-                __eval__: torch.ones(1).to("cuda")
+                __eval__: (2.5 * torch.ones(1)).to("cuda")
               scale:
                 __eval__: (0.5 * torch.ones(1)).to("cuda")
           use_lu: true
