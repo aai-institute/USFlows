@@ -282,7 +282,7 @@ class OnnxConverter(Experiment):
 
     def run_epistemic_uncertainty_verification(self, directory_with_flow, combined_model_path, maraboupy,
                                              unmodified_model_path, classifier_path, directory_without_flow):
-        for confidence in range(8, 20, 1):
+        for confidence in range(self.confidence_threshold_lower, self.confidence_threshold_upper, 1):
             experiment_directory_with_flow = self.create_experiment_subdir(directory_with_flow, confidence)
             counter_example, is_error = self.verify_epistemic_uncertainty(combined_model_path, maraboupy,
                                                                           experiment_directory_with_flow,confidence)
