@@ -36,7 +36,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_8
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_8
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/2_mnist_logNormal_linf_digit_8/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -52,7 +52,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_7
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_7
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/3_mnist_logNormal_linf_digit_7/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -68,7 +68,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_6
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_6
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/4_mnist_logNormal_linf_digit_6/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -84,7 +84,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_5
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_5
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/5_mnist_logNormal_linf_digit_5/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -100,7 +100,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_4
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_4
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/6_mnist_logNormal_linf_digit_4/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -116,7 +116,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_3
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_3
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/7_mnist_logNormal_linf_digit_3/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -132,7 +132,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_2
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_2
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/8_mnist_logNormal_linf_digit_2/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
@@ -148,7 +148,7 @@ experiments:
       timeout: 120  # Timeout for Marabou in seconds
     - &verify_1
       __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_9
+      name: verify_1
       path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/9_mnist_logNormal_linf_digit_1/forward.onnx"
       path_classifier: *path_classifier
       verify_within_dist: True
