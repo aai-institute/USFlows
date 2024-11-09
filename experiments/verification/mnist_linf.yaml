@@ -1,18 +1,164 @@
 ---
-__object__: src.explib.OnnxConverter.OnnxConverter
-name: convert_onnx
-path_flow: &path_flow "/home/mustafa/Documents/midas/all_digits_lu_small/0_mnist_logNormal_linf_digit_0/forward.onnx"
-path_classifier: &path_classifier "/home/mustafa/repos/VeriFlow/experiments/verification/resources/MnistClassifier_14_14.onnx"
-verify_within_dist: True
-verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
-verify_confidence: True  # Indicates the chosen postcondition:
-                         # True: verifies that UDL classified as target is classified with high confidence
-                         # False: verifies that the UDL is classified as target (same property as with ERAN).
-target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-p_threshold_upper: 0.000000001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
-confidence_threshold_lower: 10  # indicates the lower end of the confidence threshold level to verify
-confidence_threshold_upper: 11  # indicates the upper end of the confidence threshold level to verify
-timeout: 120  # Timeout for Marabou in seconds
-
-# threshold lower - confidence threshold upper
+__object__: src.explib.base.ExperimentCollection
+name: verify_all_digits
+experiments:
+    - &verify_0
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_0
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/0_mnist_logNormal_linf_digit_0/forward.onnx"
+      path_classifier: &path_classifier "/home/mustafa/repos/VeriFlow/experiments/verification/resources/MnistClassifier_14_14.onnx"
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+                               # True: verifies that UDL classified as target is classified with high confidence
+                               # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: &space_thold_upper 0.000000001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: &conf_thold_lower 17  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: &conf_thold_upper 18  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_9
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/1_mnist_logNormal_linf_digit_9/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 9 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_8
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/2_mnist_logNormal_linf_digit_8/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 8 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_7
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/3_mnist_logNormal_linf_digit_7/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 7 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_6
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/4_mnist_logNormal_linf_digit_6/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 6 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_5
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/5_mnist_logNormal_linf_digit_5/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 9 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 5   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_4
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/6_mnist_logNormal_linf_digit_4/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 9 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 4   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_3
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/7_mnist_logNormal_linf_digit_3/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 3 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_2
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/8_mnist_logNormal_linf_digit_2/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 2 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
+    - &verify_1
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_9
+      path_flow: "/home/mustafa/Documents/midas/all_digits_lu_small/9_mnist_logNormal_linf_digit_1/forward.onnx"
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: True  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 1 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: *space_thold_upper  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower  # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper  # indicates the upper end of the confidence threshold level to verify
+      timeout: 120  # Timeout for Marabou in seconds
