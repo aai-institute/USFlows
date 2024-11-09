@@ -7,7 +7,7 @@ from scipy.stats import norm
 # Constants for reshaping and visualization
 RESOLUTION = [14, 14]  # Adjust if different output shape is expected
 RESHAPE = (RESOLUTION[0], RESOLUTION[1])
-p = 0.0000000001
+p = 0.000000001
 
 
 def quantile_log_normal(p, mu=1, sigma=0.5):
