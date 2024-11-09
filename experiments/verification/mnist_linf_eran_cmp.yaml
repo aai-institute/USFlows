@@ -13,8 +13,8 @@ experiments:
                                # True: verifies that UDL classified as target is classified with high confidence
                                # False: verifies that the UDL is classified as target (same property as with ERAN).
       target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-      p_threshold_lower: -0.005   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: &space_thold_upper 0.005  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      p_threshold_lower: -0.001   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: &space_thold_upper 0.001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
       confidence_threshold_lower: &conf_thold_lower 5  # indicates the lower end of the confidence threshold level to verify
       confidence_threshold_upper: &conf_thold_upper 6  # indicates the upper end of the confidence threshold level to verify
       timeout: &timeout 180  # Timeout for Marabou in seconds
@@ -32,8 +32,8 @@ experiments:
                                # True: verifies that UDL classified as target is classified with high confidence
                                # False: verifies that the UDL is classified as target (same property as with ERAN).
       target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-      p_threshold_lower: -0.06   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: 0.06  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      p_threshold_lower: -0.002   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.002  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
       confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
       confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
       timeout: *timeout  # Timeout for Marabou in seconds
@@ -41,6 +41,82 @@ experiments:
                                    # that will be translated taking into account the base distribution, or taken as
                                    # constant thresholds. Latter is used for comparing experiments with ERAN.
     - &verify_2
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_0
+      path_flow: *path_flow
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: False  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: -0.003   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.003  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
+      timeout: *timeout  # Timeout for Marabou in seconds
+      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
+      # that will be translated taking into account the base distribution, or taken as
+      # constant thresholds. Latter is used for comparing experiments with ERAN.
+    - &verify_3
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_0
+      path_flow: *path_flow
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: False  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: -0.004   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.004  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
+      timeout: *timeout  # Timeout for Marabou in seconds
+      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
+      # that will be translated taking into account the base distribution, or taken as
+      # constant thresholds. Latter is used for comparing experiments with ERAN.
+    - &verify_4
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_0
+      path_flow: *path_flow
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: False  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: -0.005   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.005  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
+      timeout: *timeout  # Timeout for Marabou in seconds
+      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
+      # that will be translated taking into account the base distribution, or taken as
+      # constant thresholds. Latter is used for comparing experiments with ERAN.
+    - &verify_5
+      __object__: src.explib.OnnxConverter.OnnxConverter
+      name: verify_0
+      path_flow: *path_flow
+      path_classifier: *path_classifier
+      verify_within_dist: True
+      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
+      verify_confidence: False  # Indicates the chosen postcondition:
+      # True: verifies that UDL classified as target is classified with high confidence
+      # False: verifies that the UDL is classified as target (same property as with ERAN).
+      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
+      p_threshold_lower: -0.006   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.006  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
+      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
+      timeout: *timeout  # Timeout for Marabou in seconds
+      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
+      # that will be translated taking into account the base distribution, or taken as
+      # constant thresholds. Latter is used for comparing experiments with ERAN.
+    - &verify_6
       __object__: src.explib.OnnxConverter.OnnxConverter
       name: verify_0
       path_flow: *path_flow
@@ -59,7 +135,7 @@ experiments:
       translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
       # that will be translated taking into account the base distribution, or taken as
       # constant thresholds. Latter is used for comparing experiments with ERAN.
-    - &verify_3
+    - &verify_7
       __object__: src.explib.OnnxConverter.OnnxConverter
       name: verify_0
       path_flow: *path_flow
@@ -78,7 +154,7 @@ experiments:
       translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
       # that will be translated taking into account the base distribution, or taken as
       # constant thresholds. Latter is used for comparing experiments with ERAN.
-    - &verify_4
+    - &verify_8
       __object__: src.explib.OnnxConverter.OnnxConverter
       name: verify_0
       path_flow: *path_flow
@@ -97,7 +173,7 @@ experiments:
       translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
       # that will be translated taking into account the base distribution, or taken as
       # constant thresholds. Latter is used for comparing experiments with ERAN.
-    - &verify_5
+    - &verify_9
       __object__: src.explib.OnnxConverter.OnnxConverter
       name: verify_0
       path_flow: *path_flow
@@ -108,46 +184,8 @@ experiments:
       # True: verifies that UDL classified as target is classified with high confidence
       # False: verifies that the UDL is classified as target (same property as with ERAN).
       target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-      p_threshold_lower: -0.010   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: 0.010  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
-      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
-      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
-      timeout: *timeout  # Timeout for Marabou in seconds
-      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
-      # that will be translated taking into account the base distribution, or taken as
-      # constant thresholds. Latter is used for comparing experiments with ERAN.
-    - &verify_6
-      __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_0
-      path_flow: *path_flow
-      path_classifier: *path_classifier
-      verify_within_dist: True
-      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
-      verify_confidence: False  # Indicates the chosen postcondition:
-      # True: verifies that UDL classified as target is classified with high confidence
-      # False: verifies that the UDL is classified as target (same property as with ERAN).
-      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-      p_threshold_lower: -0.011   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: 0.011  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
-      confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
-      confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
-      timeout: *timeout  # Timeout for Marabou in seconds
-      translate_thresholds: False  # Indicates whether the thresholds p_threshold_lower, p_threshold_upper are p-values
-      # that will be translated taking into account the base distribution, or taken as
-      # constant thresholds. Latter is used for comparing experiments with ERAN.
-    - &verify_7
-      __object__: src.explib.OnnxConverter.OnnxConverter
-      name: verify_0
-      path_flow: *path_flow
-      path_classifier: *path_classifier
-      verify_within_dist: True
-      verify_full_UDL: False  # indicates whether the full UDL is searched (True) or some simple (unrotated) cube.
-      verify_confidence: False  # Indicates the chosen postcondition:
-      # True: verifies that UDL classified as target is classified with high confidence
-      # False: verifies that the UDL is classified as target (same property as with ERAN).
-      target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
-      p_threshold_lower: -0.012   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: 0.012  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      p_threshold_lower: -0.01   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
+      p_threshold_upper: 0.01  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
       confidence_threshold_lower: *conf_thold_lower # indicates the lower end of the confidence threshold level to verify
       confidence_threshold_upper: *conf_thold_upper # indicates the upper end of the confidence threshold level to verify
       timeout: *timeout  # Timeout for Marabou in seconds

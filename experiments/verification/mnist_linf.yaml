@@ -14,7 +14,7 @@ experiments:
                                # False: verifies that the UDL is classified as target (same property as with ERAN).
       target_class: 0 # Indicates the target class used for verification (see comment regarding verify_confidence)
       p_threshold_lower: 0   # Indicates the lower end of the p value. For UDL, this value is 0 (highest density). For epistemic uncertainty verification p~0.8
-      p_threshold_upper: &space_thold_upper 0.000000001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
+      p_threshold_upper: &space_thold_upper 0.0000000001  # Indicates the upper end of the p value. For UDL, this value is 0 (highest density)
       confidence_threshold_lower: &conf_thold_lower 17  # indicates the lower end of the confidence threshold level to verify
       confidence_threshold_upper: &conf_thold_upper 18  # indicates the upper end of the confidence threshold level to verify
       timeout: 120  # Timeout for Marabou in seconds

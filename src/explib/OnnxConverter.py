@@ -19,7 +19,8 @@ class OnnxConverter(Experiment):
 
     def __init__(self, path_flow: str, path_classifier: str, verify_within_dist: bool, verify_full_UDL: bool,
                  verify_confidence: bool, target_class: int, p_threshold_lower: float, p_threshold_upper: float,
-                 confidence_threshold_lower: int, confidence_threshold_upper:int, timeout: int, *args, **kwargs,) -> None:
+                 confidence_threshold_lower: int, confidence_threshold_upper:int, timeout: int, translate_thresholds: bool,
+                 *args, **kwargs,) -> None:
         """Initialize verification experiment.
         Args:
             path_flow (string): The path to the flow model used for the verification experiment in ONNX format.
@@ -39,6 +40,7 @@ class OnnxConverter(Experiment):
         self.confidence_threshold_lower = confidence_threshold_lower
         self.confidence_threshold_upper = confidence_threshold_upper
         self.timeout = timeout
+        self.translate_thresholds = translate_thresholds
 
     def quantile_log_normal(self, p, mu=1, sigma=0.5):
         return math.exp(mu + sigma * norm.ppf(p))
@@ -116,8 +118,13 @@ class OnnxConverter(Experiment):
 
     def verify_with_flow(self, combined_model_path, maraboupy, directory, confidence_threshold, post_condition_func):
         network = maraboupy.Marabou.read_onnx(combined_model_path)
-        threshold_input_lower = self.quantile_log_normal(p=self.p_threshold_lower)
-        threshold_input_upper = self.quantile_log_normal(p=self.p_threshold_upper)
+        if self.translate_thresholds:
+            threshold_input_lower = self.quantile_log_normal(p=self.p_threshold_lower)
+            threshold_input_upper = self.quantile_log_normal(p=self.p_threshold_upper)
+        else:
+            print(f'Running eran cmp experiment with {self.p_threshold_lower} and {self.p_threshold_upper}')
+            threshold_input_lower = self.p_threshold_lower
+            threshold_input_upper = self.p_threshold_upper
         if self.verify_full_UDL:
             num_vars = network.numVars
             redundant_var_count = self.total_dimensions  # number of input vars to the network. in our case 28*28.
@@ -145,10 +152,10 @@ class OnnxConverter(Experiment):
         print(f'Runtime: {runtime}')
         if vals[0] == 'TIMEOUT':
             print(f'did not solve experiment {confidence_threshold} with flow')
-            return numpy.asarray([]), True
+            return numpy.asarray([]), True, runtime
         if vals[0] == 'unsat':
             print(f'proof certificate with flow')
-            return numpy.asarray([]), True
+            return numpy.asarray([]), True, runtime
         if vals[0] == 'ERROR':
             print(f'error {vals}')
             return numpy.asarray([]), True, runtime
