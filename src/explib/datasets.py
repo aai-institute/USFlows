@@ -45,8 +45,8 @@ class DequantizedDataset(torch.utils.data.Dataset):
         self.label = label
 
     def __getitem__(self, index: int):
-        if not self.label is None:
-            x= self.dataset[index]
+        if self.label is not None:
+            x = self.dataset[index]
             x = Tensor(self.transform(x))
             return x, self.label
         else:
@@ -395,7 +395,6 @@ class MnistSplit(DataSplit):
         return self.val
 
 # CFAIR-10
-
 class Cifar10Dequantized(DequantizedDataset):
     def __init__(
         self,
@@ -408,14 +407,17 @@ class Cifar10Dequantized(DequantizedDataset):
             rel_path = "cifar-10-batches-py/data_batch_1"
         else:
             rel_path = "cifar-10-batches-py/test_batch"
-        path = os.path.join(dataloc, rel_path)
-        cifar = CIFAR10(dataloc, train=train, download=True)
-        data = cifar.data
-        labels = cifar.targets
-        data = data[label == np.array(labels)]
+        self.path = os.path.join(dataloc, rel_path)
+        self.cifar = CIFAR10(dataloc, train=train, download=True)
+        self.data = self.cifar.data
+        self.data = self.data.reshape(self.data.shape[0], -1)
+        self.labels = self.cifar.targets
+        if label is not None:
+            self.data = self.data[label == np.array(self.labels)]
+        
         # TODO: check whether the dequantization actually works correctly on three-channel images
         # (0-255 red, 0-255 green, 0-255 blue channel, i.e., each channel 8 bit)
-        super().__init__(torch.Tensor(data), num_bits=8, device=device, label=label)
+        super().__init__(torch.Tensor(self.data), num_bits=8, device=device, label=label)
             
 class Cifar10Split(DataSplit):
     def __init__(
@@ -429,7 +431,12 @@ class Cifar10Split(DataSplit):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = Cifar10Dequantized(self.dataloc, train=True, label=label)
+        self.train = Cifar10Dequantized(
+            self.dataloc, 
+            train=True, 
+            label=label, 
+            device=device
+        )
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -437,7 +444,12 @@ class Cifar10Split(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = Cifar10Dequantized(self.dataloc, train=False, label=label)
+        self.test = Cifar10Dequantized(
+            self.dataloc, 
+            train=False, 
+            label=label, 
+            device=device
+        )
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train

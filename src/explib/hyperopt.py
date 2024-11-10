@@ -334,15 +334,33 @@ def img_sample(
         writer = SummaryWriter("./")
     with torch.no_grad():
         sample = torch.clip(model.sample(torch.tensor([n, n])), 0, 1) * 255
-        
+    
+    # TODO: reshape should be specified externally.
+    dataformat = None   
     if reshape is not None:
+        if len(reshape) == 2:
+            dataformat = "HW"
+        elif reshape[0] == 3:
+            dataformat = "CHW"
+        else:
+            dataformat = "HWC" 
         reshape = [n, n] + reshape
         sample = sample.reshape(reshape)
+    else:
+        reshape = sample.shape[2:]
+        if len(reshape) == 2:
+            dataformat = "HW"
+        elif reshape[0] == 3:
+            dataformat = "CHW"
+        else:
+            dataformat = "HWC" 
+        
+        
     
-    sample = torch.cat([x for x in sample], dim=-1)
+    sample = torch.cat([x for x in sample], dim=2)
     sample = torch.cat([x for x in sample], dim=0)
     
-    writer.add_image(name, sample, global_step=step, dataformats="HW")
+    writer.add_image(name, sample, global_step=step, dataformats=dataformat)
     writer.flush()
     writer.close()
 

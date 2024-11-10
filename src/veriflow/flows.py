@@ -134,12 +134,12 @@ class Flow(torch.nn.Module):
                 try:
                     sample = data_train_shuffle[idx:end]
                     if not isinstance(sample, torch.Tensor):
-                        sample = torch.Tensor(sample)  
+                        sample = torch.Tensor(sample).to(device)  
                 except:
                     continue
                  
                 if self.soft_training:
-                    noise = self.training_noise_prior.sample([sample.shape[0]]) 
+                    noise = self.training_noise_prior.sample([sample.shape[0]]).to(device)
 
                     # Repeat noise for all data dimensions
                     sigma = noise
