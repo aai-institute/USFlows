@@ -5,6 +5,7 @@ experiments:
   - &exp_rad_logN
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: cfair_full_radial_logN
+    device: cuda
     scheduler: &scheduler 
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
@@ -22,6 +23,8 @@ experiments:
         "image_shape": [32, 32, 3]
       dataset: &dataset
         __object__: src.explib.datasets.Cifar10Split
+        label: 0
+        device: cuda
       epochs: &epochs 200000
       patience: &patience 2
       batch_size: &batch_size 
@@ -45,7 +48,7 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_layers: 10
+          coupling_layers: 5
           coupling_nn_layers: [300, 300, 300] 
           nonlinearity: &nonlinearity 
             __eval__: tune.choice([torch.nn.ReLU()])
@@ -55,8 +58,8 @@ experiments:
             device: cuda
             p: 1.0
             loc: 
-              __eval__: torch.zeros(784).to("cuda")
-            radial_distribution:
+              __eval__: torch.zeros(3072).to("cuda")
+            norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
                 __eval__: torch.zeros(1).to("cuda")
