@@ -453,7 +453,7 @@ class HelocData(SimpleSplit):
             self.test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device)
 
 
-class WineData(SimpleSplit):
+class TabularData(SimpleSplit):
     def __init__(self,
                  dataloc: os.PathLike,
                  save_split_dir: os.PathLike,
@@ -470,15 +470,15 @@ class WineData(SimpleSplit):
             if not os.path.exists(path):
                 print(f'Dataset not found {path}')
                 exit(-1)
-            wine_data = pd.read_csv(path, delimiter=",")
-            wine_data = wine_data.drop(columns = drop_columns)
+            tabular_data = pd.read_csv(path, delimiter=",")
+            tabular_data = tabular_data.drop(columns = drop_columns)
 
-            if wine_data is None:
-                print(f'Wine data is none')
+            if tabular_data is None:
+                print(f'Could not read tabular data.')
             self.dataloc = dataloc
             train_nd, val_nd, test_nd = \
-                np.split(wine_data.sample(frac=1, random_state=42),
-                         [int(.6 * len(wine_data)), int(.8 * len(wine_data))])
+                np.split(tabular_data.sample(frac=1, random_state=42),
+                         [int(.6 * len(tabular_data)), int(.8 * len(tabular_data))])
             train_df = pd.DataFrame(train_nd)
             val_df = pd.DataFrame(val_nd)
             test_df = pd.DataFrame(test_nd)
@@ -486,9 +486,14 @@ class WineData(SimpleSplit):
             val_df.to_csv(val_split_directory, index=False)
             test_df.to_csv(test_split_directory, index=False)
         else:
-            if not (os.path.exists(train_split_directory) and os.path.exists(val_split_directory)
-            and os.path.exists(test_split_directory)):
-                print(f'Dataset not found {train_split_directory} or {val_split_directory} or {test_split_directory}')
+            if not os.path.exists(train_split_directory):
+                print(f'Train dataset not found in {train_split_directory}')
+                exit(-1)
+            if not os.path.exists(val_split_directory):
+                print(f'Validation dataset not found in {val_split_directory}')
+                exit(-1)
+            if not os.path.exists(test_split_directory):
+                print(f'Test dataset not found in {test_split_directory}')
                 exit(-1)
             train_nd = pd.read_csv(train_split_directory)
             val_nd = pd.read_csv(val_split_directory)

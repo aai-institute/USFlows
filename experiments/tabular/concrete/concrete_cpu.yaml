@@ -21,7 +21,7 @@ experiments:
         images: false
         "image_shape": [9, 1]
       dataset: 
-        __object__: src.explib.datasets.WineData
+        __object__: src.explib.datasets.TabularData
         dataloc: "/home/mustafa/repos/VeriFlow/experiments/trashcan/this_should_be_empty/"
         save_split_dir: "/home/mustafa/repos/VeriFlow/experiments/tabular/concrete/data"
         drop_columns: []
