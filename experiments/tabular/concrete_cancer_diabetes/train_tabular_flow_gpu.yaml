@@ -61,8 +61,7 @@ experiments:
           base_distribution: 
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
-            p:
-              __eval__: 1.0
+            p: 1.0
             loc:
               __eval__: torch.zeros(9).to("cuda")
             norm_distribution:
@@ -131,8 +130,7 @@ experiments:
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
-            p:
-              __eval__: 1.0
+            p: 1.0
             loc:
               __eval__: torch.zeros(31).to("cuda")
             norm_distribution:
@@ -201,8 +199,7 @@ experiments:
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
-            p:
-              __eval__: 1.0
+            p: 1.0
             loc:
               __eval__: torch.zeros(9).to("cuda")
             norm_distribution:
