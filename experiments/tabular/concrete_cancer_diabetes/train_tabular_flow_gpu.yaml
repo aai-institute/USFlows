@@ -28,7 +28,7 @@ experiments:
         drop_columns: []
         first_run: false
         device: "cuda"
-      epochs:  3  # 200000
+      epochs:  30  # 200000
       patience: 2
       batch_size:
         __eval__: tune.choice([16])
