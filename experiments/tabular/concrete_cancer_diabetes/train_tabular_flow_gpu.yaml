@@ -71,4 +71,4 @@ experiments:
                 __eval__: torch.ones(1).to("cuda")
               scale:
                 __eval__:   (0.5 * torch.ones(1)).to("cuda")
-          use_lu: false
+          use_lu: true
