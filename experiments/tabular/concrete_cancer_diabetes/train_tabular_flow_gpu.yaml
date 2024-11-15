@@ -54,16 +54,23 @@ experiments:
           coupling_layers: 
             __eval__: tune.choice([l for l in range(2, 4)])
           coupling_nn_layers:
-            __eval__: tune.choice([[16] * l for l in range(2, 3)])
+            __eval__: tune.choice([[18] * l for l in range(2, 3)])
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim: 4
+          split_dim: 5
           base_distribution: 
-            __object__: pyro.distributions.Laplace
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: "cuda"
+            p:
+              __eval__: 1.0
             loc:
               __eval__: torch.zeros(9).to("cuda")
-            scale:
-              __eval__: torch.ones(9).to("cuda")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
   - &cancer
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -117,16 +124,23 @@ experiments:
           coupling_layers:
             __eval__: tune.choice([l for l in range(2, 4)])
           coupling_nn_layers:
-            __eval__: tune.choice([[16] * l for l in range(2, 4)])
+            __eval__: tune.choice([[64] * l for l in range(2, 4)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim: 15
+          split_dim: 16
           base_distribution:
-            __object__: pyro.distributions.Laplace
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: "cuda"
+            p:
+              __eval__: 1.0
             loc:
               __eval__: torch.zeros(31).to("cuda")
-            scale:
-              __eval__: torch.ones(31).to("cuda")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
   - &diabetes
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -180,14 +194,21 @@ experiments:
           coupling_layers:
             __eval__: tune.choice([l for l in range(2, 4)])
           coupling_nn_layers:
-            __eval__: tune.choice([[16] * l for l in range(2, 3)])
+            __eval__: tune.choice([[18] * l for l in range(2, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 5
           base_distribution:
-            __object__: pyro.distributions.Laplace
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: "cuda"
+            p:
+              __eval__: 1.0
             loc:
               __eval__: torch.zeros(9).to("cuda")
-            scale:
-              __eval__: torch.ones(9).to("cuda")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
