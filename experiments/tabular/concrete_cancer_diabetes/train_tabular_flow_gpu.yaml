@@ -59,15 +59,16 @@ experiments:
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 5
-          base_distribution: 
+          base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
-            p: 1.0
             device: "cuda"
+            p: 1.0
             loc:
               __eval__: torch.zeros(9).to("cuda")
             norm_distribution:
-              __object__: pyro.distributions.Exponential
-              rate:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
                 __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
           use_lu: false
-
