@@ -23,8 +23,8 @@ experiments:
         "image_shape": [11, 1]
       dataset: 
         __object__: src.explib.datasets.WineData
-        dataloc: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/winequality-white.csv"
-        save_split_dir: "/home/mustafa.yalciner/repos/USFlows/experiments/wine/data/save_split_dir"
+        dataloc: "/home/mustafa.yalciner/repos/USFlows/experiments/tabular/data/winequality-white.csv"
+        save_split_dir: "/home/mustafa.yalciner/repos/USFlows/experiments/tabular/data/save_split_dir"
         drop_columns: ["quality"]
         first_run: true
         device: "cuda"
