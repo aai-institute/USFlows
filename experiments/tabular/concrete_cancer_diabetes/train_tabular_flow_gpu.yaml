@@ -64,7 +64,7 @@ experiments:
               __eval__: torch.zeros(9).to("cuda")
             scale:
               __eval__: torch.ones(9).to("cuda")
-          use_lu: true
+          use_lu: false
   - &cancer
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: cancer_flow
@@ -127,7 +127,7 @@ experiments:
               __eval__: torch.zeros(31).to("cuda")
             scale:
               __eval__: torch.ones(31).to("cuda")
-          use_lu: true
+          use_lu: false
   - &diabetes
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: diabetes_flow
@@ -190,4 +190,4 @@ experiments:
               __eval__: torch.zeros(9).to("cuda")
             scale:
               __eval__: torch.ones(9).to("cuda")
-          use_lu: true
+          use_lu: false
