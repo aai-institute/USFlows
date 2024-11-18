@@ -12,7 +12,7 @@ experiments:
       grace_period: 1000000
       reduction_factor: 2
     num_hyperopt_samples: 6
-    gpus_per_trial: 3
+    gpus_per_trial: 2
     cpus_per_trial: 0
     tuner_params: 
       metric: val_loss
