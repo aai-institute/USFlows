@@ -55,7 +55,7 @@ experiments:
           coupling_layers: 
             __eval__: tune.choice([l for l in range(1, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[18] * l for l in range(1, 3)])
+            __eval__: tune.choice([[9] * l for l in range(1, 3)])
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 5
@@ -125,10 +125,10 @@ experiments:
           coupling_layers:
             __eval__: tune.choice([l for l in range(1, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[62] * l for l in range(1, 3)])
+            __eval__: tune.choice([[31] * l for l in range(1, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim: 5
+          split_dim: 15
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
@@ -195,10 +195,10 @@ experiments:
           coupling_layers:
             __eval__: tune.choice([l for l in range(1, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[18] * l for l in range(1, 3)])
+            __eval__: tune.choice([[9] * l for l in range(1, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim: 5
+          split_dim:
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
