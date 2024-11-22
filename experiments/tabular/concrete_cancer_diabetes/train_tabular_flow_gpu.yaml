@@ -11,8 +11,8 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 6
-    gpus_per_trial: 2
+    num_hyperopt_samples: &num_hyperopt 6
+    gpus_per_trial: &gpu_per_trial 2
     cpus_per_trial: 0
     tuner_params: 
       metric: val_loss
@@ -29,7 +29,7 @@ experiments:
         first_run: false
         device: "cuda"
       epochs:  200000  # 200000
-      patience: 100
+      patience: &patience 100
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg: 
@@ -37,7 +37,7 @@ experiments:
           __class__: torch.optim.Adam 
         params:
           lr:
-            __eval__: tune.loguniform(1e-5, 1e-3)
+            __eval__: &lr tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
       model_cfg: 
         type:
@@ -81,8 +81,8 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 6
-    gpus_per_trial: 2
+    num_hyperopt_samples: *num_hyperopt
+    gpus_per_trial: *gpu_per_trial
     cpus_per_trial: 0
     tuner_params:
       metric: val_loss
@@ -99,7 +99,7 @@ experiments:
         first_run: false
         device: "cuda"
       epochs:  200000  # 200000
-      patience: 100
+      patience: *patience
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg:
@@ -151,8 +151,8 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 6
-    gpus_per_trial: 2
+    num_hyperopt_samples: *num_hyperopt
+    gpus_per_trial: *gpu_per_trial
     cpus_per_trial: 0
     tuner_params:
       metric: val_loss
@@ -169,7 +169,7 @@ experiments:
         first_run: false
         device: "cuda"
       epochs:  200000  # 200000
-      patience: 100
+      patience: *patience
       batch_size:
         __eval__: tune.choice([16])
       optim_cfg:
