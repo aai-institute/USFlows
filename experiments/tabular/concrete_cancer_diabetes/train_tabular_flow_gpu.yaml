@@ -56,7 +56,7 @@ experiments:
             __eval__: tune.choice([l for l in range(1, 3)])
           coupling_nn_layers:
             __eval__: tune.choice([[9] * l for l in range(1, 3)])
-          nonlinearity: 
+          nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 5
           base_distribution:
@@ -198,7 +198,7 @@ experiments:
             __eval__: tune.choice([[9] * l for l in range(1, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
-          split_dim:
+          split_dim: 5
           base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: "cuda"
