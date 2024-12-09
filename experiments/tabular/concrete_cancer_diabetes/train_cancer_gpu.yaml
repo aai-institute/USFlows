@@ -11,7 +11,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: 3
+    num_hyperopt_samples: 5
     gpus_per_trial: 2
     cpus_per_trial: 0
     tuner_params:
@@ -53,9 +53,9 @@ experiments:
               __eval__: torch.ones(31).to("cuda")
           prior_scale: 1.0
           coupling_layers:
-            __eval__: tune.choice([l for l in range(1, 3)])
+            __eval__: tune.choice([l for l in range(2, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[31] * l for l in range(1, 3)])
+            __eval__: tune.choice([[40] * l for l in range(2, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 15
