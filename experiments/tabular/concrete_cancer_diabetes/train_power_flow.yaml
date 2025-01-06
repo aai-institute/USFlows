@@ -1,0 +1,74 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: power
+experiments:
+  - &power
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: power_flow
+    device: "cuda"
+    scheduler:  
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: &num_hyperopt 5
+    gpus_per_trial: &gpu_per_trial 2
+    cpus_per_trial: 0
+    tuner_params: 
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [5, 1]
+      dataset: 
+        __object__: src.explib.datasets.TabularData
+        dataloc: "/home/mustafa.yalciner/repos/USFlows/tabular_data/trashcan/this_should_be_empty/"
+        save_split_dir: "/home/mustafa.yalciner/repos/USFlows/tabular_data/power"
+        drop_columns: []
+        first_run: false
+        device: "cuda"
+      epochs:  200000  # 200000
+      patience: &patience 100
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg: 
+        optimizer:
+          __class__: torch.optim.Adam 
+        params:
+          lr:
+            __eval__: &lr tune.loguniform(1e-5, 1e-3)
+          weight_decay: 0.0
+      model_cfg: 
+        type:
+          __class__:  src.veriflow.flows.NiceFlow
+        params:
+          masktype: alternate
+          soft_training: false
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(5).to("cuda")
+            scale:
+              __eval__: torch.ones(5).to("cuda")
+          prior_scale: 1.0
+          coupling_layers: 
+            __eval__: tune.choice([l for l in range(2, 3)])
+          coupling_nn_layers:
+            __eval__: tune.choice([[5] * l for l in range(2, 3)])
+          nonlinearity:
+            __eval__: tune.choice([torch.nn.ReLU()])
+          split_dim: 2
+          base_distribution:
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: "cuda"
+            p: 1.0
+            loc:
+              __eval__: torch.zeros(5).to("cuda")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones(1).to("cuda")
+              scale:
+                __eval__:   (0.5 * torch.ones(1)).to("cuda")
+          use_lu: true
