@@ -55,7 +55,7 @@ experiments:
           coupling_layers: 
             __eval__: tune.choice([l for l in range(2, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[5] * l for l in range(2, 3)])
+            __eval__: tune.choice([[5] * l for l in range(1, 2)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 2
