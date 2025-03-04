@@ -14,7 +14,7 @@ of the base Distribution.
 # Installation
 1) Clone Project:
 ```bash
-git clone git@github.com:aai-institute/VeriFlow.git
+git clone git@github.com:aai-institute/USFlows.git
 ```
 2) Install poetry
 ```bash
