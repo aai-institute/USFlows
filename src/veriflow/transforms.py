@@ -519,11 +519,11 @@ class BlockLUTransform(LUTransform):
         w = torch.matmul(U_inv, L_inv).view(
             self.block_size,
             self.block_size,
-            *([1] * self.input_rank
+            *([1] * self.input_rank)
         )
         b = self.bias.view(
             self.block_size,
-            *([1] * self.input_rank
+            *([1] * self.input_rank)
         )
         
         y = y - b
