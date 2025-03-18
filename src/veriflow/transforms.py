@@ -456,7 +456,7 @@ class LUTransform(BaseTransform):
         return BijectiveLinearTransform(self.dim, M, self.bias, M_inv)
             
 
-class BlockLUTransform(BaseTransform):
+class BlockLUTransform(LUTransform):
     """Implementation of a tiled LU transform. The transform is defined by a block-diagonal matrix $\mathbf{L}\mathbf{U}$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. The blocks are of size $b \times b$.
     Bijectivity is guaranteed by requiring that the diagonal elements of $\mathbf{U}$ are non-zero and the diagonal elements of  $\mathbf{L}$ are all $1$.
@@ -470,16 +470,21 @@ class BlockLUTransform(BaseTransform):
         """ Initializes the tiled LU transform.
         
         Args:
-            in_dims (int): dimension of the input and output
+            in_dims (int): dimension of the input (and output)
+            prior_scale (float): scale of the prior distribution
         """
         self.in_dims = in_dims
-        self.block_size = in_dims[-1]
-        self.n_blocks = math.prod(in_dims[:-1])
-        self.block_transform = LUTransform(
-            self.block_size,
-            prior_scale=prior_scale
-        )
-        super().__init__(*args, **kwargs)
+        self.block_size = in_dims[0]
+        self.input_rank = len(in_dims) - 1
+        self.n_blocks = math.prod(in_dims[1:])
+        global_transform = {
+            1: F.linear,
+            2: F.conv1d,
+            3: F.conv2d,
+            4: F.conv3d
+        }
+        self.global_transform = global_transform[len(in_dims)]
+        super().__init__(self.block_size, prior_scale, *args, **kwargs)
     
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """Computes the blockwise affine transform $y = (LU)^{-1}x + \mathrm{bias}$.
@@ -494,9 +499,13 @@ class BlockLUTransform(BaseTransform):
         :return: transformed tensor $(LU)x + \mathrm{bias}$
         """
         
-        x = x.view(-1, self.block_size)
-        y = self.block_transform.forward(x)
-        return y.view(-1, *self.in_dims)
+        w = LA.matmul(self.L, self.U).view(
+            self.block_size,
+            self.block_size,
+            *([1] * self.input_rank)
+        )
+        b = self.bias
+        return self.global_transform(x, w, b)
     
     def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
         """Computes the inverse transform $(LU)(y - \mathrm{bias})$
@@ -505,9 +514,21 @@ class BlockLUTransform(BaseTransform):
         :type y: torch.Tensor
         :return: transformed tensor $(LU)^{-1}(y - \mathrm{bias})$"""
         
-        y = y.view(-1, self.block_size)
-        x = self.block_transform.backward(y)
-        return x.view(-1, *self.in_dims)
+        L_inv = torch.inverse(self.L())
+        U_inv = torch.inverse(self.U())
+        w = torch.matmul(U_inv, L_inv).view(
+            self.block_size,
+            self.block_size,
+            *([1] * self.input_rank
+        )
+        b = self.bias.view(
+            self.block_size,
+            *([1] * self.input_rank
+        )
+        
+        y = y - b
+        y = self.global_transform(y, w)
+        
     
     def _call(self, x: torch.Tensor) -> torch.Tensor:
         """ Alias for :func:`forward`"""
@@ -535,6 +556,17 @@ class BlockLUTransform(BaseTransform):
             float: log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
         """
         return self.block_transform.log_abs_det_jacobian(x, y, context) * self.n_blocks
+    
+    def sign(self) -> int:
+        """ Computes the sign of the determinant of the Jacobian of the blockwise transform $(LU)x + \mathrm{bias}$.
+        
+        Args:
+            x (torch.Tensor): input tensor
+            
+        Returns:
+            float: sign of the determinant of the Jacobian of the blockwise transform $(LU)x + \mathrm{bias}$
+        """
+        return self.block_transform.sign() ** self.n_blocks
 
 class MaskedCoupling(BaseTransform):
     """Implementation of a masked coupling layer. The layer is defined by a mask that specifies which dimensions are passed through unchanged and which are transformed.
@@ -642,7 +674,6 @@ class InverseTransform(BaseTransform):
         self.domain = transform.codomain
         self.codomain = transform.domain
         self.sign = transform.sign
-        self.ladj = -transform.ladj
         
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """ Computes the inverse transform
@@ -667,6 +698,18 @@ class InverseTransform(BaseTransform):
     def _inverse(self, y: torch.Tensor) -> torch.Tensor:
         """ Alias for :func:`backward`"""
         return self.backward(y)
+    
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
+        """ Computes the log absolute determinant of the Jacobian of the transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): output tensor
+            
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform
+        """
+        return -self.transform.log_abs_det_jacobian(x, y, context)
     
 class LeakyReLUTransform(BaseTransform):
     bijective = True
@@ -728,7 +771,8 @@ class LeakyReLUTransform(BaseTransform):
         return torch.log(y/x).sum()
 
 class Rotation(BaseTransform):
-    """Implements a rotation transform. The transform is defined by two coordinate axes, defining a plane, and a rotation angle."""
+    """Implements a rotation transform. The transform is defined by two 
+    coordinate axes, defining a plane, and a rotation angle."""
     bijective = True
     domain = dist.constraints.real
     codomain = dist.constraints.real
