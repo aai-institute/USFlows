@@ -5,13 +5,15 @@ from torch.utils.data import Dataset
 
 from pyro import distributions as dist
 from pyro.nn import DenseNN
-from typing import List, Dict, Literal, Any, Iterable, Optional, Union, Tuple
+from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Union, Tuple
 import torch
 
 from src.veriflow.transforms import (
     ScaleTransform,
     MaskedCoupling,
     LUTransform,
+    BlockLUTransform,
+    InverseTransform,
     BaseTransform,
 )
 from src.veriflow.networks import ConvNet2D, ConditionalDenseNN
@@ -277,43 +279,49 @@ class USFlow(Flow):
         base_distribution,
         in_dims: List[int], 
         coupling_blocks: int,
-        conditioner_args: Dict[str, Any] = None, 
+        conditioner_cls: Type[torch.nn.Module],
+        conditioner_args: Dict[str, Any], 
         soft_training = False, 
-        training_noise_prior=None, 
+        prior_scale: Optional[float] = None,
+        training_noise_prior=None,
+        affine_conjugation: bool = False, 
         *args, 
         **kwargs
     ):
         
-        self.layers = []
+        layers = []
         self.coupling_blocks = coupling_blocks
         self.in_dims = in_dims
         self.soft_training = soft_training
         self.training_noise_prior = training_noise_prior
+        self.conditioner_cls = conditioner_cls
         self.conditioner_args = conditioner_args
+        self.affine_conjugation = affine_conjugation
         
         for _ in range(coupling_blocks):
             # LU layer
-            lu_layer = LUTransform(in_dims)
-            self.layers.append(lu_layer)
+            lu_layer = BlockLUTransform(in_dims, prior_scale)
+            layers.append(lu_layer)
 
             # Coupling layer
             coupling_layer = MaskedCoupling(
                 torch.ones(in_dims),
-                DenseNN(
-                    in_dims,
-                    conditioner_args["hidden_layers"],
-                    [in_dims],
-                    nonlinearity=conditioner_args["nonlinearity"],
-                ),
+                conditioner_cls(**conditioner_args),
             )
-            self.layers.append(coupling_layer)
+            layers.append(coupling_layer)
+            
+            # Inverse affine transformation
+            if affine_conjugation:
+                inverse_lu_layer = InverseTransform(lu_layer)
+                layers.append(inverse_lu_layer)
+            
             # Scale layer
             scale_layer = ScaleTransform(in_dims)
-            self.layers.append(scale_layer)
+            layers.append(scale_layer)
         
         super().__init__(
             base_distribution,
-            self.layers,
+            layers,
             soft_training=soft_training,
             training_noise_prior=training_noise_prior,
             *args,
