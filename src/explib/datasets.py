@@ -22,8 +22,10 @@ class DequantizedDataset(torch.utils.data.Dataset):
         self,
         dataset: T.Union[os.PathLike, torch.utils.data.Dataset, np.ndarray],
         num_bits: int = 8,
+        space_to_depth_factor: int = 1,
         device: torch.device = None, 
     ):
+        super().__init__()
         if isinstance(dataset, torch.utils.data.Dataset) or isinstance(
             dataset, np.ndarray
         ) or isinstance(dataset, torch.Tensor):
@@ -31,7 +33,18 @@ class DequantizedDataset(torch.utils.data.Dataset):
         else:
             self.dataset = pd.read_csv(dataset).values
 
-        #
+        if not isinstance(self.dataset, torch.Tensor):
+            self.dataset = Tensor(self.dataset)
+            
+        if space_to_depth_factor > 1:
+            n, c, h, w = self.dataset.shape
+            f = space_to_depth_factor
+            self.dataset = (
+                self.dataset.reshape(n, c, h//f, f, w//f, f)  # Split spatial dims into (n, k) blocks
+                .permute(0, 1, 3, 5, 2, 4)                # Reorder axes to (c, n, n, k, k)
+                .reshape(c * f * f, h//f, w//f)               # Combine channels and blocks into (k²c, n, n)
+            )
+            
         self.dataset = self.dataset.to(device)
         self.num_bits = num_bits
         self.num_levels = 2**num_bits
@@ -312,7 +325,8 @@ class MnistDequantized(DequantizedDataset):
         digit: T.Optional[int] = None,
         flatten=True,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        space_to_depth_factor: int = 1
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -335,7 +349,12 @@ class MnistDequantized(DequantizedDataset):
             path = os.path.join(dataloc, rel_path)
             labels = idx2numpy.convert_from_file(path)
             dataset = dataset[labels == digit]
-        super().__init__(torch.Tensor(dataset), num_bits=8, device=device)
+        super().__init__(
+            torch.Tensor(dataset),
+            num_bits=8,
+            device=device,
+            space_to_depth_factor=space_to_depth_factor
+        )
 
     def __getitem__(self, index: int):
         if not isinstance(self.dataset, torch.Tensor):
@@ -352,12 +371,20 @@ class MnistSplit(DataSplit):
         val_split: float = 0.1,
         digit: T.Optional[int] = None,
         scale: bool = False,
-        device: torch.device = None
+        device: torch.device = None,
+        space_to_depth_factor: int = 1
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = MnistDequantized(self.dataloc, train=True, digit=digit, scale=scale, device=device)
+        self.train = MnistDequantized(
+            self.dataloc,
+            train=True,
+            digit=digit,
+            scale=scale,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device
+        )
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -365,7 +392,14 @@ class MnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = MnistDequantized(self.dataloc, train=False, digit=digit, scale=scale, device=device)
+        self.test = MnistDequantized(
+            self.dataloc,
+            train=False,
+            digit=digit,
+            scale=scale,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device
+        )
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
