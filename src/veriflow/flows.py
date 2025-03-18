@@ -47,10 +47,13 @@ class Flow(torch.nn.Module):
         base_distribution,
         layers,
         soft_training: bool = False,
-        training_noise_prior=dist.Uniform(0, 1e-6),
+        training_noise_prior=None,
         *args,
         **kwargs,
     ) -> None:
+        if training_noise_prior is None:
+            training_noise_prior = dist.Uniform(0, 1e-6)
+            
         super().__init__(*args, **kwargs)
 
         self.soft_training = soft_training
@@ -261,7 +264,147 @@ class Flow(torch.nn.Module):
         """Moves the base distribution to the given device"""
         pass
 
+class USFlow(Flow):
+    """Implementation of a uniformly scaling flow architecture by using 
+    bijective 1X1 convolutions (parametrized by LU decomposed weight matrices),
+    additive coupling layers and a scale transform.
+    The flow is trained in a maximum posterior fashion by adding a log-normal
+    prior on the diagonal elements of the LU weight matrices.
+    """
 
+    def __init__(
+        self, 
+        base_distribution,
+        in_dims: List[int], 
+        coupling_blocks: int,
+        conditioner_args: Dict[str, Any] = None, 
+        soft_training = False, 
+        training_noise_prior=None, 
+        *args, 
+        **kwargs
+    ):
+        
+        self.layers = []
+        self.coupling_blocks = coupling_blocks
+        self.in_dims = in_dims
+        self.soft_training = soft_training
+        self.training_noise_prior = training_noise_prior
+        self.conditioner_args = conditioner_args
+        
+        for _ in range(coupling_blocks):
+            # LU layer
+            lu_layer = LUTransform(in_dims)
+            self.layers.append(lu_layer)
+
+            # Coupling layer
+            coupling_layer = MaskedCoupling(
+                torch.ones(in_dims),
+                DenseNN(
+                    in_dims,
+                    conditioner_args["hidden_layers"],
+                    [in_dims],
+                    nonlinearity=conditioner_args["nonlinearity"],
+                ),
+            )
+            self.layers.append(coupling_layer)
+            # Scale layer
+            scale_layer = ScaleTransform(in_dims)
+            self.layers.append(scale_layer)
+        
+        super().__init__(
+            base_distribution,
+            self.layers,
+            soft_training=soft_training,
+            training_noise_prior=training_noise_prior,
+            *args,
+            **kwargs
+        )
+        
+    def log_prior(self) -> torch.Tensor:
+        """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
+        $$argmax_{\\theta} \log p_{\\theta}(D) + \log p_{prior}(\\theta)$$ By default, this ia the constant zero, which amounts
+        to maximum likelihood training (improper uniform prior).
+        """
+        if self.training_noise_prior is not None:
+            log_prior = 0
+            n_layers = self.in_dims * len(self.layers)
+            for p in self.layers:
+                if isinstance(p, LUTransform):
+                    precision = None
+                    d = self.in_dims
+                    if self.training_noise_prior.correlated:
+                        # Pairwise negative correlation of 1/d
+                        covariance = -1 / d * torch.ones(d, d).to(self.device) + (1 + 1 / d) * torch.diag(
+                            torch.ones(d).to(self.device)
+                        )
+                        # Scaling
+                        covariance = covariance * (self.training_noise_prior.scale**2 / n_layers)
+                    else:
+                        covariance = torch.eye(d).to(self.device)
+                        # Scaling
+                        covariance = covariance * (self.training_noise_prior.scale**2 / (n_layers * d))
+
+                    precision = torch.linalg.inv(covariance).to(self.device)
+
+                    # log-density of Normal in log-space
+                    x = p.U.diag().abs().log() 
+                    log_prior += -(x * (precision @ x)).sum()
+                    # Change of variables to input space
+                    log_prior += -x.sum()
+            return log_prior
+        else:
+            return 0
+        
+    def log_prob(
+        self, x: torch.Tensor, context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Returns the models log-densities for the given samples
+
+        Args:
+            x: sample tensor.
+        """
+        if self.soft_training:
+            if context is not None:
+                return super().log_prob(x, context)
+            else:
+                # implicit conditioning with noise scale 0
+                context = torch.zeros(x.shape[0]).unsqueeze(-1).to(x.device)
+                return super().log_prob(x, context)
+        else:
+            return super().log_prob(x)
+    
+    def sample(
+        self, sample_shape: Iterable[int] = None, context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Returns n_sample samples from the distribution
+
+        Args:
+            n_sample: sample shape.
+        """
+        if context is not None:
+            return super().sample(sample_shape, context)
+        else:
+            # if self.soft_training:
+            #     return super().sample(
+            #         sample_shape, torch.zeros(list(sample_shape)).unsqueeze(-1).to(self.device)
+            #     )
+            # else:
+            return super().sample(
+                sample_shape
+            )
+    
+    def to(self, device) -> None:
+        """Moves the model to the given device"""
+        self.device = device
+        # self.layers = torch.nn.ModuleList([l.to(device) for l in self.layers])
+        self.trainable_layers = torch.nn.ModuleList(
+            [l.to(device) for l in self.trainable_layers]
+        )
+                    
+        self._distribution_to(device)
+        return super().to(device)
+    
+        
 class NiceFlow(Flow):
     mask = Literal["random", "half", "alternate"]
 
