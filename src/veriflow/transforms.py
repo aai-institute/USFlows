@@ -631,6 +631,42 @@ class MaskedCoupling(BaseTransform):
         
         return super().to(device)
 
+class InverseTransform(BaseTransform):
+    """Represents the inverse of a given transform. 
+    This is useful for composing transforms"""
+    
+    def __init__(self, transform: Transform, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.transform = transform
+        self.bijective = transform.bijective
+        self.domain = transform.codomain
+        self.codomain = transform.domain
+        self.sign = transform.sign
+        self.ladj = -transform.ladj
+        
+    def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the inverse transform
+        Args:
+            x (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        return self.transform.backward(x, context)
+    
+    def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the forward transform
+        Args:
+            y (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        return self.transform.forward(y, context)
+    
+    def _call(self, x: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`forward`"""
+        return self.forward(x)
+    
+    def _inverse(self, y: torch.Tensor) -> torch.Tensor:
+        """ Alias for :func:`backward`"""
+        return self.backward(y)
     
 class LeakyReLUTransform(BaseTransform):
     bijective = True
