@@ -1,11 +1,12 @@
 import math
+from time import sleep
 import numpy as np
 
 from torch.utils.data import Dataset
 
 from pyro import distributions as dist
 from pyro.nn import DenseNN
-from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Union, Tuple
+from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
 import torch
 
 from src.veriflow.transforms import (
@@ -167,7 +168,6 @@ class Flow(torch.nn.Module):
                     noise = None
 
                 optim.zero_grad()
-
                 loss = -model.log_prob(
                     sample, context=noise
                 ).mean() - model.log_prior()
@@ -285,6 +285,8 @@ class USFlow(Flow):
         prior_scale: Optional[float] = None,
         training_noise_prior=None,
         affine_conjugation: bool = False, 
+        nonlinearity: Optional[torch.nn.Module] = None,
+        use_lu: bool = True,
         *args, 
         **kwargs
     ):

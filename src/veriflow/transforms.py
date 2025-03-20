@@ -1,5 +1,6 @@
 import math
 from abc import abstractmethod
+from time import sleep
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
@@ -69,6 +70,8 @@ class ScaleTransform(BaseTransform):
     def init_params(self):
         """initialization of the parameters"""
         dim = self.dim
+        if isinstance(dim, Iterable):
+            dim = np.prod(dim)
         bound = 1 / math.sqrt(dim) if dim > 0 else 0
         init.uniform_(self.scale, -bound, bound)
 
@@ -514,8 +517,8 @@ class BlockLUTransform(LUTransform):
         :type y: torch.Tensor
         :return: transformed tensor $(LU)^{-1}(y - \mathrm{bias})$"""
         
-        L_inv = torch.inverse(self.L())
-        U_inv = torch.inverse(self.U())
+        L_inv = torch.inverse(self.L)
+        U_inv = torch.inverse(self.U)
         w = torch.matmul(U_inv, L_inv).view(
             self.block_size,
             self.block_size,
@@ -528,6 +531,7 @@ class BlockLUTransform(LUTransform):
         
         y = y - b
         y = self.global_transform(y, w)
+        return y
         
     
     def _call(self, x: torch.Tensor) -> torch.Tensor:
@@ -555,7 +559,7 @@ class BlockLUTransform(LUTransform):
         Returns:
             float: log absolute determinant of the Jacobian of the transform $(LU)x + \mathrm{bias}$
         """
-        return self.block_transform.log_abs_det_jacobian(x, y, context) * self.n_blocks
+        return super().log_abs_det_jacobian(x, y, context) * self.n_blocks
     
     def sign(self) -> int:
         """ Computes the sign of the determinant of the Jacobian of the blockwise transform $(LU)x + \mathrm{bias}$.
@@ -673,7 +677,6 @@ class InverseTransform(BaseTransform):
         self.bijective = transform.bijective
         self.domain = transform.codomain
         self.codomain = transform.domain
-        self.sign = transform.sign
         
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """ Computes the inverse transform
@@ -710,6 +713,17 @@ class InverseTransform(BaseTransform):
             float: log absolute determinant of the Jacobian of the transform
         """
         return -self.transform.log_abs_det_jacobian(x, y, context)
+
+    def sign(self) -> int:
+        """ Computes the sign of the determinant of the Jacobian of the transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            
+        Returns:
+            int: sign of the determinant of the Jacobian of the transform
+        """
+        return self.transform.sign()
     
 class LeakyReLUTransform(BaseTransform):
     bijective = True

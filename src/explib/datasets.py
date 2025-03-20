@@ -35,6 +35,9 @@ class DequantizedDataset(torch.utils.data.Dataset):
 
         if not isinstance(self.dataset, torch.Tensor):
             self.dataset = Tensor(self.dataset)
+        
+        if len(self.dataset.shape) == 3:
+            self.dataset = self.dataset.unsqueeze(1)
             
         if space_to_depth_factor > 1:
             n, c, h, w = self.dataset.shape
@@ -42,7 +45,7 @@ class DequantizedDataset(torch.utils.data.Dataset):
             self.dataset = (
                 self.dataset.reshape(n, c, h//f, f, w//f, f)  # Split spatial dims into (n, k) blocks
                 .permute(0, 1, 3, 5, 2, 4)                # Reorder axes to (c, n, n, k, k)
-                .reshape(c * f * f, h//f, w//f)               # Combine channels and blocks into (k²c, n, n)
+                .reshape(n, c * f * f, h//f, w//f)               # Combine channels and blocks into (k²c, n, n)
             )
             
         self.dataset = self.dataset.to(device)
@@ -323,7 +326,7 @@ class MnistDequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         digit: T.Optional[int] = None,
-        flatten=True,
+        flatten=False,
         scale: bool = False,
         device: torch.device = None,
         space_to_depth_factor: int = 1
