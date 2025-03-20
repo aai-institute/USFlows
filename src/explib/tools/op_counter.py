@@ -12,17 +12,10 @@ def count_parameters(model):
 
 
 if __name__ == '__main__':
-    PATH ="/home/mustafa/repos/ERAN/eran/veriflow/unscaled_mnist/experiments/"
-    NAMES = ["merged_mnist_unscaled0.onnx",
-             "merged_mnist_unscaled1.onnx",
-             "merged_mnist_unscaled2.onnx",
-             "merged_mnist_unscaled3.onnx",
-             "merged_mnist_unscaled4.onnx",
-             "merged_mnist_unscaled5.onnx"]
+    PATH ="/home/mustafa/repos/VeriFlow/experiments/verification/resources/radial/"
+    NAMES = ["mnist_4_forward.onnx", "model_0_lognormal_decay_forward.onnx"]
 
     for name in NAMES:
-        model = onnx.load_model(f'{PATH}{name}')
+        model = onnx.load_model(f'/home/mustafa/repos/counterfactuals/plausible_counterfactuals/experiment_sources/power/classifier_medium.onnx')
         params = calculate_params(model)
-        print(f'Number of params {name}:', params)
-        params = count_parameters(model)
         print(f'Number of params {name}:', params)

@@ -36,7 +36,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-5, 1e-2)
+            __eval__: tune.loguniform(1e-5, 1e-4)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -52,7 +52,7 @@ experiments:
               __eval__: torch.ones(9).to("cpu")
           prior_scale: 1.0
           coupling_layers:
-            __eval__: tune.choice([l for l in range(2, 4)])
+            __eval__: tune.choice([l for l in range(2, 3)])
           coupling_nn_layers:
             __eval__: tune.choice([[18] * l for l in range(2, 3)])
           nonlinearity:
@@ -99,7 +99,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-5, 1e-2)
+            __eval__: tune.loguniform(1e-5, 1e-4)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -115,9 +115,9 @@ experiments:
               __eval__: torch.ones(31).to("cpu")
           prior_scale: 1.0
           coupling_layers:
-            __eval__: tune.choice([l for l in range(2, 4)])
+            __eval__: tune.choice([l for l in range(2, 3)])
           coupling_nn_layers:
-            __eval__: tune.choice([[62] * l for l in range(2, 4)])
+            __eval__: tune.choice([[62] * l for l in range(2, 3)])
           nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
           split_dim: 16
@@ -162,7 +162,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-5, 1e-2)
+            __eval__: tune.loguniform(1e-5, 1e-4)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -178,7 +178,7 @@ experiments:
               __eval__: torch.ones(9).to("cpu")
           prior_scale: 1.0
           coupling_layers:
-            __eval__: tune.choice([l for l in range(2, 4)])
+            __eval__: tune.choice([l for l in range(2, 3)])
           coupling_nn_layers:
             __eval__: tune.choice([[18] * l for l in range(2, 3)])
           nonlinearity:

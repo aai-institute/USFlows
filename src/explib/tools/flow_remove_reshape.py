@@ -63,14 +63,16 @@ def compare_networks(PATH_APPROVED, PATH_TO_TEST, dimensions):
 
 
 if __name__ == '__main__':
-    path_flow = '/home/mustafa/Documents/midas/all_digits_lu_small/0_mnist_logNormal_linf_digit_0/forward.onnx'
+    dir_to_flow = '/home/mustafa/Documents/midas/flows_for_plausible_ctx/concrete_diabetes_cancer/1_cancer_flow/2024-11-1523:35:06.711882/'
+    path_flow = f'{dir_to_flow}/forward.onnx'
     model = onnx.load(path_flow)
+    dimensions = model.graph.input[0].type.tensor_type.shape.dim[0].dim_value
     model = remove_reshape_node(model)
     onnx.checker.check_model(model=model, full_check=True)
-    target_flow_path = '/home/mustafa/Documents/midas/all_digits_lu_small/0_mnist_logNormal_linf_digit_0/forward_processed.onnx'
+    target_flow_path = f'{dir_to_flow}/forward_processed.onnx'
     onnx.save(model, target_flow_path)
     print(f'Testing semantic equivalence of original and transformed model')
-    compare_networks(path_flow, target_flow_path, 196)
+    compare_networks(path_flow, target_flow_path, dimensions)
 
 
 

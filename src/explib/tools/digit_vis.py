@@ -107,7 +107,7 @@ def plot_digits_UDL(models: Dict[str, Flow], sqrtn: int, save_to=None, res=RESOL
                 model = models[digit]
                 with torch.no_grad():
                     radius = norm(model.base_distribution.sample((n_udl_estimation,)), -1).quantile(0.001)
-                sample = udl_multisample(model, radius, "conditional", -1, 3, RESHAPE)
+                sample = udl_multisample(model, radius, "boundary_basis", -1, 3, RESHAPE)
                 ax.imshow(sample, cmap="gray")
                 ax.set_xticks([])
                 ax.set_yticks([])
@@ -124,9 +124,7 @@ def plot_digits_UDL(models: Dict[str, Flow], sqrtn: int, save_to=None, res=RESOL
 def evaluate(res=RESOLUTION, save_to="./"):
     models = dict()
     PATHS = [ # Adjust the paths accordingly.
-        "/home/mustafa/Documents/midas/all_digits_lu_small/full_experiment/mnist_multiple_digits_poc/8_mnist_logNormal_linf_digit_2",
-        "/home/mustafa/Documents/midas/all_digits_lu_small/full_experiment/mnist_multiple_digits_poc/6_mnist_logNormal_linf_digit_4",
-        "/home/mustafa/Documents/midas/all_digits_lu_small/full_experiment/mnist_multiple_digits_poc/9_mnist_logNormal_linf_digit_1",
+        "/home/mustafa/Documents/midas/all_digits_lu_small/3_mnist_logNormal_linf_digit_7",
     ]
     for exp in PATHS:
         exp_name = exp.split("/")[-1]
