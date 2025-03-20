@@ -61,7 +61,7 @@ experiments:
             device: cpu
             p: 1.0
             loc: 
-              __eval__: torch.zeros(784).to("cpu")
+              __eval__: torch.zeros([4, 14, 14]).to("cpu")
             norm_distribution:
               __object__: pyro.distributions.LogNormal
               loc: 
@@ -79,9 +79,9 @@ experiments:
               __exact__: 
                 __object__: pyro.distributions.Laplace
                 loc: 
-                  __eval__: torch.zeros(784).to("cpu")
+                  __eval__: torch.zeros([4, 14, 14]).to("cpu")
                 scale: 
-                  __eval__: torch.ones(784).to("cpu")
+                  __eval__: torch.ones([4, 14, 14]).to("cpu")
   - &exp_normal
     __overwrites__: *exp_rad_logN
     name: mnist_full_laplace
