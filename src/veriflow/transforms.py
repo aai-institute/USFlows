@@ -432,6 +432,7 @@ class LUTransform(BaseTransform):
         # self.L_raw = self.L_raw.to(device)
         # self.U_raw = self.U_raw.to(device)
         # self.bias = self.bias.to(device)
+        self.device = device
         return super().to(device)
 
     def is_feasible(self) -> bool:
@@ -542,7 +543,32 @@ class BlockLUTransform(LUTransform):
         """ Alias for :func:`backward`"""
         return self.backward(y)
     
-    
+    def log_prior(self, correlated: bool = False) -> torch.Tensor:
+        """Defines a log-normal prior on the diagonal elements of U Matrix,
+        implicitply defining a log-normal prior on the absolute determinat
+        of the transform."""
+        precision = None
+        d = self.block_size
+        if correlated:
+            # Pairwise negative correlation of 1/d
+            covariance = -1 / d * torch.ones(d, d).to(self.device) + (1 + 1 / d) * torch.diag(
+                torch.ones(d).to(self.device)
+            )
+            # Scaling
+            covariance = covariance * (self.prior_scale**2)
+        else:
+            covariance = torch.eye(d).to(self.device)
+            # Scaling
+            covariance = covariance * (self.prior_scale**2 / (d))
+
+        precision = torch.linalg.inv(covariance).to(self.device)
+
+        # log-density of Normal in log-space
+        x = self.U.diag().abs().log() 
+        log_prior = -(x * (precision @ x)).sum()
+        # Change of variables to input space
+        log_prior += -x.sum()
+        return log_prior
     
     def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
         """ Computes the log absolute determinant of the Jacobian of the 

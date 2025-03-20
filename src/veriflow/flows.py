@@ -298,6 +298,7 @@ class USFlow(Flow):
         self.training_noise_prior = training_noise_prior
         self.conditioner_cls = conditioner_cls
         self.conditioner_args = conditioner_args
+        self.prior_scale = prior_scale
         
         for _ in range(coupling_blocks):
             # LU layer
@@ -351,37 +352,17 @@ class USFlow(Flow):
             mask = 1 - mask
         return mask
         
-    def log_prior(self) -> torch.Tensor:
+    def log_prior(self, correlated: bool = False) -> torch.Tensor:
         """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
         $$argmax_{\\theta} \log p_{\\theta}(D) + \log p_{prior}(\\theta)$$ By default, this ia the constant zero, which amounts
         to maximum likelihood training (improper uniform prior).
         """
-        if self.training_noise_prior is not None:
+        if self.prior_scale is not None:
             log_prior = 0
             n_layers = self.in_dims * len(self.layers)
             for p in self.layers:
-                if isinstance(p, LUTransform):
-                    precision = None
-                    d = self.in_dims
-                    if self.training_noise_prior.correlated:
-                        # Pairwise negative correlation of 1/d
-                        covariance = -1 / d * torch.ones(d, d).to(self.device) + (1 + 1 / d) * torch.diag(
-                            torch.ones(d).to(self.device)
-                        )
-                        # Scaling
-                        covariance = covariance * (self.training_noise_prior.scale**2 / n_layers)
-                    else:
-                        covariance = torch.eye(d).to(self.device)
-                        # Scaling
-                        covariance = covariance * (self.training_noise_prior.scale**2 / (n_layers * d))
-
-                    precision = torch.linalg.inv(covariance).to(self.device)
-
-                    # log-density of Normal in log-space
-                    x = p.U.diag().abs().log() 
-                    log_prior += -(x * (precision @ x)).sum()
-                    # Change of variables to input space
-                    log_prior += -x.sum()
+                if isinstance(p, BlockLUTransform):
+                    log_prior += p.log_prior(correlated=correlated)
             return log_prior
         else:
             return 0
