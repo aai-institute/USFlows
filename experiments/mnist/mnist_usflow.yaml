@@ -2,7 +2,7 @@
 __object__: src.explib.base.ExperimentCollection
 name: mnist_ablation
 experiments:
-  - &exp_rad_logN
+  - &exp_laplace
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: mnist_full_radial_logN
     scheduler: &scheduler 
@@ -18,7 +18,7 @@ experiments:
       mode: min
     trial_config:
       logging:
-        images: true
+        images: false
         "image_shape": [28, 28]
       dataset: &dataset
         __object__: src.explib.datasets.MnistSplit
@@ -46,7 +46,7 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 10
+          coupling_blocks: 1
           conditioner_cls: 
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
@@ -57,41 +57,9 @@ experiments:
           nonlinearity: &nonlinearity 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
-            __object__: src.veriflow.distributions.RadialDistribution       
-            device: cpu
-            p: 1.0
+            __object__: pyro.distributions.Laplace
             loc: 
               __eval__: torch.zeros([4, 14, 14]).to("cpu")
-            norm_distribution:
-              __object__: pyro.distributions.LogNormal
-              loc: 
-                __eval__: torch.zeros(1).to("cpu")
-              scale: 
-                __eval__: (.5 * torch.ones(1)).to("cpu")
+            scale: 
+              __eval__: torch.ones([4, 14, 14]).to("cpu")
           use_lu: true
-  - &exp_laplace
-    __overwrites__: *exp_rad_logN
-    name: mnist_full_laplace
-    trial_config:
-      model_cfg: 
-          params:
-            base_distribution:
-              __exact__: 
-                __object__: pyro.distributions.Laplace
-                loc: 
-                  __eval__: torch.zeros([4, 14, 14]).to("cpu")
-                scale: 
-                  __eval__: torch.ones([4, 14, 14]).to("cpu")
-  - &exp_normal
-    __overwrites__: *exp_rad_logN
-    name: mnist_full_laplace
-    trial_config:
-      model_cfg: 
-          params:
-            base_distribution:
-              __exact__: 
-                __object__: pyro.distributions.Normal
-                loc: 
-                  __eval__: torch.zeros(784).to("cpu")
-                scale: 
-                  __eval__: torch.ones(784).to("cpu")
