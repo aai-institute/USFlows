@@ -16,6 +16,9 @@ from src.veriflow.transforms import (
     BlockLUTransform,
     InverseTransform,
     BaseTransform,
+    BlockAffineTransform,
+    HouseholderTransform,
+    SequentialAffineTransform
 )
 from src.veriflow.networks import ConvNet2D, ConditionalDenseNN
 
@@ -286,7 +289,8 @@ class USFlow(Flow):
         training_noise_prior=None,
         affine_conjugation: bool = False, 
         nonlinearity: Optional[torch.nn.Module] = None,
-        use_lu: bool = True,
+        lu_transform: int = 1,
+        householder: int = 1,
         *args, 
         **kwargs
     ):
@@ -299,12 +303,41 @@ class USFlow(Flow):
         self.conditioner_cls = conditioner_cls
         self.conditioner_args = conditioner_args
         self.prior_scale = prior_scale
+        #self.nonlinearity = nonlinearity
+        if lu_transform < 0:
+            raise ValueError("Number of LU transforms must be non-negative")
+        self.lu_transform = lu_transform
+        if householder < 0:
+            raise ValueError(
+                "Number of Householder vectors transforms must be non-negative"
+            )
+        self.householder = householder
         
         for _ in range(coupling_blocks):
+            
+            affine_layers = []
             # LU layer
-            lu_layer = BlockLUTransform(in_dims, prior_scale)
-            layers.append(lu_layer)
-
+            for _ in range(lu_transform):
+                lu_layer = BlockLUTransform(in_dims, prior_scale)
+                affine_layers.append(lu_layer)
+            # Householder layer
+            if householder > 0:
+                householder_layer = HouseholderTransform(
+                        dim=in_dims[0],
+                        nvs=householder
+                )
+                affine_layers.append(householder_layer)
+            
+            # Create block affine layer
+            block_affine_layer = None
+            if len(affine_layers) > 0:
+                block_affine_layer = BlockAffineTransform(
+                    in_dims,
+                    SequentialAffineTransform(
+                        affine_layers
+                    )
+                )
+            
             # Coupling layer
             coupling_layer = MaskedCoupling(
                 USFlow.create_checkerboard_mask(in_dims),
@@ -313,9 +346,8 @@ class USFlow(Flow):
             layers.append(coupling_layer)
             
             # Inverse affine transformation
-            if affine_conjugation:
-                inverse_lu_layer = InverseTransform(lu_layer)
-                layers.append(inverse_lu_layer)
+            if affine_conjugation and block_affine_layer is not None:
+                layers.append(InverseTransform(block_affine_layer))
             
             # Scale layer
             scale_layer = ScaleTransform(in_dims)
@@ -352,7 +384,7 @@ class USFlow(Flow):
             mask = 1 - mask
         return mask
         
-    def log_prior(self, correlated: bool = False) -> torch.Tensor:
+    def log_prior(self) -> torch.Tensor:
         """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
         $$argmax_{\\theta} \log p_{\\theta}(D) + \log p_{prior}(\\theta)$$ By default, this ia the constant zero, which amounts
         to maximum likelihood training (improper uniform prior).
@@ -361,8 +393,7 @@ class USFlow(Flow):
             log_prior = 0
             n_layers = self.in_dims * len(self.layers)
             for p in self.layers:
-                if isinstance(p, BlockLUTransform):
-                    log_prior += p.log_prior(correlated=correlated)
+                log_prior += p.log_prior()
             return log_prior
         else:
             return 0
