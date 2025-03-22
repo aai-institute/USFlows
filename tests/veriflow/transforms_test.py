@@ -40,7 +40,7 @@ def test_lu_transform():
     with torch.no_grad():
         transform.L_raw.copy_(torch.tril(torch.ones(dim, dim)))
         transform.U_raw.copy_(torch.eye(dim))
-        transform.bias.copy_(torch.zeros(dim))
+        transform.bias_vector.copy_(torch.zeros(dim))
     x = torch.ones(dim)
     
     # Test forward, inverse, and log det
