@@ -99,7 +99,7 @@ class ConvNet2D(nn.Module):
             c_in: Number of input channels
             c_hidden: Number of hidden dimensions to use within the network
             rescale_hidden: Factor by which to rescale hight and width the hidden before and after the hidden layers.
-            c_out: Number of output channels. If -1, 2 times the input channels are used (affine coupling)
+            c_out: Number of output channels. If -1, the numberinput channels are used (affine coupling)
             num_layers: Number of gated ResNet blocks to apply
         """
         super().__init__()

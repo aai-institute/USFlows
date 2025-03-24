@@ -1,3 +1,4 @@
+from glob import glob
 import io
 import json
 import logging
@@ -185,6 +186,7 @@ class HyperoptExperiment(Experiment):
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
+        self.temp_dir = os.path.join(storage_path, "temp")
         ray.init(_temp_dir=f"{storage_path}/temp/")
         #ray.init()
         
@@ -236,10 +238,21 @@ class HyperoptExperiment(Experiment):
         id = f"exp_{exp_id}_{trial_id}"
         for d in os.listdir(expdir):
             if trial_id in d:
-                shutil.copyfile(
-                    os.path.join(expdir, d, f"checkpoint.pt"), 
-                    os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
-                )
+                # Workaround for Ray not saving the checkpoint
+                # in the right directory in newer versions
+                try:
+                    shutil.copyfile(
+                        os.path.join(expdir, d, f"checkpoint.pt"), 
+                        os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
+                    )
+                except:
+                    chkpt_path = glob(f"{self.temp_dir}/session_latest/**/checkpoint.pt", recursive=True)[0]
+                    shutil.copyfile(
+                        chkpt_path, 
+                        os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
+                    )
+                    
+                # Copy the best config   
                 shutil.copyfile(
                     os.path.join(expdir, d, "params.pkl"), 
                     os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
