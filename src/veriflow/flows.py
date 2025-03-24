@@ -338,6 +338,7 @@ class USFlow(Flow):
                         affine_layers
                     )
                 )
+                layers.append(block_affine_layer)
             
             # Coupling layer
             coupling_layer = MaskedCoupling(
@@ -447,6 +448,14 @@ class USFlow(Flow):
                     
         self._distribution_to(device)
         return super().to(device)
+    
+    def simplify(self) -> Flow:
+        """Simplifies the flow by removing LU/Householder layers and replacing 
+        them with a PlaneBijectiveLinear layer"""
+        layers = []
+        for l in self.layers:
+            layers.append(l.simplify())
+        return Flow(self.base_distribution, layers)
     
         
 class NiceFlow(Flow):

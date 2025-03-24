@@ -64,6 +64,11 @@ class BaseTransform(dist.TransformModule):
     def log_prior(self) -> torch.Tensor:
         """Defines a uniform (pseudo-)prior."""
         return 0.0
+    
+    def simplify(self) -> object:
+        """Simplifies the transform. All Affine Transform are converted to 
+        PlaneAffineTransforms."""
+        return self
         
 
 
@@ -244,74 +249,7 @@ class Permute(BaseTransform):
         if self._cache_size == cache_size:
             return self
         return Permute(self.permutation, cache_size=cache_size)
-
-
-class BijectiveLinearTransform(BaseTransform):
-    """Simple implementation of a bijective linear transform. Applies a transform $y = \mathbf{W}x + \mathbf{b}$, where $\mathbf{W}$ is a
-    learnable parameter matrix and $\mathbf{b}$ is a learnable bias vector.
-    Note: This is a dummy implementation that does not enforce bijectivity nor is it intended to be trained.
-    It acts as a simplification of the LU transform for verification purposes.
-    """
-    
-    bijective = True
-    volume_preserving = False
-    domain = dist.constraints.real_vector
-    codomain = dist.constraints.real_vector
-    
-    def __init__(self, dim: int, m: torch.Tensor, bias: torch.Tensor, m_inv: torch.Tensor = None, *args, **kwargs):
-        """ Initializes the linear transform.
-        Args:
-            dim (int): dimension of the input and output
-            m: weight matrix
-            bias: bias vector
-            m_inv: inverse weight matrix
-        """
-        super().__init__(*args, **kwargs)
-        self.dim = dim
-        self.bias = bias
-        
-        self.forth = torch.nn.Linear(dim, dim, bias=True)
-        self.forth.weight = torch.nn.Parameter(m)
-        self.forth.bias = torch.nn.Parameter(bias)
-        
-        self.back = torch.nn.Linear(dim, dim, bias=True)
-        self.back.weight = torch.nn.Parameter(m_inv)
-        self.back.bias = torch.nn.Parameter(-torch.matmul(m_inv, bias))
-        
-        self.m_inv = m_inv
-        with torch.no_grad():
-            self.ladj = torch.linalg.slogdet(m)[1]
-        
-    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
-        """ Computes the log absolute determinant of the Jacobian of the transform
-        
-        Args:
-            x (torch.Tensor): input tensor
-            y (torch.Tensor): output tensor
-        
-        Returns:
-            float: log absolute determinant of the Jacobian of the transform
-        """
-        return self.ladj
-    
-    def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
-        """ Computes the affine transform $y = \mathbf{W}x + \mathbf{b}$.
-        
-        Args:
-            x (torch.Tensor): input tensor
-            context (torch.Tensor): context tensor (ignored)
-        """
-        
-        return self.forth(x)
-    
-    def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
-        """ Computes the inverse transform $y = \mathbf{W}^{-1}x + \mathbf{b}$.
-        
-        Args:
-            y (torch.Tensor): input tensor
-            context (torch.Tensor): context tensor (ignored)
-        """
-        return self.back(y)            
+       
 
 class MaskedCoupling(BaseTransform):
     """Implementation of a masked coupling layer. The layer is defined by a mask that specifies which dimensions are passed through unchanged and which are transformed.
@@ -418,6 +356,8 @@ class InverseTransform(BaseTransform):
         self.bijective = transform.bijective
         self.domain = transform.codomain
         self.codomain = transform.domain
+        self.args = args
+        self.kwargs = kwargs
         
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """ Computes the inverse transform
@@ -465,6 +405,14 @@ class InverseTransform(BaseTransform):
             int: sign of the determinant of the Jacobian of the transform
         """
         return self.transform.sign()
+    
+    def simplify(self):
+        return InverseTransform(
+            self.transform.simplify(),
+            *self.args, 
+            **self.kwargs
+        )
+    
     
 class LeakyReLUTransform(BaseTransform):
     bijective = True
@@ -667,6 +615,85 @@ class CompositeRotation(BaseTransform):
         return self.ladj
 
 
+class PlaneBijectiveLinearTransform(BaseTransform):
+    """Simple implementation of a bijective linear transform. Applies a transform $y = \mathbf{W}x + \mathbf{b}$, where $\mathbf{W}$ is a
+    learnable parameter matrix and $\mathbf{b}$ is a learnable bias vector.
+    Note: This is a dummy implementation that does not enforce bijectivity nor is it intended to be trained.
+    It acts as a simplification of the LU transform for verification purposes.
+    """
+    
+    bijective = True
+    volume_preserving = False
+    domain = dist.constraints.real_vector
+    codomain = dist.constraints.real_vector
+    
+    def __init__(self, dim: int, m: torch.Tensor, bias: torch.Tensor, m_inv: torch.Tensor = None, *args, **kwargs):
+        """ Initializes the linear transform.
+        Args:
+            dim (int): dimension of the input and output
+            m: weight matrix
+            bias: bias vector
+            m_inv: inverse weight matrix
+        """
+        super().__init__(*args, **kwargs)
+        self.dim = dim
+        self.bias_vector = bias
+        
+        self.forth = torch.nn.Linear(dim, dim, bias=True)
+        self.forth.weight = torch.nn.Parameter(m)
+        self.forth.bias = torch.nn.Parameter(bias)
+        
+        self.back = torch.nn.Linear(dim, dim, bias=True)
+        self.back.weight = torch.nn.Parameter(m_inv)
+        self.back.bias = torch.nn.Parameter(-torch.matmul(m_inv, bias))
+        
+        self.m_inv = m_inv
+        with torch.no_grad():
+            self.ladj = torch.linalg.slogdet(m)[1]
+        
+    def log_abs_det_jacobian(self, x: torch.Tensor, y: torch.Tensor, context = None) -> float:
+        """ Computes the log absolute determinant of the Jacobian of the transform
+        
+        Args:
+            x (torch.Tensor): input tensor
+            y (torch.Tensor): output tensor
+        
+        Returns:
+            float: log absolute determinant of the Jacobian of the transform
+        """
+        return self.ladj
+    
+    def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the affine transform $y = \mathbf{W}x + \mathbf{b}$.
+        
+        Args:
+            x (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        
+        return self.forth(x)
+    
+    def backward(self, y: torch.Tensor, context = None) -> torch.Tensor:
+        """ Computes the inverse transform $y = \mathbf{W}^{-1}x + \mathbf{b}$.
+        
+        Args:
+            y (torch.Tensor): input tensor
+            context (torch.Tensor): context tensor (ignored)
+        """
+        return self.back(y) 
+    
+    def matrix(self) -> torch.Tensor:
+        """ Returns the transformation matrix"""
+        return self.forth.weight
+    
+    def inverse_matrix(self) -> torch.Tensor:
+        """ Returns the inverse transformation matrix"""
+        return self.back.weight
+    
+    def bias(self) -> torch.Tensor:
+        """ Returns the bias vector"""
+        return self.forth.bias
+
 class AffineTransform(BaseTransform):
     """Interface for an affine transform that offers getters for the
     transformation matrix and the bias vector. 
@@ -688,13 +715,11 @@ class AffineTransform(BaseTransform):
         self.dim = dim
         self.input_shape = dim
 
-    @property
     @abstractmethod
     def matrix(self) -> torch.Tensor:
         """ Returns the transformation matrix"""
         pass
 
-    @property
     @abstractmethod
     def bias(self) -> torch.Tensor:
         """ Returns the bias vector"""
@@ -704,6 +729,25 @@ class AffineTransform(BaseTransform):
     def inverse_matrix(self) -> torch.Tensor:
         """ Returns the inverse transformation matrix"""
         pass
+    
+    def _to_plane_linear(self) -> BaseTransform:
+        """ Converts the input tensor to a plane linear form.
+        
+        Args:
+            x (torch.Tensor): input tensor
+            
+        Returns:
+            torch.Tensor: transformed tensor
+        """
+        return PlaneBijectiveLinearTransform(
+            self.dim,
+            self.matrix(),
+            self.bias(),
+            self.inverse_matrix(),    
+        )
+    
+    def simplify(self):
+        return self._to_plane_linear()
 
 class HouseholderTransform(AffineTransform):
     """Implements a Householder transform. The transform is defined by a 
@@ -946,6 +990,20 @@ class BlockAffineTransform(BaseTransform):
         """
         return self.block_transform.sign() ** self.n_blocks
     
+    def _to_block_plane_linear(self) -> BaseTransform:
+        """ Converts the input tensor to a block plane linear form.
+        
+        Returns:
+            torch.Tensor: transformed tensor
+        """
+        return BlockAffineTransform(
+            self.in_dims,
+            self.block_transform._to_plane_linear(),
+        )
+    
+    def simplify(self):
+        return self._to_block_plane_linear()
+    
 class LUTransform(AffineTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. Bijectivity is guaranteed by
@@ -1133,11 +1191,11 @@ class LUTransform(AffineTransform):
                 + perturbation * torch.eye(self.dim, device=self.U_raw.device)
             )
     
-    def to_linear(self) -> BijectiveLinearTransform:
+    def to_linear(self) -> PlaneBijectiveLinearTransform:
         """ Converts the transform to a linear transform"""
         M_inv = torch.matmul(self.L, self.U)
         M = torch.inverse(M_inv)
-        return BijectiveLinearTransform(self.dim, M, self.bias_vector, M_inv)
+        return PlaneBijectiveLinearTransform(self.dim, M, self.bias_vector, M_inv)
     
     def log_prior(self) -> float:
         """ Computes the (log-normal) log prior of the transform 
