@@ -157,11 +157,10 @@ class ScaleTransform(BaseTransform):
         """Defines a log-normal prior on the diagonal elements of U Matrix,
         implicitply defining a log-normal prior on the absolute determinat
         of the transform."""
-        d = self.dim
 
         # log-density of Normal in log-space
         x = self.scale.abs().log()
-        log_prior = -(x * x).sum() / (self.prior_scale**2 / (d))
+        log_prior = -(x * x).sum() / (2 * self.prior_scale**2)
         # Change of variables to input space
         log_prior += -x.sum()
         return log_prior
@@ -1139,7 +1138,16 @@ class LUTransform(AffineTransform):
         M_inv = torch.matmul(self.L, self.U)
         M = torch.inverse(M_inv)
         return BijectiveLinearTransform(self.dim, M, self.bias_vector, M_inv)
-
+    
+    def log_prior(self) -> float:
+        """ Computes the (log-normal) log prior of the transform 
+        (additive constants are omitted)"""
+        # log-density of Normal in log-space
+        x = self.U.diag().abs().log()
+        log_prior = -(x * x).sum() / (2 * self.prior_scale**2)
+        # Change of variables to input space
+        log_prior += -x.sum()
+        return log_prior
 class SequentialAffineTransform(AffineTransform):
     """Implements a sequential affine transform. The transform is defined by a sequence of affine transforms $y = A_1 A_2 \ldots A_n x + b$.
     """

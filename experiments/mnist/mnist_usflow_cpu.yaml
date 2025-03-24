@@ -23,7 +23,7 @@ experiments:
         image_shape: [28, 28]
       dataset: 
         __object__: src.explib.datasets.MnistSplit
-        space_to_depth_factor: 2
+        space_to_depth_factor: 4
         device: cpu 
       epochs:  200000
       patience:  2
@@ -48,21 +48,23 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 3
+          coupling_blocks: 5
           lu_transform: 1
           householder: 1
           conditioner_cls: 
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
-            c_in: 4
-            num_layers: 3
-          in_dims: [4, 14, 14]
+            c_in: 16
+            c_hidden: 32
+            num_layers: 1
+            rescale_hidden: 1
+          in_dims: [16, 7, 7]
           affine_conjugation: true
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
             __object__: pyro.distributions.Laplace
             loc: 
-              __eval__: torch.zeros([4, 14, 14]).to("cpu")
+              __eval__: torch.zeros([16, 7, 7]).to("cpu")
             scale: 
-              __eval__: torch.ones([4, 14, 14]).to("cpu")
+              __eval__: torch.ones([16, 7, 7]).to("cpu")
