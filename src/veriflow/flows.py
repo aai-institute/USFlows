@@ -324,7 +324,8 @@ class USFlow(Flow):
             if householder > 0:
                 householder_layer = HouseholderTransform(
                         dim=in_dims[0],
-                        nvs=householder
+                        nvs=householder,
+                        device=self.device
                 )
                 affine_layers.append(householder_layer)
             
