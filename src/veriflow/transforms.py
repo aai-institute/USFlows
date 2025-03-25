@@ -951,12 +951,12 @@ class BlockAffineTransform(BaseTransform):
             self.block_size,
             self.block_size,
             *([1] * self.input_rank)
-        )
+        ).to(y.device)
         b = self.block_transform.bias().view(
             self.block_size,
             *([1] * self.input_rank)
-        )
-        
+        ).to(y.device)
+
         y = y - b
         y = self.global_transform(y, w)
         return y
