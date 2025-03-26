@@ -318,7 +318,7 @@ class USFlow(Flow):
             affine_layers = []
             # LU layer
             for _ in range(lu_transform):
-                lu_layer = BlockLUTransform(in_dims, prior_scale)
+                lu_layer = LUTransform(in_dims[0], prior_scale)
                 affine_layers.append(lu_layer)
             # Householder layer
             if householder > 0:
@@ -351,9 +351,9 @@ class USFlow(Flow):
             if affine_conjugation and block_affine_layer is not None:
                 layers.append(InverseTransform(block_affine_layer))
             
-            # Scale layer
-            scale_layer = ScaleTransform(in_dims)
-            layers.append(scale_layer)
+        # Scale layer
+        scale_layer = ScaleTransform(in_dims)
+        layers.append(scale_layer)
         
         super().__init__(
             base_distribution,
