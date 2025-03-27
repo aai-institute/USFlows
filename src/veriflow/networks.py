@@ -163,10 +163,10 @@ class ConvNet2D(nn.Module):
         """ Forwards method
         
         Args:
-            x (torch.Tensor): Input tensor.
+            x: Input tensor.
             
         Returns:
-            torch.Tensor: network output.
+            Network output.
         """
         return self.nn(x)
 
