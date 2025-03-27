@@ -63,8 +63,8 @@ class GatedConv(nn.Module):
         """
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(2 * c_in, c_hidden, kernel_size=3, padding=1),
-            nn.Conv2d(2 * c_hidden, 2 * c_in, kernel_size=1),
+            nn.Conv2d(c_in, c_hidden, kernel_size=3, padding=1),
+            nn.Conv2d(c_hidden, 2 * c_in, kernel_size=1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -77,7 +77,9 @@ class GatedConv(nn.Module):
             torch.Tensor: network output.
         """
         out = self.net(x)
+        # Split the output into filter and gate components. 
         val, gate = out.chunk(2, dim=1)
+        # Apply the gated residual connection after activation of the gate.
         return x + val * torch.sigmoid(gate)
 
 
