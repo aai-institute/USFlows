@@ -94,13 +94,22 @@ class ConvNet2D(nn.Module):
         padding: int = None,
     ):
         """
-        Module that summarizes the previous blocks to a full convolutional neural network.
+        Module that summarizes the previous blocks to a full convolutional
+        neural network.
+
         Args:
-            c_in: Number of input channels
-            c_hidden: Number of hidden dimensions to use within the network
-            rescale_hidden: Factor by which to rescale hight and width the hidden before and after the hidden layers.
-            c_out: Number of output channels. If -1, the numberinput channels are used (affine coupling)
-            num_layers: Number of gated ResNet blocks to apply
+            c_in: Number of input channels 
+            c_hidden: Number of hidden dimensions to use within the network 
+            rescale_hidden: Factor by which to rescale hight and width the 
+                hidden before and after the hidden layers.
+            c_out: Number of output channels. If -1, the numberinput channels
+                are used (affine coupling) 
+            num_layers: Number of gated ResNet blocks to apply 
+            nonlinearity: Nonlinearity to use within the network. ReLU
+                allows to maintain piece-wise affinity. 
+            kernel_size: Size of the convolutional kernel. 
+            padding: Padding to apply to the convolutional layers. If None, the 
+                padding is set to half the kernel size. 
         """
         super().__init__()
 
