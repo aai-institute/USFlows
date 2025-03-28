@@ -234,7 +234,7 @@ class CondConvNet2D(ConvNet2D):
             padding=padding,
         )
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Forward method for conditional convolutional network.
         
         Args:
