@@ -25,8 +25,8 @@ experiments:
         __object__: src.explib.datasets.MnistSplit
         space_to_depth_factor: 2
         device: cuda
-      epochs: &epochs 20
-      patience: &patience 2
+      epochs: &epochs 200000
+      patience: &patience 10
       batch_size: &batch_size 
         __eval__: tune.choice([1024])
       optim_cfg: &optim 
