@@ -25,6 +25,7 @@ experiments:
         __object__: src.explib.datasets.MnistSplit
         space_to_depth_factor: 2
         device: cuda
+        digit: 0
       epochs: &epochs 200000
       patience: &patience 10
       batch_size: &batch_size 
