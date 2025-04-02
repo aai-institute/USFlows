@@ -54,7 +54,7 @@ experiments:
           conditioner_args:
             c_in: 4
             num_layers: 3
-            rescale_hidden: 1
+            rescale_hidden: 2
           in_dims: [4, 14, 14]
           affine_conjugation: true
           nonlinearity: &nonlinearity 
