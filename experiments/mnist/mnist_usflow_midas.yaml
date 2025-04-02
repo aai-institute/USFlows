@@ -10,7 +10,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples: &num_hyperopt_samples 2
+    num_hyperopt_samples: &num_hyperopt_samples 3
     gpus_per_trial: &gpus_per_trial 2
     cpus_per_trial: &cpus_per_trial 10
     tuner_params: &tuner_params
@@ -37,7 +37,6 @@ experiments:
           lr: 
             __eval__: 1e-4
           weight_decay: 0.0
-      
       model_cfg: 
         type:
           __class__: &model src.veriflow.flows.USFlow
