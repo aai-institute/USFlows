@@ -162,13 +162,15 @@ class ScaleTransform(BaseTransform):
         """Defines a log-normal prior on the diagonal elements of U Matrix,
         implicitply defining a log-normal prior on the absolute determinat
         of the transform."""
-
+        return 0
+        """
         # log-density of Normal in log-space
         x = self.scale.abs().log()
         log_prior = -(x * x).sum() / (2 * self.prior_scale**2)
         # Change of variables to input space
         log_prior += -x.sum()
         return log_prior
+        """
 
 
 class Permute(BaseTransform):
