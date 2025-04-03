@@ -313,7 +313,7 @@ class USFlow(Flow):
             )
         self.householder = householder
         
-        for _ in range(coupling_blocks):
+        for i in range(coupling_blocks):
             
             affine_layers = []
             # LU layer
@@ -340,9 +340,14 @@ class USFlow(Flow):
                 )
                 layers.append(block_affine_layer)
             
-            # Coupling layer
+            # Coupling layer: Alternate between channel and checkerboard mask
             coupling_layer = MaskedCoupling(
                 USFlow.create_checkerboard_mask(in_dims),
+                conditioner_cls(**conditioner_args),
+            )
+            layers.append(coupling_layer)
+            coupling_layer = MaskedCoupling(
+                1 - USFlow.create_checkerboard_mask(in_dims),
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
@@ -385,6 +390,28 @@ class USFlow(Flow):
         if invert:
             mask = 1 - mask
         return mask
+    
+    @classmethod
+    def create_channel_mask(
+        cls, in_dims, invert: bool = False
+    ) -> torch.Tensor:
+        """Creates a checkerboard mask of size $(h,w)$.
+
+        Args:
+            h (_type_): height
+            w (_type_): width
+            invert (bool, optional): If True, inverts the mask. Defaults to False.
+        Returns:
+            Checkerboard mask of height $h$ and width $w$.
+        """
+        axes = [torch.arange(d, dtype=torch.int32) for d in in_dims]
+        ax_idxs = torch.stack(torch.meshgrid(*axes, indexing="ij"))
+        
+        mask = torch.fmod(ax_idxs[0], 2)
+        mask = mask.to(torch.float32).view(1, *in_dims)
+        if invert:
+            mask = 1 - mask
+        return mask
         
     def log_prior(self) -> torch.Tensor:
         """Returns the log prior of the model parameters. The model is trained in maximum posterior fashion, i.e.
@@ -393,7 +420,6 @@ class USFlow(Flow):
         """
         if self.prior_scale is not None:
             log_prior = 0
-            n_layers = self.in_dims * len(self.layers)
             for p in self.layers:
                 log_prior += p.log_prior()
             return log_prior
