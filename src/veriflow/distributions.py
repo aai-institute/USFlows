@@ -152,12 +152,14 @@ class UniformUnitLpBall(torch.distributions.Distribution):
     
     
 class RadialDistribution(torch.distributions.Distribution):
-    """Implements radial distributions. More precisely, this class realizes Lp-radial distributions with specifiable redial distribution.
+    """Implements radial distributions. More precisely, this class realizes 
+    Lp-radial distributions with specifiable redial distribution.
     
     Args:
         loc: Location of the distribution
         norm_distribution: Distribution of the radial component
-        p: Exponent of the Lp norm used to define the distribution. Currently, p = 1, 2, and inf are supported.
+        p: Exponent of the Lp norm used to define the distribution. Currently, 
+        p = 1, 2, and inf are supported.
     """
     arg_constraints = {"loc": constraints.real}
     support = constraints.positive
@@ -173,7 +175,8 @@ class RadialDistribution(torch.distributions.Distribution):
         self.loc = loc.to(device)
         self.norm_distribution = norm_distribution
         self.p = p
-        self.dim = loc.shape[0]
+        self.dim = torch.prod(torch.tensor(loc.shape))
+        self.shape = loc.shape
         self.unit_ball_distribution = UniformUnitLpBall(self.dim, p)
         
         super().__init__(event_shape=(loc.shape[0],), validate_args=False)
@@ -189,8 +192,9 @@ class RadialDistribution(torch.distributions.Distribution):
         
         r = self.norm_distribution.sample(sample_shape).to(self.device)
     
-        r = r.repeat(*[1 for _ in sample_shape], self.dim)
+        r = r.repeat(*[1 for _ in sample_shape], *self.shape)
         u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
+        u = u.reshape(*sample_shape, *self.shape)
         x = r * u
  
         if peel:
@@ -201,7 +205,8 @@ class RadialDistribution(torch.distributions.Distribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         x = x - self.loc
-        r = x.norm(dim=-1, p=self.p)
+        dims = tuple(reversed(-(torch.arange(len(self.shape)).to(self.device) + 1)))
+        r = x.norm(dim=dims, p=self.p)
         log_prob_norm = self.norm_distribution.log_prob(r)
         log_dV = self.log_delta_volume(self.p, r)
         
