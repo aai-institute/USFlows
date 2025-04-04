@@ -1,14 +1,17 @@
-from typing import Iterable, Union
+from typing import Dict, Iterable, Union
 from src.veriflow.transforms import Rotation, CompositeRotation
 from src.veriflow.linalg import random_orthonormal_matrix
 import torch
 from torch.distributions import constraints
+from torch.nn import ParameterDict
+from torch.distributions import Distribution, Chi2
 import pyro
 from pyro.distributions.torch_distribution import TorchDistributionMixin
 import math
 
 class RotatedLaplace(torch.distributions.Distribution):
-    """Implements a Laplace distribution that is rotated so that the bounding box of the density contours is of minimal (Euclidean) volume."""
+    """Implements a Laplace distribution that is rotated so that the bounding 
+    box of the density contours is of minimal (Euclidean) volume."""
     arg_constraints = {"loc": constraints.real, "scale": constraints.positive}
     support = constraints.real
     has_enumerate_support = False  
@@ -39,8 +42,6 @@ class RotatedLaplace(torch.distributions.Distribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.laplace.log_prob(torch.matmul(x, self.rotation.t()))
- 
-from torch.distributions import Distribution, Chi2
 
 class Chi(Distribution):
     arg_constraints = {"df": constraints.positive}
@@ -98,7 +99,77 @@ class Chi(Distribution):
         """
         return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
  
-   
+class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
+    """Wrapper class to treat pyro distributions as PyTorch modules."""
+    def __init__(
+        self,
+        distribution: torch.distributions.Distribution,
+        trainable_args: Dict[str, torch.tensor] = None,
+        static_args: Dict[str, any] = None,
+    ):
+        super().__init__()
+        self.distribution = distribution
+        self.trainable_args = ParameterDict({ 
+            key: torch.nn.Parameter(value)
+            for key, value in trainable_args.items()
+        })
+        self.static_args = static_args
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass for the distribution module. Synonymous to the
+        distribution's log_prob method."""
+        return self.distribution(
+            **self.trainable_args,
+            **self.static_args
+        ).log_prob(x)   
+    
+    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
+        """Samples batch of shape sample_shape from the distribution."""
+        if sample_shape is None:
+            sample_shape = ()
+        else:
+            sample_shape = tuple(sample_shape)
+        
+        return self.distribution(
+            **self.trainable_args,
+            **self.static_args
+        ).sample(sample_shape)
+    
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        """Computes the log probability of the points x under the distribution."""
+        return self.distribution(
+            **self.trainable_args,
+            **self.static_args
+        ).log_prob(x)
+        
+class LogNormal(DistributionModule):
+    """Wrapper class for the LogNormal distribution."""
+    def __init__(self, loc: torch.Tensor, scale: torch.Tensor):
+        """Initializes the LogNormal distribution."""
+        distribution = torch.distributions.LogNormal
+        trainable_args = {"loc": loc, "scale": scale}
+        static_args = {}
+        super().__init__(distribution, trainable_args, static_args)
+        
+class Laplace(DistributionModule):
+    """Wrapper class for the Laplace distribution."""
+    def __init__(self, loc: torch.Tensor, scale: torch.Tensor):
+        """Initializes the Laplace distribution."""
+        distribution = torch.distributions.Laplace
+        trainable_args = {"loc": loc, "scale": scale}
+        static_args = {}
+        super().__init__(distribution, trainable_args, static_args)
+        
+class Normal(DistributionModule):
+    """Wrapper class for the Normal distribution."""
+    def __init__(self, loc: torch.Tensor, scale: torch.Tensor):
+        """Initializes the Normal distribution."""
+        distribution = torch.distributions.Normal
+        trainable_args = {"loc": loc, "scale": scale}
+        static_args = {}
+        super().__init__(distribution, trainable_args, static_args)
+        
+
 class UniformUnitLpBall(torch.distributions.Distribution):
     """Implements a uniform distribution on the unit ball."""
     
@@ -150,8 +221,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
         
         return -self.log_surface_area_unit_ball
     
-    
-class RadialDistribution(torch.distributions.Distribution):
+class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
     """Implements radial distributions. More precisely, this class realizes 
     Lp-radial distributions with specifiable redial distribution.
     
