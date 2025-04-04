@@ -101,6 +101,7 @@ class Chi(Distribution):
  
 class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     """Wrapper class to treat pyro distributions as PyTorch modules."""
+    batch_shape = torch.Size()
     def __init__(
         self,
         distribution: torch.distributions.Distribution,
@@ -115,13 +116,16 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         })
         self.static_args = static_args
 
+    @property
+    def event_shape(self) -> torch.Size:
+        """Returns the shape of the distribution."""
+        return self.build().event_shape
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
         distribution's log_prob method."""
-        return self.distribution(
-            **self.trainable_args,
-            **self.static_args
-        ).log_prob(x)   
+        d = self.build()
+        return d.log_prob(x)   
     
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
@@ -129,18 +133,29 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
             sample_shape = ()
         else:
             sample_shape = tuple(sample_shape)
+            
+        d = self.build()
         
-        return self.distribution(
-            **self.trainable_args,
-            **self.static_args
-        ).sample(sample_shape)
+        return d.sample(sample_shape)
     
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        return self.distribution(
+        d = self.build()
+            
+        return d.log_prob(x)
+    
+    def build(self) -> torch.distributions.Distribution:
+        """Builds the distribution with the current parameters."""
+        d = self.distribution(
             **self.trainable_args,
             **self.static_args
-        ).log_prob(x)
+        )
+        
+        nbatch_dims = len(d.batch_shape)
+        if nbatch_dims > 0:
+            d = torch.distributions.Independent(d, nbatch_dims)
+        
+        return d
         
 class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
