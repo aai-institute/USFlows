@@ -111,7 +111,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         super().__init__()
         self.distribution = distribution
         self.trainable_args = ParameterDict({ 
-            key: torch.nn.Parameter(value)
+            key: torch.nn.Parameter(value, requires_grad=True)
             for key, value in trainable_args.items()
         })
         self.static_args = static_args

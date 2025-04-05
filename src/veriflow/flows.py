@@ -125,9 +125,9 @@ class Flow(torch.nn.Module):
         model = self.to(device)
 
         if optim_params is not None:
-            optim = optim(model.trainable_layers.parameters(), **optim_params)
+            optim = optim(model.parameters(), **optim_params)
         else:
-            optim = optim(model.trainable_layers.parameters())
+            optim = optim(model.parameters())
 
         N = len(data_train)
 
@@ -342,7 +342,7 @@ class USFlow(Flow):
             
             # Coupling layer: Alternate between channel and checkerboard mask
             coupling_layer = MaskedCoupling(
-                USFlow.create_checkerboard_mask(in_dims),
+                USFlow.create_channel_mask(in_dims),
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
