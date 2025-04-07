@@ -1,9 +1,9 @@
-from math import ceil
-from typing import List, Optional, Tuple, Union
-
 import torch
+
+from math import ceil
 from pyro.nn import DenseNN
 from torch import nn
+from typing import List, Optional, Tuple, Union
 
 
 class AdditiveAffineNN(torch.nn.Module):
@@ -54,7 +54,7 @@ class LayerNormChannels(nn.Module):
 
 
 class GatedConv(nn.Module):
-    def __init__(self, c_in, c_hidden):
+    def __init__(self, c_in, c_hidden, kernel_size=3, padding=1, stride=1, nonlinearity: callable = nn.ReLU(), dilation=1):
         """
         This module applies a two-layer convolutional ResNet block with input gate
         Args:
@@ -62,9 +62,15 @@ class GatedConv(nn.Module):
             c_hidden: Number of hidden dimensions we want to model (usually similar to c_in)
         """
         super().__init__()
+        
+        assert stride == 1, "Stride > 1 cannot be used to skip connection."
+
         self.net = nn.Sequential(
-            nn.Conv2d(2 * c_in, c_hidden, kernel_size=3, padding=1),
-            nn.Conv2d(2 * c_hidden, 2 * c_in, kernel_size=1),
+            nonlinearity,
+            nn.Conv2d(c_in, c_hidden, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
+            nonlinearity,
+            # The kernel size below is set to 1 to reduce the number of parameters.
+            nn.Conv2d(c_hidden, 2 * c_in, kernel_size=1, padding=padding, stride=stride, dilation=dilation),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -77,8 +83,14 @@ class GatedConv(nn.Module):
             torch.Tensor: network output.
         """
         out = self.net(x)
+        # Split the output into filter and gate components. 
         val, gate = out.chunk(2, dim=1)
-        return x + val * torch.sigmoid(gate)
+        # Apply the gated residual connection after activation of the gate.
+        ret = x + val * torch.sigmoid(gate)
+        
+        assert ret.shape == x.shape, f"Shape mismatch: {ret.shape} != {x.shape}"
+        
+        return ret 
 
 
 class ConvNet2D(nn.Module):
@@ -91,16 +103,27 @@ class ConvNet2D(nn.Module):
         num_layers: int = 3,
         nonlinearity: any = nn.ReLU(),
         kernel_size: int = 3,
+        stride:int = 1, 
+        dilation: int = 1,
         padding: int = None,
     ):
         """
-        Module that summarizes the previous blocks to a full convolutional neural network.
+        Module that summarizes the previous blocks to a full convolutional
+        neural network.
+
         Args:
-            c_in: Number of input channels
-            c_hidden: Number of hidden dimensions to use within the network
-            rescale_hidden: Factor by which to rescale hight and width the hidden before and after the hidden layers.
-            c_out: Number of output channels. If -1, the numberinput channels are used (affine coupling)
-            num_layers: Number of gated ResNet blocks to apply
+            c_in: Number of input channels 
+            c_hidden: Number of hidden dimensions to use within the network 
+            rescale_hidden: Factor by which to rescale hight and width the 
+                hidden before and after the hidden layers.
+            c_out: Number of output channels. If -1, the numberinput channels
+                are used (affine coupling) 
+            num_layers: Number of gated ResNet blocks to apply 
+            nonlinearity: Nonlinearity to use within the network. ReLU
+                allows to maintain piece-wise affinity. 
+            kernel_size: Size of the convolutional kernel. 
+            padding: Padding to apply to the convolutional layers. If None, the 
+                padding is set to half the kernel size. 
         """
         super().__init__()
 
@@ -111,14 +134,15 @@ class ConvNet2D(nn.Module):
         c_out = c_out if c_out > 0 else c_in
         layers = []
         layers += [
-            nn.Conv2d(c_in, c_hidden, kernel_size=kernel_size, padding=padding),
+            nn.Conv2d(c_in, c_hidden, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
         ]
         if rescale_hidden != 1:
             layers += [nn.MaxPool2d(rescale_hidden)]
 
         for layer_index in range(num_layers):
             layers += [
-                nn.Conv2d(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding),
+                GatedConv(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
+                # nn.Conv2d(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding),
                 nonlinearity,
                 LayerNormChannels(c_hidden),
             ]
@@ -138,26 +162,104 @@ class ConvNet2D(nn.Module):
                     c_hidden,
                     c_hidden,
                     kernel_size=kernel_size,
-                    stride=rescale_hidden,
+                    stride=stride,
                     output_padding=outpad,
                     padding=pad,
                 ),
                 nonlinearity,
             ]
 
-        layers += [nn.Conv2d(c_hidden, c_out, kernel_size=kernel_size, padding=padding)]
+        layers += [nn.Conv2d(c_hidden, c_out, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation)]
         self.nn = nn.Sequential(*layers)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
         """ Forwards method
         
         Args:
-            x (torch.Tensor): Input tensor.
+            x: Input tensor.
             
         Returns:
-            torch.Tensor: network output.
+            Network output.
         """
         return self.nn(x)
+
+
+class CondConvNet2D(ConvNet2D):
+    def __init__(
+        self,
+        c_in: int,
+        c_hidden: int = 3,
+        rescale_hidden: int = 2,
+        c_out: int = -1,
+        num_layers: int = 3,
+        nonlinearity: any = nn.ReLU(),
+        kernel_size: int = 3,
+        stride:int = 1, 
+        dilation: int = 1,
+        padding: int = None,
+    ):
+        """
+        Module that summarizes the previous blocks to a full convolutional
+        neural network.
+
+        Args:
+            c_in: Number of input channels 
+            c_hidden: Number of hidden dimensions to use within the network 
+            rescale_hidden: Factor by which to rescale hight and width the 
+                hidden before and after the hidden layers.
+            c_out: Number of output channels. If -1, the numberinput channels
+                are used (affine coupling) 
+            num_layers: Number of gated ResNet blocks to apply 
+            nonlinearity: Nonlinearity to use within the network. ReLU
+                allows to maintain piece-wise affinity. 
+            kernel_size: Size of the convolutional kernel. 
+            padding: Padding to apply to the convolutional layers. If None, the 
+                padding is set to half the kernel size. 
+        """
+        # For c_out < 0, the parent class will set c_out to c_in. As we increase
+        # c_in by one below, we need to set c_out explicitly.
+        if c_out < 0:
+            c_out = c_in
+
+        super().__init__( 
+            c_in=c_in+1,
+            c_hidden=c_hidden,
+            rescale_hidden=rescale_hidden,
+            c_out=c_out,
+            num_layers=num_layers,
+            nonlinearity=nonlinearity,
+            kernel_size=kernel_size,
+            stride=stride, 
+            dilation=dilation,
+            padding=padding,
+        )
+
+    def forward(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Forward method for conditional convolutional network.
+        
+        Args:
+            x: Input tensor.
+            context: Context tensor.
+            
+        Returns:
+            Network output.
+        """
+        size_in = x.shape
+        # Make sure to create a new obj. to avoid inplace operations.
+        if context is not None:
+            context = torch.Tensor([0]).to(x.device)
+        
+        height, width = x.shape[-2:]
+        # Expand the context to the size of the input image.
+        # Batch, Channel, Height, Width
+        context = context.expand(x.shape[0], 1, height, width)
+        x = torch.cat([x, context], dim=1)
+
+        size_target = torch.Size([size_in[0], size_in[1] + 1, size_in[2], size_in[3]])
+        assert x.shape == size_target, f"Shape mismatch: {x.shape} != {size_target}"
+
+        return self.nn(x)
+
 
 class ConditionalDenseNN(torch.nn.Module):
     """

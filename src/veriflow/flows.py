@@ -148,7 +148,7 @@ class Flow(torch.nn.Module):
                     continue
                  
                 if self.soft_training:
-                    noise = self.training_noise_prior.sample([sample.shape[0]]) 
+                    noise = self.training_noise_prior.sample([sample.shape[0]]).to(device)
 
                     # Repeat noise for all data dimensions
                     sigma = noise
