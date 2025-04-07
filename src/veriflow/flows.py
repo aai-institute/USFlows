@@ -342,7 +342,7 @@ class USFlow(Flow):
             
             # Coupling layer: Alternate between channel and checkerboard mask
             coupling_layer = MaskedCoupling(
-                USFlow.create_channel_mask(in_dims),
+                USFlow.create_checkerboard_mask(in_dims),
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
@@ -357,6 +357,12 @@ class USFlow(Flow):
                 layers.append(InverseTransform(block_affine_layer))
             
         # Scale layer
+        lu_layer = LUTransform(in_dims[0], prior_scale) 
+        block_affine_layer = BlockAffineTransform(
+            in_dims,
+            lu_layer
+        )
+        layers.append(block_affine_layer)       
         scale_layer = ScaleTransform(in_dims)
         layers.append(scale_layer)
         

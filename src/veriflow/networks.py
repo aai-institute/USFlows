@@ -1,5 +1,6 @@
 from math import ceil
-from typing import List, Optional, Tuple, Union
+import math
+from typing import Iterable, List, Optional, Tuple, Union
 
 import torch
 from pyro.nn import DenseNN
@@ -227,3 +228,80 @@ class ConditionalDenseNN(torch.nn.Module):
         h = self.layers[-1](h)
 
         return h 
+    
+    
+class BottleneckConv(nn.Module):
+    def __init__(
+        self,
+        c_in: Iterable[int],
+        c_hidden_in: Iterable[int],
+        c_hidden_out: Iterable[int],
+        in_dims: Iterable[int],
+        c_hidden: int = 3,  
+        nonlinearity: any = nn.ReLU(),
+        kernel_size: int = 3,
+    ):
+        """
+        Module that summarizes the previous blocks to a full convolutional neural network.
+        Args:
+            c_in: Number of input channels
+            c_hidden: Number of hidden dimensions to use within the network
+            rescale_hidden: Factor by which to rescale hight and width the hidden before and after the hidden layers.
+            c_out: Number of output channels. If -1, the numberinput channels are used (affine coupling)
+            num_layers: Number of gated ResNet blocks to apply
+        """
+        super().__init__()
+        
+        self.in_dims = in_dims
+        self.n_pixels = math.prod(in_dims[1:])
+        
+        in_convolutions = []
+        in_convolutions += [
+            nn.Conv2d(c_in, c_hidden, kernel_size=kernel_size, padding="same"),
+            nn.Conv2d(c_hidden, 1, kernel_size=kernel_size, padding="same"),
+        ]
+        self.in_convolutions = nn.ModuleList(in_convolutions)
+        
+        linear_layers = []
+        linear_layers += [
+            nn.Linear(self.n_pixels, self.n_pixels),
+            nn.Linear(self.n_pixels, self.n_pixels),   
+        ]
+        self.linear_layers = nn.ModuleList(linear_layers)
+        
+        out_convolutions = []
+        out_convolutions += [
+            nn.Conv2d(1, c_hidden, kernel_size=kernel_size, padding="same"),
+            nn.Conv2d(c_hidden, c_in, kernel_size=kernel_size, padding="same"),
+        ]
+        self.out_convolutions = nn.ModuleList(out_convolutions)
+        
+        self.nonlinearity = nonlinearity
+        
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forwards method
+        
+        Args:
+            x (torch.Tensor): Input tensor.
+            
+        Returns:
+            torch.Tensor: network output.
+        """
+        for conv in self.in_convolutions:
+            x = conv(x)
+            x = self.nonlinearity(x)
+        
+        x = x.view(x.shape[0], -1)
+        for layer in self.linear_layers:
+            x = layer(x)
+            x = self.nonlinearity(x)
+        
+        x = x.view(x.shape[0], 1, *self.in_dims[1:])
+        for conv in self.out_convolutions:
+            x = conv(x)
+            x = self.nonlinearity(x)
+        return x
+    
+    
+
