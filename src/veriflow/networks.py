@@ -109,7 +109,7 @@ class ConvNet2D(nn.Module):
         kernel_size: int = 3,
         stride:int = 1, 
         dilation: int = 1,
-        padding: int = None,
+        padding: int  = 0,
     ):
         """
         Module that summarizes the previous blocks to a full convolutional

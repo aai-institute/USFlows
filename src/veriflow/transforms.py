@@ -1006,6 +1006,15 @@ class BlockAffineTransform(BaseTransform):
     def simplify(self):
         return self._to_block_plane_linear()
     
+    def to(self, device):
+        """ Moves the layer to a given device
+        
+        Args:
+            device (torch.device): target device
+        """
+        self.block_transform.to(device)
+        return super().to(device)
+    
 class LUTransform(AffineTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
     lower triangular matrix with unit diagonal and $\mathbf{U}$ is an upper triangular matrix. Bijectivity is guaranteed by
@@ -1226,7 +1235,7 @@ class SequentialAffineTransform(AffineTransform):
             raise ValueError("All transforms must have the same dimension")
         
         super().__init__(dim, *args, **kwargs)
-        self.transforms = transforms
+        self.transforms = torch.nn.ModuleList(transforms)
         
     def forward(self, x: torch.Tensor, context = None) -> torch.Tensor:
         """ Computes the sequential affine transform
@@ -1286,24 +1295,34 @@ class SequentialAffineTransform(AffineTransform):
     
     def matrix(self) -> torch.Tensor:
         """ Returns the transformation matrix"""
-        M = torch.eye(self.dim)
+        M = torch.eye(self.dim).to(self.device)
         for transform in self.transforms:
             M = torch.matmul(M, transform.matrix())
         return M
     
     def inverse_matrix(self) -> torch.Tensor:
         """ Returns the inverse transformation matrix"""
-        M = torch.eye(self.dim)
+        M = torch.eye(self.dim).to(self.device)
         for transform in self.transforms[::-1]:
             M = torch.matmul(M, transform.inverse_matrix())
         return M
     
     def bias(self) -> torch.Tensor:
         """ Returns the bias vector"""
-        b = torch.zeros(self.dim)
+        b = torch.zeros(self.dim).to(self.device)
         for transform in self.transforms:
             b = torch.matmul(b, transform.matrix()) + transform.bias()
         return b
+
+    def to(self, device) -> None:
+        """ Moves the layer to a given device
+        
+        Args:
+            device (torch.device): target device
+        """
+        for transform in self.transforms:
+            transform.to(device)
+        self.device = device
     
 class BlockLUTransform(LUTransform):
     """Implementation of a tiled LU transform. The transform is defined by a block-diagonal matrix $\mathbf{L}\mathbf{U}$, where $\mathbf{L}$ is a
