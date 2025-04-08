@@ -140,12 +140,12 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     @property
     def event_shape(self) -> torch.Size:
         """Returns the shape of the distribution."""
-        return self.build().event_shape
+        return self.distribution.event_shape
 
     @property
     def batch_shape(self) -> torch.Size:
         """Returns the batch shape of the distribution."""
-        return self.build().batch_shape
+        return self.distribution.batch_shape
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
@@ -377,7 +377,6 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             sample_shape = tuple(sample_shape)
 
         r = self.norm_distribution.sample(sample_shape).to(self.device)
-
         r = r.repeat(
             *[1 for _ in sample_shape],
             *[1 for _ in range(self.n_batch_dims)],
@@ -401,7 +400,11 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             reversed(-(torch.arange(len(self.event_shape)).to(self.device) + 1))
         )
         r = x.norm(dim=dims, p=self.p)
-        log_prob_norm = self.norm_distribution.log_prob(r)
+        if len(self.norm_distribution.batch_shape) > 0:
+            log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1))
+            log_prob_norm = log_prob_norm.squeeze(-1)
+        else:
+            log_prob_norm = self.norm_distribution.log_prob(r)
         log_dV = self.log_delta_volume(self.p, r)
 
         return log_prob_norm - log_dV
@@ -471,16 +474,15 @@ class RadialMM(DistributionModule):
             norm_distribution.sample().shape[0] == loc.shape[0]
         ), f"Non-aligned batch-shapes: {norm_distribution.sample().shape[0]} and {loc.shape[0]}"
         self.n_batch_dims = norm_distribution.n_batch_dims
-        self._batch_shape = loc.shape[: self.n_batch_dims]  # todo: clean up this hack!
         norm_batch = RadialDistribution(
             loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims
         )
         if mixture_weights is None:
             component_distribution = torch.distributions.Categorical(
-                torch.ones(self._batch_shape)
+                logits=torch.ones(norm_distribution.batch_shape)
             )
         else:
-            component_distribution = torch.distributions.Categorical(mixture_weights)
+            component_distribution = torch.distributions.Categorical(logits=mixture_weights)
         # self.n_batch_dims = n_batch_dims
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
@@ -493,7 +495,11 @@ class RadialMM(DistributionModule):
             trainable_args,
             static_args,
             n_batch_dims=self.n_batch_dims,
-            batch_shape=self._batch_shape,
+            #batch_shape=self._batch_shape,
             *args,
             **kwargs,
         )
+        
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        """Computes the log probability of the points x under the distribution."""
+        return self.distribution.log_prob(x).squeeze(-1)
