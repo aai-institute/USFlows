@@ -465,29 +465,21 @@ class RadialMM(DistributionModule):
         self.n_batch_dims = norm_distribution.n_batch_dims
         self._batch_shape = loc.shape[:self.n_batch_dims]  # todo: clean up this hack! 
         norm_batch = RadialDistribution(loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims)
-        self.component_distribution = mixture_weights
+        if mixture_weights is None:
+            component_distribution = torch.distributions.Categorical(
+                torch.ones(self._batch_shape)
+            )
+        else:
+            component_distribution = torch.distributions.Categorical(
+                mixture_weights
+            )
         # self.n_batch_dims = n_batch_dims
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
         static_args = {
-            "mixture_distribution": self.component_distribution,
+            "mixture_distribution": component_distribution,
             "component_distribution": norm_batch,
         }
         super().__init__(distribution, trainable_args, static_args, n_batch_dims=self.n_batch_dims)
 
-    @property
-    def component_distribution(self) -> torch.distributions.Categorical:
-        """Returns the mixture weights."""
-        return self._component_distribution
-
-    @component_distribution.setter
-    def component_distribution(self, mixture_weights: torch.Tensor):
-        """Sets the mixture weights."""
-        if mixture_weights is None:
-            self._component_distribution = torch.distributions.Categorical(
-                torch.ones(self._batch_shape)
-            )
-        else:
-            self._component_distribution = torch.distributions.Categorical(
-                mixture_weights
-            )
+ 
