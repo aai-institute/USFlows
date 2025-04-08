@@ -9,13 +9,15 @@ import pyro
 from pyro.distributions.torch_distribution import TorchDistributionMixin
 import math
 
+
 class RotatedLaplace(torch.distributions.Distribution):
-    """Implements a Laplace distribution that is rotated so that the bounding 
+    """Implements a Laplace distribution that is rotated so that the bounding
     box of the density contours is of minimal (Euclidean) volume."""
+
     arg_constraints = {"loc": constraints.real, "scale": constraints.positive}
     support = constraints.real
-    has_enumerate_support = False  
-    
+    has_enumerate_support = False
+
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor):
         self.dim = loc.shape[0]
         self.loc = loc
@@ -29,25 +31,26 @@ class RotatedLaplace(torch.distributions.Distribution):
             )
         self.shape = self.laplace.event_shape
         super().__init__(event_shape=(self.dim,), validate_args=False)
-    
+
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples n points from the distribution."""
         if sample_shape is None:
             sample_shape = ()
         else:
             sample_shape = tuple(sample_shape)
-        
+
         return torch.matmul(self.laplace.sample(sample_shape), self.rotation)
-    
+
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.laplace.log_prob(torch.matmul(x, self.rotation.t()))
 
+
 class Chi(Distribution):
     arg_constraints = {"df": constraints.positive}
     support = constraints.positive
-    has_enumerate_support = False  
-    
+    has_enumerate_support = False
+
     def __init__(self, df, validate_args=None):
         """
         Initialize the Chi distribution with degrees of freedom `df`.
@@ -57,8 +60,10 @@ class Chi(Distribution):
         """
         self.chi2 = Chi2(df)
         self.df = df
-        super(Chi, self).__init__(self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args)
-        
+        super(Chi, self).__init__(
+            self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args
+        )
+
     def sample(self, sample_shape=torch.Size()):
         """
         Generate samples from the Chi distribution.
@@ -68,7 +73,7 @@ class Chi(Distribution):
             Tensor: A sample of the specified shape.
         """
         return torch.sqrt(self.chi2.sample(sample_shape))
-    
+
     def log_prob(self, value):
         """
         Calculate the log probability of a given value.
@@ -77,9 +82,9 @@ class Chi(Distribution):
         Returns:
             Tensor: The log probability of the value.
         """
-        y = value ** 2
+        y = value**2
         return self.chi2.log_prob(y) + torch.log(value * 2)
-    
+
     def cdf(self, value):
         """
         Calculate the cumulative distribution function (CDF) at a given value.
@@ -88,9 +93,9 @@ class Chi(Distribution):
         Returns:
             Tensor: The CDF of the value.
         """
-        y = value ** 2
+        y = value**2
         return self.chi2.cdf(y)
-    
+
     def entropy(self):
         """
         Calculate the entropy of the distribution.
@@ -98,127 +103,140 @@ class Chi(Distribution):
             Tensor: The entropy of the distribution.
         """
         return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
- 
+
+
 class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     """Wrapper class to treat pyro distributions as PyTorch modules.
-    
-    
+
+
     Args:
-        distribution: Pyro distribution to wrap.
-        trainable_args: Dictionary of trainable parameters. 
+        distribution_class: Pyro distribution to wrap.
+        trainable_args: Dictionary of trainable parameters.
             Initial parameters need to be given as tensors.
-        static_args: Dictionary of static (non-trainable) parameters. 
+        static_args: Dictionary of static (non-trainable) parameters.
         n_batch_dims: Number of batch dimensions.
     """
+
     def __init__(
         self,
-        distribution: torch.distributions.Distribution,
+        distribution_class: torch.distributions.Distribution,  # todo: type hint should be a class on not an instance of a class. Use type[..]
         params: Dict[str, torch.tensor] = None,
         other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
     ):
         super().__init__()
-        self.distribution = distribution
-        self.params = ParameterDict({ 
-            key: torch.nn.Parameter(value, requires_grad=True)
-            for key, value in params.items()
-        })
+        self.distribution_class = distribution_class
+        self.params = ParameterDict(
+            {
+                key: torch.nn.Parameter(value, requires_grad=True)
+                for key, value in params.items()
+            }
+        )
         self.other_args = ParameterDict(other_args)
         self.n_batch_dims = n_batch_dims
-        
-        
+
     @property
     def event_shape(self) -> torch.Size:
         """Returns the shape of the distribution."""
         return self.build().event_shape
-    
+
     @property
     def batch_shape(self) -> torch.Size:
         """Returns the batch shape of the distribution."""
         return self.build().batch_shape
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
         distribution's log_prob method."""
-        d = self.build()
-        return d.log_prob(x)   
-    
+        # d = self.build()
+        return self.distribution.log_prob(x)
+
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
         if sample_shape is None:
             sample_shape = ()
         else:
             sample_shape = tuple(sample_shape)
-            
-        d = self.build()
-        
-        return d.sample(sample_shape)
-    
+
+        # d = self.build()
+
+        return self.distribution.sample(sample_shape)
+
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        d = self.build()
-            
-        return d.log_prob(x)
-    
-    def build(self) -> torch.distributions.Distribution:
+        # d = self.build()
+
+        return self.distribution.log_prob(x)
+
+    @property
+    def distribution(self) -> torch.distributions.Distribution:
         """Builds the distribution with the current parameters."""
-        d = self.distribution(
-            **self.params,
-            **self.other_args
-        )
-        
+        d = self.distribution_class(**self.params, **self.other_args)
+
         nbatch_dims = len(d.batch_shape) - self.n_batch_dims
         if nbatch_dims > 0:
             d = torch.distributions.Independent(d, nbatch_dims)
-        
+
         return d
-        
+
+
 class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
+
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
         """Initializes the LogNormal distribution."""
         distribution = torch.distributions.LogNormal
         trainable_args = {"loc": loc, "scale": scale}
         static_args = {}
         super().__init__(distribution, trainable_args, static_args, *args, **kwargs)
-        
+
+
 class Laplace(DistributionModule):
     """Wrapper class for the Laplace distribution."""
+
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
         """Initializes the Laplace distribution."""
         distribution = torch.distributions.Laplace
         trainable_args = {"loc": loc, "scale": scale}
         static_args = {}
         super().__init__(distribution, trainable_args, static_args, *args, **kwargs)
-        
+
+
 class Normal(DistributionModule):
     """Wrapper class for the Normal distribution."""
+
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
         """Initializes the Normal distribution."""
         distribution = torch.distributions.Normal
         trainable_args = {"loc": loc, "scale": scale}
         static_args = {}
-        super().__init__(
-            distribution, trainable_args, static_args, *args, **kwargs
-        )
-        
+        super().__init__(distribution, trainable_args, static_args, *args, **kwargs)
+
+
 class GMM(DistributionModule):
     """Wrapper class for the Gaussian Mixture Model (GMM) distribution."""
-    def __init__(self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor):
+
+    def __init__(
+        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
+    ):
         """Initializes the GMM distribution."""
-        normal_batch = Normal(self.loc, self.scale, n_batch_dims=1)
+        normal_batch = Normal(loc, scale, n_batch_dims=1)
         mixture_distribution = torch.distributions.Categorical(mixture_weights)
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
         static_args = {
             "mixture_distribution": mixture_distribution,
-            "component_distribution": normal_batch
+            "component_distribution": normal_batch,
         }
         super().__init__(distribution, trainable_args, static_args)
-        
+
+
 class LMM(DistributionModule):
     """Wrapper class for the Laplace Mixture Model (LMM) distribution."""
-    def __init__(self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor):
+
+    def __init__(
+        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
+    ):
         """Initializes the LMM distribution."""
         laplace_batch = Laplace(loc, scale, n_batch_dims=1)
         mixture_distribution = torch.distributions.Categorical(mixture_weights)
@@ -226,92 +244,123 @@ class LMM(DistributionModule):
         trainable_args = {}
         static_args = {
             "mixture_distribution": mixture_distribution,
-            "component_distribution": laplace_batch
+            "component_distribution": laplace_batch,
         }
         super().__init__(distribution, trainable_args, static_args)
-        
+
 
 class UniformUnitLpBall(torch.distributions.Distribution):
     """Implements a uniform distribution on the unit ball."""
-    
+
     support = constraints.real
-    has_enumerate_support = False  
-    
+    has_enumerate_support = False
+
     def __init__(self, dim: int, p: float):
         self.p = p
         self.dim = dim
-        if self.p == 1: 
-            self.log_surface_area_unit_ball = (3/2) * math.log(self.dim) + math.log(2) * self.dim  -  torch.log(torch.arange(1, self.dim + 1)).sum() 
+        if self.p == 1:
+            self.log_surface_area_unit_ball = (
+                (3 / 2) * math.log(self.dim)
+                + math.log(2) * self.dim
+                - torch.log(torch.arange(1, self.dim + 1)).sum()
+            )
         elif self.p == 2:
-            self.log_surface_area_unit_ball = math.log(2) + (self.dim / 2) * math.log(math.pi) - math.lgamma(self.dim / 2)
+            self.log_surface_area_unit_ball = (
+                math.log(2)
+                + (self.dim / 2) * math.log(math.pi)
+                - math.lgamma(self.dim / 2)
+            )
         elif self.p == math.inf:
-            self.log_surface_area_unit_ball = math.log(2) * self.dim + math.log(self.dim) 
+            self.log_surface_area_unit_ball = math.log(2) * self.dim + math.log(
+                self.dim
+            )
         else:
             raise ValueError("p must be 1, 2, or inf.")
         super().__init__(event_shape=(dim,), validate_args=False)
-        
+
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
         if sample_shape is None:
             sample_shape = ()
         else:
             sample_shape = tuple(sample_shape)
-            
+
         if self.p == 1:
             x = pyro.distributions.Dirichlet(torch.ones(self.dim)).sample(sample_shape)
-            dims = pyro.distributions.Categorical(probs=torch.ones(2) / 2).sample(sample_shape + (self.dim,)) * 2 - 1
+            dims = (
+                pyro.distributions.Categorical(probs=torch.ones(2) / 2).sample(
+                    sample_shape + (self.dim,)
+                )
+                * 2
+                - 1
+            )
             x = x * dims
         elif self.p == 2:
             x = pyro.distributions.Normal(0, 1).sample(sample_shape + (self.dim,))
             x = x / x.norm(dim=-1, keepdim=True)
         elif self.p == math.inf:
-            extremal_dims = pyro.distributions.Categorical(torch.ones(self.dim)/ self.dim).sample(sample_shape + (1,))
-            mask = torch.ones(sample_shape + (self.dim,)).cumsum(dim=-1) - 1 == extremal_dims
+            extremal_dims = pyro.distributions.Categorical(
+                torch.ones(self.dim) / self.dim
+            ).sample(sample_shape + (1,))
+            mask = (
+                torch.ones(sample_shape + (self.dim,)).cumsum(dim=-1) - 1
+                == extremal_dims
+            )
 
             boundary = torch.ones(sample_shape + (self.dim,))
             hyperplane_distribution = pyro.distributions.Uniform(-boundary, boundary)
             x = hyperplane_distribution.sample()
-            x[mask] = 1.
+            x[mask] = 1.0
         else:
             raise ValueError("p must be 1, 2, or inf.")
-        
+
         return x
-    
+
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        
+
         return -self.log_surface_area_unit_ball
-    
+
+
 class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
-    """Implements radial distributions. More precisely, this class realizes 
+    """Implements radial distributions. More precisely, this class realizes
     Lp-radial distributions with specifiable redial distribution.
-    
+
     Args:
         loc: Location of the distribution
         norm_distribution: Distribution of the radial component
-        p: Exponent of the Lp norm used to define the distribution. Currently, 
+        p: Exponent of the Lp norm used to define the distribution. Currently,
         p = 1, 2, and inf are supported.
     """
+
     arg_constraints = {"loc": constraints.real}
     support = constraints.real
-    has_enumerate_support = False  
-    
-    def __init__(self, loc: torch.Tensor, norm_distribution: torch.distributions.Distribution, p: float, device: str = "cpu"):
-        
-        super().__init__(event_shape=loc.shape, validate_args=False)
+    has_enumerate_support = False
+
+    def __init__(
+        self,
+        loc: torch.Tensor,
+        norm_distribution: torch.distributions.Distribution,
+        p: float,
+        n_batch_dims: int = 0,
+        device: str = "cpu",
+    ):
+
+        super().__init__(event_shape=loc.shape[n_batch_dims:], validate_args=False, batch_shape=loc.shape[:n_batch_dims])
         if not isinstance(p, float):
             raise ValueError("p must be a float.")
         if p <= 0:
             raise ValueError("p must be positive.")
-        
+
         self.device = device
         self.loc = loc.to(device)
         self.norm_distribution = norm_distribution
         self.p = p
-        self.dim = torch.prod(torch.tensor(loc.shape))
+        self.n_batch_dims = n_batch_dims
+        self.dim = torch.prod(torch.tensor(loc.shape[self.n_batch_dims :]))
         self.shape = loc.shape
         self.unit_ball_distribution = UniformUnitLpBall(self.dim, p)
-        
+
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
         peel = False
@@ -320,33 +369,43 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             peel = True
         else:
             sample_shape = tuple(sample_shape)
-        
+
         r = self.norm_distribution.sample(sample_shape).to(self.device)
-    
-        r = r.repeat(*[1 for _ in sample_shape], *self.shape)
-        u = self.unit_ball_distribution.sample(sample_shape).to(self.device)
+
+        r = r.repeat(
+            *[1 for _ in sample_shape],
+            *[1 for _ in range(self.n_batch_dims)],
+            *tuple(self.event_shape),
+        )
+        u = self.unit_ball_distribution.sample(
+            sample_shape + tuple(self.batch_shape)
+        ).to(self.device)
         u = u.reshape(*sample_shape, *self.shape)
         x = r * u
- 
+
         if peel:
             x = x.squeeze(0)
-            
+
         return x + self.loc
-    
+
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         x = x - self.loc
-        dims = tuple(reversed(-(torch.arange(len(self.shape)).to(self.device) + 1)))
+        dims = tuple(
+            reversed(-(torch.arange(len(self.event_shape)).to(self.device) + 1))
+        )
         r = x.norm(dim=dims, p=self.p)
         log_prob_norm = self.norm_distribution.log_prob(r)
         log_dV = self.log_delta_volume(self.p, r)
-        
+
         return log_prob_norm - log_dV
-    
-    def log_delta_volume(self, p: int, r: Union[float, torch.Tensor]) -> Union[float, torch.Tensor]:
-        """Computes the differential log-volume of an $L^p$ ball with radius r. 
+
+    def log_delta_volume(
+        self, p: int, r: Union[float, torch.Tensor]
+    ) -> Union[float, torch.Tensor]:
+        """Computes the differential log-volume of an $L^p$ ball with radius r.
         Currently, $p=1,2,\text{ or }\infty$ is implemented
-        
+
         Args:
             p: p norm
             r: radius (batch)
@@ -354,19 +413,81 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             Differential volume (batch)
         """
         if p == 1:
-           # V_1^d'(r) = (2r)**(d-1) / (d-1)!
-           log_denominator = sum([math.log(i) for i in range(1, self.dim)])
-           log_dv = math.log(2) * self.dim + torch.log(r) * (self.dim-1) - log_denominator
+            # V_1^d'(r) = (2r)**(d-1) / (d-1)!
+            log_denominator = sum([math.log(i) for i in range(1, self.dim)])
+            log_dv = (
+                math.log(2) * self.dim + torch.log(r) * (self.dim - 1) - log_denominator
+            )
         elif p == 2:
-           # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
-           log_numerator = (
-               math.log(self.dim) + (self.dim / 2) * math.log(math.pi) + (self.dim - 1) * torch.log(r)
-           )
-           log_dv = log_numerator - math.lgamma((self.dim / 2) + 1)
+            # V_2^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+            log_numerator = (
+                math.log(self.dim)
+                + (self.dim / 2) * math.log(math.pi)
+                + (self.dim - 1) * torch.log(r)
+            )
+            log_dv = log_numerator - math.lgamma((self.dim / 2) + 1)
         elif p == math.inf:
-           # V_\infty^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
-           log_dv = math.log(self.dim) + self.dim * math.log(2) + (self.dim - 1) * torch.log(r)  
+            # V_\infty^d'(r) = d * (pi)^(d/2) * r^(d-1) / Gamma(d/2 + 1)
+            log_dv = (
+                math.log(self.dim)
+                + self.dim * math.log(2)
+                + (self.dim - 1) * torch.log(r)
+            )
         else:
             raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
-        
+
         return log_dv
+
+
+class RadialMM(DistributionModule):
+
+    def __init__(
+        self,
+        loc: torch.Tensor,
+        norm_distribution: torch.distributions.Distribution,
+        p: float,
+        mixture_weights: torch.Tensor = None,
+        # n_batch_dims: int = 1,
+        device: str = "cpu",
+    ):
+        """Builds a mixture of radial distributions.
+
+        Args:
+            loc: Location param. of (B,D)
+            norm_distribution: Norm distributions of (B,D).
+            p: _description_
+            n_batch_dims: _description_
+            device: _description_. Defaults to "cpu".
+        """
+        assert (
+            norm_distribution.sample().shape[0] == loc.shape[0]
+        ), f"Non-aligned batch-shapes: {norm_distribution.sample().shape[0]} and {loc.shape[0]}"
+        self.n_batch_dims = norm_distribution.n_batch_dims
+        self._batch_shape = loc.shape[:self.n_batch_dims]  # todo: clean up this hack! 
+        norm_batch = RadialDistribution(loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims)
+        self.component_distribution = mixture_weights
+        # self.n_batch_dims = n_batch_dims
+        distribution = torch.distributions.MixtureSameFamily
+        trainable_args = {}
+        static_args = {
+            "mixture_distribution": self.component_distribution,
+            "component_distribution": norm_batch,
+        }
+        super().__init__(distribution, trainable_args, static_args, n_batch_dims=self.n_batch_dims)
+
+    @property
+    def component_distribution(self) -> torch.distributions.Categorical:
+        """Returns the mixture weights."""
+        return self._component_distribution
+
+    @component_distribution.setter
+    def component_distribution(self, mixture_weights: torch.Tensor):
+        """Sets the mixture weights."""
+        if mixture_weights is None:
+            self._component_distribution = torch.distributions.Categorical(
+                torch.ones(self._batch_shape)
+            )
+        else:
+            self._component_distribution = torch.distributions.Categorical(
+                mixture_weights
+            )
