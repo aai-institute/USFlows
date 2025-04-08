@@ -382,6 +382,7 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             *[1 for _ in range(self.n_batch_dims)],
             *tuple(self.event_shape),
         )
+
         u = self.unit_ball_distribution.sample(
             sample_shape + tuple(self.batch_shape)
         ).to(self.device)
