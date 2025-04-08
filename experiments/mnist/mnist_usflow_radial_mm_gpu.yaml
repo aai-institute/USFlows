@@ -65,15 +65,17 @@ experiments:
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
-            __object__: pyro.distributions.RadialMM
+            __object__: src.veriflow.distributions.RadialMM
             loc: 
-              __eval__: torch.normal([10, 16, 7, 7]).to("cuda")
+              __eval__: torch.randn([10, 16, 7, 7]).to("cuda")
             norm_distribution: 
               __object__: src.veriflow.distributions.LogNormal
               loc: 
                 __eval__: torch.zeros([10, 1]).to("cuda")
               scale:
                 __eval__: torch.ones([10, 1]).to("cuda")
+              n_batch_dims: 1
             p: 1.0
-            mixture_weights: None
+            mixture_weights: 
+              __eval__: None
             device: cuda

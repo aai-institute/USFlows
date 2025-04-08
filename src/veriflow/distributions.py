@@ -123,8 +123,10 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         params: Dict[str, torch.tensor] = None,
         other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
+        *args,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.distribution_class = distribution_class
         self.params = ParameterDict(
             {
@@ -346,7 +348,11 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
         device: str = "cpu",
     ):
 
-        super().__init__(event_shape=loc.shape[n_batch_dims:], validate_args=False, batch_shape=loc.shape[:n_batch_dims])
+        super().__init__(
+            event_shape=loc.shape[n_batch_dims:],
+            validate_args=False,
+            batch_shape=loc.shape[:n_batch_dims],
+        )
         if not isinstance(p, float):
             raise ValueError("p must be a float.")
         if p <= 0:
@@ -449,6 +455,8 @@ class RadialMM(DistributionModule):
         mixture_weights: torch.Tensor = None,
         # n_batch_dims: int = 1,
         device: str = "cpu",
+        *args,
+        **kwargs,
     ):
         """Builds a mixture of radial distributions.
 
@@ -463,16 +471,16 @@ class RadialMM(DistributionModule):
             norm_distribution.sample().shape[0] == loc.shape[0]
         ), f"Non-aligned batch-shapes: {norm_distribution.sample().shape[0]} and {loc.shape[0]}"
         self.n_batch_dims = norm_distribution.n_batch_dims
-        self._batch_shape = loc.shape[:self.n_batch_dims]  # todo: clean up this hack! 
-        norm_batch = RadialDistribution(loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims)
+        self._batch_shape = loc.shape[: self.n_batch_dims]  # todo: clean up this hack!
+        norm_batch = RadialDistribution(
+            loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims
+        )
         if mixture_weights is None:
             component_distribution = torch.distributions.Categorical(
                 torch.ones(self._batch_shape)
             )
         else:
-            component_distribution = torch.distributions.Categorical(
-                mixture_weights
-            )
+            component_distribution = torch.distributions.Categorical(mixture_weights)
         # self.n_batch_dims = n_batch_dims
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
@@ -480,6 +488,12 @@ class RadialMM(DistributionModule):
             "mixture_distribution": component_distribution,
             "component_distribution": norm_batch,
         }
-        super().__init__(distribution, trainable_args, static_args, n_batch_dims=self.n_batch_dims)
-
- 
+        super().__init__(
+            distribution,
+            trainable_args,
+            static_args,
+            n_batch_dims=self.n_batch_dims,
+            batch_shape=self._batch_shape,
+            *args,
+            **kwargs,
+        )
