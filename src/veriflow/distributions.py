@@ -479,12 +479,14 @@ class RadialMM(DistributionModule):
             loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims
         )
         dim = math.prod(norm_distribution.batch_shape)
+        
         if mixture_weights is None:
-            component_distribution = torch.distributions.Categorical(
-                probs=torch.ones(norm_distribution.batch_shape)/dim
-            )
+            mixture_weights = torch.ones(norm_distribution.batch_shape)/dim
         else:
-            component_distribution = torch.distributions.Categorical(probs=mixture_weights)
+            assert isinstance(mixture_weights, torch.Tensor), \
+                f"`mixture_weights` must be a tensor. Got {type(mixture_weights)}"
+            
+        component_distribution = torch.distributions.Categorical(probs=mixture_weights)
         # self.n_batch_dims = n_batch_dims
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
