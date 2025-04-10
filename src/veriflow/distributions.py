@@ -119,7 +119,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
 
     def __init__(
         self,
-        distribution_class: torch.distributions.Distribution,  # todo: type hint should be a class on not an instance of a class. Use type[..]
+        distribution_class: type[torch.distributions.Distribution],
         params: Dict[str, torch.tensor] = None,
         other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
@@ -150,7 +150,6 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
         distribution's log_prob method."""
-        # d = self.build()
         return self.distribution.log_prob(x)
 
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
@@ -160,14 +159,10 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
 
-        # d = self.build()
-
         return self.distribution.sample(sample_shape)
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        # d = self.build()
-
         return self.distribution.log_prob(x)
 
     @property
@@ -447,7 +442,7 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
 
         return log_dv
-    
+
 
 class Categorical(torch.distributions.Categorical, torch.nn.Module):
     """Wrapper class for the Categorical distribution."""
@@ -458,7 +453,6 @@ class Categorical(torch.distributions.Categorical, torch.nn.Module):
         self.distribution_class = torch.distributions.Categorical
         params = {"logits": logits}
         other_args = {}
-        
         self.params = ParameterDict(
             {
                 key: torch.nn.Parameter(value, requires_grad=True)
@@ -481,7 +475,6 @@ class Categorical(torch.distributions.Categorical, torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
         distribution's log_prob method."""
-        # d = self.build()
         return self.distribution.log_prob(x)
 
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
@@ -491,14 +484,10 @@ class Categorical(torch.distributions.Categorical, torch.nn.Module):
         else:
             sample_shape = tuple(sample_shape)
 
-        # d = self.build()
-
         return self.distribution.sample(sample_shape)
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        # d = self.build()
-
         return self.distribution.log_prob(x)
 
     @property
@@ -521,7 +510,6 @@ class RadialMM(DistributionModule):
         norm_distribution: torch.distributions.Distribution,
         p: float,
         mixture_weights: torch.Tensor = None,
-        # n_batch_dims: int = 1,
         device: str = "cpu",
         *args,
         **kwargs,
@@ -531,9 +519,8 @@ class RadialMM(DistributionModule):
         Args:
             loc: Location param. of (B,D)
             norm_distribution: Norm distributions of (B,D).
-            p: _description_
-            n_batch_dims: _description_
-            device: _description_. Defaults to "cpu".
+            p: Order of norm.
+            device: Compute deivce.
         """
         assert (
             norm_distribution.sample().shape[0] == loc.shape[0]
@@ -545,18 +532,17 @@ class RadialMM(DistributionModule):
         dim = math.prod(norm_distribution.batch_shape)
 
         if mixture_weights is None:
-                mixture_weights = torch.ones(norm_distribution.batch_shape)
+            mixture_weights = torch.ones(norm_distribution.batch_shape)
         else:
-            assert isinstance(mixture_weights, torch.Tensor), \
-                f"`mixture_weights` must be a tensor. Got {type(mixture_weights)}"
-        
-        # if not mixture_weights.requires_grad:
-        #     mixture_weights = torch.nn.Parameter(mixture_weights, requires_grad=True)
-            
-        # todo: wrap the Categorical and have it hold the params. 
-        # component_distribution = torch.distributions.Categorical(probs=mixture_weights)
-        component_distribution = Categorical(logits=mixture_weights)
-        # self.n_batch_dims = n_batch_dims
+            assert isinstance(
+                mixture_weights, torch.Tensor
+            ), f"`mixture_weights` must be a tensor. Got {type(mixture_weights)}"
+
+        # Move weights to the same device as the distribution
+        mixture_weights = mixture_weights.to(device)
+        component_distribution = Categorical(
+            logits=mixture_weights, n_batch_dims=self.n_batch_dims
+        )
         distribution_class = torch.distributions.MixtureSameFamily
         trainable_args = {}
         static_args = {
@@ -568,11 +554,10 @@ class RadialMM(DistributionModule):
             trainable_args,
             static_args,
             n_batch_dims=self.n_batch_dims,
-            #batch_shape=self._batch_shape,
             *args,
             **kwargs,
         )
-        
+
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.distribution.log_prob(x).squeeze(-1)
