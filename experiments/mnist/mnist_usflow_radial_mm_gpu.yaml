@@ -60,6 +60,7 @@ experiments:
             num_layers: 6
             rescale_hidden: 1
             padding: same
+            normalize_layers: false
           in_dims: [16, 7, 7]
           affine_conjugation: true
           nonlinearity: 
@@ -71,9 +72,9 @@ experiments:
             norm_distribution: 
               __object__: src.veriflow.distributions.LogNormal
               loc: 
-                __eval__: torch.zeros([10, 1]).to("cuda")
+                __eval__: torch.zeros([10, 1, 1, 1]).to("cuda")
               scale:
-                __eval__: torch.ones([10, 1]).to("cuda")
+                __eval__: torch.ones([10, 1, 1, 1]).to("cuda")
               n_batch_dims: 1
             p: 1.0
             mixture_weights: 

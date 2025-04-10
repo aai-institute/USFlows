@@ -447,6 +447,70 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             raise ValueError(f"p={p} not implemented. Use p=1,2, or infinity")
 
         return log_dv
+    
+
+class Categorical(torch.distributions.Categorical, torch.nn.Module):
+    """Wrapper class for the Categorical distribution."""
+
+    def __init__(self, logits: torch.Tensor, n_batch_dims: int = 0, *args, **kwargs):
+        """Initializes the Categorical distribution."""
+        super().__init__(logits=logits, *args, **kwargs)
+        self.distribution_class = torch.distributions.Categorical
+        params = {"logits": logits}
+        other_args = {}
+        
+        self.params = ParameterDict(
+            {
+                key: torch.nn.Parameter(value, requires_grad=True)
+                for key, value in params.items()
+            }
+        )
+        self.other_args = ParameterDict(other_args)
+        self.n_batch_dims = n_batch_dims
+
+    @property
+    def event_shape(self) -> torch.Size:
+        """Returns the shape of the distribution."""
+        return self.distribution.event_shape
+
+    @property
+    def batch_shape(self) -> torch.Size:
+        """Returns the batch shape of the distribution."""
+        return self.distribution.batch_shape
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass for the distribution module. Synonymous to the
+        distribution's log_prob method."""
+        # d = self.build()
+        return self.distribution.log_prob(x)
+
+    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
+        """Samples batch of shape sample_shape from the distribution."""
+        if sample_shape is None:
+            sample_shape = ()
+        else:
+            sample_shape = tuple(sample_shape)
+
+        # d = self.build()
+
+        return self.distribution.sample(sample_shape)
+
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        """Computes the log probability of the points x under the distribution."""
+        # d = self.build()
+
+        return self.distribution.log_prob(x)
+
+    @property
+    def distribution(self) -> torch.distributions.Distribution:
+        """Builds the distribution with the current parameters."""
+        d = self.distribution_class(**self.params, **self.other_args)
+
+        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
+        if nbatch_dims > 0:
+            d = torch.distributions.Independent(d, nbatch_dims)
+
+        return d
 
 
 class RadialMM(DistributionModule):
@@ -479,23 +543,28 @@ class RadialMM(DistributionModule):
             loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims
         )
         dim = math.prod(norm_distribution.batch_shape)
-        
+
         if mixture_weights is None:
-            mixture_weights = torch.ones(norm_distribution.batch_shape)/dim
+                mixture_weights = torch.ones(norm_distribution.batch_shape)
         else:
             assert isinstance(mixture_weights, torch.Tensor), \
                 f"`mixture_weights` must be a tensor. Got {type(mixture_weights)}"
+        
+        # if not mixture_weights.requires_grad:
+        #     mixture_weights = torch.nn.Parameter(mixture_weights, requires_grad=True)
             
-        component_distribution = torch.distributions.Categorical(probs=mixture_weights)
+        # todo: wrap the Categorical and have it hold the params. 
+        # component_distribution = torch.distributions.Categorical(probs=mixture_weights)
+        component_distribution = Categorical(logits=mixture_weights)
         # self.n_batch_dims = n_batch_dims
-        distribution = torch.distributions.MixtureSameFamily
+        distribution_class = torch.distributions.MixtureSameFamily
         trainable_args = {}
         static_args = {
             "mixture_distribution": component_distribution,
             "component_distribution": norm_batch,
         }
         super().__init__(
-            distribution,
+            distribution_class,
             trainable_args,
             static_args,
             n_batch_dims=self.n_batch_dims,
