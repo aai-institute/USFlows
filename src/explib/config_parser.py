@@ -219,7 +219,7 @@ def from_checkpoint(params: str, state_dict: str) -> Any:
     spec = load(open(params, "rb"))["model_cfg"]
     model = spec["type"](**spec["params"])
     
-    state_dict = torch.load(state_dict)
+    state_dict = torch.load(state_dict, map_location = "cpu")
     model.load_state_dict(state_dict)
     
     return model

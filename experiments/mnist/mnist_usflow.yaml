@@ -25,8 +25,9 @@ experiments:
         __object__: src.explib.datasets.MnistSplit
         space_to_depth_factor: 2
         device: cpu
-      epochs: &epochs 3
-      patience: &patience 2
+        digit: 0
+      epochs: &epochs 500
+      patience: &patience 20
       batch_size: &batch_size 
         __eval__: tune.choice([32])
       optim_cfg: &optim 
@@ -54,6 +55,7 @@ experiments:
           conditioner_args:
             c_in: 4
             num_layers: 3
+            rescale_hidden: 1
           in_dims: [4, 14, 14]
           affine_conjugation: true
           nonlinearity: &nonlinearity 
