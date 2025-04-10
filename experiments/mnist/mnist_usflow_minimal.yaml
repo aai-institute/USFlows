@@ -1,0 +1,154 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: mnist_ablation
+experiments:
+  - &exp_laplace0
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: mnist0
+    scheduler:  
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples:  1
+    gpus_per_trial:  0
+    cpus_per_trial:  1
+    tuner_params: 
+      metric: val_loss
+      mode: min
+    device: cuda
+    trial_config:
+      logging:
+        images: false
+        image_shape: [28, 28]
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 0
+      epochs:  100000
+      patience:  2
+      batch_size:  
+        __eval__: tune.choice([32])
+      optim_cfg: 
+        optimizer:
+          __class__: torch.optim.Adam 
+        params:
+          lr: 
+            __eval__: 1e-4
+          weight_decay: 0.0
+      
+      model_cfg: 
+        type:
+          __class__: src.veriflow.flows.USFlow
+        params:
+          soft_training: true
+          training_noise_prior:
+            __object__: pyro.distributions.Uniform
+            low: 
+              __eval__: 1e-20
+            high: 0.01
+          prior_scale: 1.0
+          coupling_blocks: 1
+          lu_transform: 1
+          householder: 1
+          conditioner_cls: 
+            __class__: src.veriflow.networks.CondConvNet2D
+          conditioner_args:
+            c_in: 16
+            c_hidden: 32
+            num_layers: 1
+            padding: same
+            rescale_hidden: 1
+            normalize_layers: false
+          in_dims: [16, 7, 7]
+          affine_conjugation: true
+          nonlinearity: 
+            __eval__: tune.choice([torch.nn.ReLU()])
+          base_distribution: 
+            __object__: src.veriflow.distributions.Laplace
+            loc: 
+              __eval__: torch.zeros([16, 7, 7]).to("cuda")
+            scale: 
+              __eval__: torch.ones([16, 7, 7]).to("cuda")
+  - &exp_laplace1
+    __overwrites__: *exp_laplace0
+    name: mnist1
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 1
+  - &exp_laplace2
+    __overwrites__: *exp_laplace0
+    name: mnist2
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 2
+  - &exp_laplace3
+    __overwrites__: *exp_laplace0
+    name: mnist3
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 3
+  - &exp_laplace4
+    __overwrites__: *exp_laplace0
+    name: mnist4
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 4
+  - &exp_laplace5
+    __overwrites__: *exp_laplace0
+    name: mnist5
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 5
+  - &exp_laplace6
+    __overwrites__: *exp_laplace0
+    name: mnist6
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 6
+  - &exp_laplace7
+    __overwrites__: *exp_laplace0
+    name: mnist7
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 7
+  - &exp_laplace8
+    __overwrites__: *exp_laplace0
+    name: mnist8
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 8
+  - &exp_laplace9
+    __overwrites__: *exp_laplace0
+    name: mnist9
+    trial_config:
+      dataset: 
+        __object__: src.explib.datasets.MnistSplit
+        space_to_depth_factor: 4
+        device: cuda 
+        digit: 9
