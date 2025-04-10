@@ -110,6 +110,7 @@ class ConvNet2D(nn.Module):
         stride:int = 1, 
         dilation: int = 1,
         padding: int  = 0,
+        normalize_layers: bool = True,
     ):
         """
         Module that summarizes the previous blocks to a full convolutional
@@ -148,8 +149,11 @@ class ConvNet2D(nn.Module):
                 GatedConv(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
                 # nn.Conv2d(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding),
                 nonlinearity,
-                LayerNormChannels(c_hidden),
             ]
+            if normalize_layers:
+                layers += [
+                    LayerNormChannels(c_hidden),
+                ]
 
         # compute padding and output padding for rescaling via transposed convolutions
         if rescale_hidden != 1:
