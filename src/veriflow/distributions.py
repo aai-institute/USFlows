@@ -119,7 +119,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
 
     def __init__(
         self,
-        distribution_class: torch.distributions.Distribution,  # todo: type hint should be a class on not an instance of a class. Use type[..]
+        distribution_class: type[torch.distributions.Distribution],
         params: Dict[str, torch.tensor] = None,
         other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
@@ -150,7 +150,6 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the distribution module. Synonymous to the
         distribution's log_prob method."""
-        # d = self.build()
         return self.distribution.log_prob(x)
 
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
@@ -160,14 +159,10 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         else:
             sample_shape = tuple(sample_shape)
 
-        # d = self.build()
-
         return self.distribution.sample(sample_shape)
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
-        # d = self.build()
-
         return self.distribution.log_prob(x)
 
     @property
