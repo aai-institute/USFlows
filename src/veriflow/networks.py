@@ -304,8 +304,17 @@ class CondConvNet2D(ConvNet2D):
         """
         size_in = x.shape
         # Make sure to create a new obj. to avoid inplace operations.
-        if context is not None:
+        if context is None:
             context = torch.Tensor([0]).to(x.device)
+        else:
+            if not isinstance(context, torch.Tensor):
+                context = torch.tensor(context).to(x.device)
+            n_context_dims = len(context.shape)
+            n_input_dims = len(x.shape)
+            n_dims = n_input_dims - n_context_dims
+            if n_dims > 0:
+                shape = tuple(context.shape) + (1,) * n_dims
+                context = context.reshape(*shape)
 
         height, width = x.shape[-2:]
         # Expand the context to the size of the input image.
