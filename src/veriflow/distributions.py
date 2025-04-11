@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Dict, Iterable, Union
 from src.veriflow.transforms import Rotation, CompositeRotation
 from src.veriflow.linalg import random_orthonormal_matrix
@@ -134,7 +135,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
                 for key, value in params.items()
             }
         )
-        self.other_args = ParameterDict(other_args)
+        self.other_args = torch.nn.ModuleDict(other_args)  # todo: should be a module dict. 
         self.n_batch_dims = n_batch_dims
 
     @property
@@ -459,8 +460,23 @@ class Categorical(torch.distributions.Categorical, torch.nn.Module):
                 for key, value in params.items()
             }
         )
-        self.other_args = ParameterDict(other_args)
+        self.other_args = torch.nn.ModuleDict(other_args)
         self.n_batch_dims = n_batch_dims
+
+    @property
+    def logits(self) -> torch.Tensor:
+        """Returns the logits of the distribution."""
+        try: 
+            ret = self.params.logits
+        except AttributeError:
+            ret = self._logits
+        return ret
+    
+    @logits.setter
+    def logits(self, value: torch.Tensor):
+        """Sets the logits of the distribution."""
+        print("Setting logits") 
+        self._logits = value
 
     @property
     def event_shape(self) -> torch.Size:
@@ -489,15 +505,15 @@ class Categorical(torch.distributions.Categorical, torch.nn.Module):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.distribution.log_prob(x)
-
+    
     @property
     def distribution(self) -> torch.distributions.Distribution:
         """Builds the distribution with the current parameters."""
         d = self.distribution_class(**self.params, **self.other_args)
 
-        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
-        if nbatch_dims > 0:
-            d = torch.distributions.Independent(d, nbatch_dims)
+        n_batch_dims = len(d.batch_shape) - self.n_batch_dims
+        if n_batch_dims > 0:
+            d = torch.distributions.Independent(d, n_batch_dims)
 
         return d
 
@@ -540,13 +556,13 @@ class RadialMM(DistributionModule):
 
         # Move weights to the same device as the distribution
         mixture_weights = mixture_weights.to(device)
-        component_distribution = Categorical(
+        mixture_distribution = Categorical(
             logits=mixture_weights, n_batch_dims=self.n_batch_dims
         )
         distribution_class = torch.distributions.MixtureSameFamily
         trainable_args = {}
         static_args = {
-            "mixture_distribution": component_distribution,
+            "mixture_distribution": mixture_distribution,
             "component_distribution": norm_batch,
         }
         super().__init__(
