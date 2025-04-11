@@ -228,22 +228,6 @@ class GMM(DistributionModule):
         super().__init__(distribution, trainable_args, static_args)
 
 
-class LMM(DistributionModule):
-    """Wrapper class for the Laplace Mixture Model (LMM) distribution."""
-
-    def __init__(
-        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
-    ):
-        """Initializes the LMM distribution."""
-        laplace_batch = Laplace(loc, scale, n_batch_dims=1)
-        mixture_distribution = torch.distributions.Categorical(mixture_weights)
-        distribution = torch.distributions.MixtureSameFamily
-        trainable_args = {}
-        static_args = {
-            "mixture_distribution": mixture_distribution,
-            "component_distribution": laplace_batch,
-        }
-        super().__init__(distribution, trainable_args, static_args)
 
 
 class UniformUnitLpBall(torch.distributions.Distribution):
@@ -561,3 +545,20 @@ class RadialMM(DistributionModule):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         return self.distribution.log_prob(x).squeeze(-1)
+
+class LMM(DistributionModule):
+    """Wrapper class for the Laplace Mixture Model (LMM) distribution."""
+
+    def __init__(
+        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
+    ):
+        """Initializes the LMM distribution."""
+        laplace_batch = Laplace(loc, scale, n_batch_dims=1)
+        mixture_distribution = Categorical(mixture_weights)
+        distribution = torch.distributions.MixtureSameFamily
+        trainable_args = {}
+        static_args = {
+            "mixture_distribution": mixture_distribution,
+            "component_distribution": laplace_batch,
+        }
+        super().__init__(distribution, trainable_args, static_args)

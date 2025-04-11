@@ -1,3 +1,4 @@
+from time import sleep
 import torch
 
 from math import ceil
@@ -134,6 +135,7 @@ class ConvNet2D(nn.Module):
         dilation: int = 1,
         padding: int = 0,
         normalize_layers: bool = True,
+        gating: bool = True,
     ):
         """
         Module that summarizes the previous blocks to a full convolutional
@@ -175,18 +177,31 @@ class ConvNet2D(nn.Module):
             layers += [nn.MaxPool2d(rescale_hidden)]
 
         for layer_index in range(num_layers):
-            layers += [
-                GatedConv(
-                    c_hidden,
-                    c_hidden,
-                    kernel_size=kernel_size,
-                    padding=padding,
-                    stride=stride,
-                    dilation=dilation,
-                ),
-                # nn.Conv2d(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding),
-                nonlinearity,
-            ]
+            if gating:
+                layers += [
+                    GatedConv(
+                        c_hidden,
+                        c_hidden,
+                        kernel_size=kernel_size,
+                        padding=padding,
+                        stride=stride,
+                        dilation=dilation,
+                    ),
+                    # nn.Conv2d(c_hidden, c_hidden, kernel_size=kernel_size, padding=padding),
+                    nonlinearity,
+                ]
+            else:
+                layers += [
+                    nn.Conv2d(
+                        c_hidden,
+                        c_hidden,
+                        kernel_size=kernel_size,
+                        padding=padding,
+                        stride=stride,
+                        dilation=dilation,
+                    ),
+                    nonlinearity,
+                ]
             if normalize_layers:
                 layers += [
                     LayerNormChannels(c_hidden),
@@ -303,6 +318,8 @@ class CondConvNet2D(ConvNet2D):
             Network output.
         """
         size_in = x.shape
+        print(size_in)
+        sleep(1)
         # Make sure to create a new obj. to avoid inplace operations.
         if context is None:
             context = torch.Tensor([0]).to(x.device)
@@ -324,7 +341,8 @@ class CondConvNet2D(ConvNet2D):
 
         size_target = torch.Size([size_in[0], size_in[1] + 1, size_in[2], size_in[3]])
         assert x.shape == size_target, f"Shape mismatch: {x.shape} != {size_target}"
-
+        print(x.shape)
+        sleep(1)
         return self.nn(x)
 
 
