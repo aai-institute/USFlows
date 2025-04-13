@@ -58,9 +58,10 @@ experiments:
             c_in: 16
             c_hidden: 32
             num_layers: 1
-            padding: same
+            padding: 1
             rescale_hidden: 1
             normalize_layers: false
+            gating: false
           in_dims: [16, 7, 7]
           affine_conjugation: true
           nonlinearity: 
