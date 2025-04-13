@@ -10,9 +10,9 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  100
+    num_hyperopt_samples:  50
     gpus_per_trial:  1
-    cpus_per_trial:  4
+    cpus_per_trial:  1
     tuner_params: 
       metric: val_loss
       mode: min
