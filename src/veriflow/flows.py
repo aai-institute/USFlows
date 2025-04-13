@@ -54,6 +54,7 @@ class Flow(torch.nn.Module):
         layers,
         soft_training: bool = False,
         training_noise_prior=None,
+        device: str = "cpu",
         *args,
         **kwargs,
     ) -> None:
@@ -69,6 +70,8 @@ class Flow(torch.nn.Module):
             [l for l in layers if isinstance(l, torch.nn.Module)]
         )
         self.base_distribution = base_distribution
+        self.to(device)
+        self.device = device
 
         # Redeclare all batch dimensions to event dimensions
         # This is a sanitary measure to avoid pyro from creating a batch of transforms
