@@ -318,8 +318,6 @@ class CondConvNet2D(ConvNet2D):
             Network output.
         """
         size_in = x.shape
-        print(size_in)
-        sleep(1)
         # Make sure to create a new obj. to avoid inplace operations.
         if context is None:
             context = torch.Tensor([0]).to(x.device)
@@ -341,8 +339,6 @@ class CondConvNet2D(ConvNet2D):
 
         size_target = torch.Size([size_in[0], size_in[1] + 1, size_in[2], size_in[3]])
         assert x.shape == size_target, f"Shape mismatch: {x.shape} != {size_target}"
-        print(x.shape)
-        sleep(1)
         return self.nn(x)
 
 
