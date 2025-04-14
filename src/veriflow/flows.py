@@ -279,6 +279,7 @@ class USFlow(Flow):
     The flow is trained in a maximum posterior fashion by adding a log-normal
     prior on the diagonal elements of the LU weight matrices.
     """
+    MASKTYPE = Literal["checkerboard", "channel"]
 
     def __init__(
         self, 
@@ -294,6 +295,7 @@ class USFlow(Flow):
         nonlinearity: Optional[torch.nn.Module] = None,
         lu_transform: int = 1,
         householder: int = 1,
+        masktype: MASKTYPE = "checkerboard",
         *args, 
         **kwargs
     ):
@@ -307,6 +309,14 @@ class USFlow(Flow):
         self.conditioner_args = conditioner_args
         self.prior_scale = prior_scale
         #self.nonlinearity = nonlinearity
+        if masktype == "checkerboard" :
+            self.mask_Generator = USFlow.create_checkerboard_mask 
+        elif masktype == "channel":
+            self.mask_Generator = USFlow.create_channel_mask
+        else:
+            raise ValueError(f"Unknown mask type {masktype}")
+        
+        
         if lu_transform < 0:
             raise ValueError("Number of LU transforms must be non-negative")
         self.lu_transform = lu_transform
@@ -343,14 +353,14 @@ class USFlow(Flow):
                 )
                 layers.append(block_affine_layer)
             
-            # Coupling layer: Alternate between channel and checkerboard mask
+            mask = self.mask_Generator(in_dims)
             coupling_layer = MaskedCoupling(
-                USFlow.create_checkerboard_mask(in_dims),
+                mask,
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
             coupling_layer = MaskedCoupling(
-                1 - USFlow.create_checkerboard_mask(in_dims),
+                1 - mask,
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
