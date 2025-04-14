@@ -67,11 +67,18 @@ experiments:
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
-            __object__: src.veriflow.distributions.Laplace
+            __object__: src.veriflow.distributions.RadialDistribution       
+            device: cuda
+            p: 1.0
             loc: 
               __eval__: torch.zeros([16, 7, 7]).to("cuda")
-            scale: 
-              __eval__: torch.ones([16, 7, 7]).to("cuda")
+            norm_distribution:
+              __object__: src.veriflow.distributions.LogNormal
+              loc: 
+                __eval__: torch.ones([1]).to("cuda") * 4.5
+              scale:
+                __eval__: torch.ones([1]).to("cuda") * .35 
+  
   - &exp_laplace1
     __overwrites__: *exp_laplace0
     name: mnist1

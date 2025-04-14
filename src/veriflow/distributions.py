@@ -51,7 +51,7 @@ class Chi(Distribution):
     support = constraints.positive
     has_enumerate_support = False
 
-    def __init__(self, df, validate_args=None):
+    def __init__(self, df: int, validate_args=None):
         """
         Initialize the Chi distribution with degrees of freedom `df`.
         Args:
@@ -130,7 +130,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         self.distribution_class = distribution_class
         self.params = ParameterDict(
             {
-                key: torch.nn.Parameter(value, requires_grad=True)
+                key: torch.nn.Parameter(value, requires_grad=True) if not isinstance(value, torch.nn.Parameter) else value
                 for key, value in params.items()
             }
         )
@@ -176,6 +176,18 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
 
         return d
 
+class Gamma(DistributionModule):
+    """Wrapper class for the Gamma distribution."""
+
+    def __init__(self, concentration: torch.Tensor, rate: torch.Tensor, *args, **kwargs):
+        """Initializes the Gamma distribution."""
+        distribution = torch.distributions.Gamma
+        trainable_args = {
+            "concentration": concentration,
+            "rate": rate
+        }
+        other_args = {}
+        super().__init__(distribution, trainable_args, other_args, *args, **kwargs)
 
 class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
@@ -560,5 +572,22 @@ class LMM(DistributionModule):
         static_args = {
             "mixture_distribution": mixture_distribution,
             "component_distribution": laplace_batch,
+        }
+        super().__init__(distribution, trainable_args, static_args)
+
+class GammaMM(DistributionModule):
+    """Wrapper class for the Gamma Mixture Model (GMM) distribution."""
+
+    def __init__(
+        self, concentration: torch.Tensor, rate: torch.Tensor, mixture_weights: torch.Tensor
+    ):
+        """Initializes the GMM distribution."""
+        gamma_batch = Gamma(concentration, rate, n_batch_dims=1)
+        mixture_distribution = Categorical(mixture_weights)
+        distribution = torch.distributions.MixtureSameFamily
+        trainable_args = {}
+        static_args = {
+            "mixture_distribution": mixture_distribution,
+            "component_distribution": gamma_batch,
         }
         super().__init__(distribution, trainable_args, static_args)
