@@ -49,7 +49,7 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 1
+          coupling_blocks: 3
           lu_transform: 1
           householder: 1
           conditioner_cls: 
