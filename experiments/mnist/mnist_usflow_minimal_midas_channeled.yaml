@@ -49,7 +49,8 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: tune.choice([3,4])
+          coupling_blocks:
+            __eval__: tune.choice([3,4])
           lu_transform: 1
           householder: 1
           conditioner_cls: 
