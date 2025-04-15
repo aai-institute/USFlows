@@ -20,7 +20,7 @@ experiments:
     trial_config:
       logging:
         images: false
-        image_shape: [16, 7, 7]
+        image_shape: [28, 28]
       dataset: 
         __object__: src.explib.datasets.MnistSplit
         space_to_depth_factor: 4
