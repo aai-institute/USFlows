@@ -23,10 +23,12 @@ experiments:
       logging:
         images: false
         image_shape: [28, 28]
-      dataset: 
-        __object__: src.explib.datasets.MnistSplit
-        space_to_depth_factor: 4
-        device: cpu 
+      dataset:
+        type:
+          __class__: src.explib.datasets.MnistSplit
+        params:
+          space_to_depth_factor: 4
+          device: cpu 
       batch_size:  
         __eval__: tune.choice([32])
       optim_cfg: 
@@ -47,7 +49,7 @@ experiments:
             low: 
               __eval__: 1e-20
             high: 0.01
-          prior_scale: 1.0
+          prior_scale: 5.0
           coupling_blocks: 2
           lu_transform: 1
           householder: 0
