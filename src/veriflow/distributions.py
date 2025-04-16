@@ -121,6 +121,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         self,
         distribution_class: type[torch.distributions.Distribution],
         params: Dict[str, torch.tensor] = None,
+        module_args: Dict[str, any] = None,
         other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
         *args,
@@ -134,7 +135,8 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
                 for key, value in params.items()
             }
         )
-        self.other_args = ParameterDict(other_args)
+        self.module_args = torch.nn.ModuleDict(module_args) 
+        self.other_args = other_args if other_args is not None else {}
         self.n_batch_dims = n_batch_dims
 
     @property
@@ -168,7 +170,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     @property
     def distribution(self) -> torch.distributions.Distribution:
         """Builds the distribution with the current parameters."""
-        d = self.distribution_class(**self.params, **self.other_args)
+        d = self.distribution_class(**self.params, **self.module_args, **self.other_args)
 
         nbatch_dims = len(d.batch_shape) - self.n_batch_dims
         if nbatch_dims > 0:
@@ -183,11 +185,33 @@ class Gamma(DistributionModule):
         """Initializes the Gamma distribution."""
         distribution = torch.distributions.Gamma
         trainable_args = {
-            "concentration": concentration,
-            "rate": rate
+            "concentration": concentration
         }
-        other_args = {}
-        super().__init__(distribution, trainable_args, other_args, *args, **kwargs)
+        module_args = {}
+        super().__init__(distribution, trainable_args, module_args, *args, **kwargs)
+        self._rate_unconstrained = torch.nn.Parameter(rate, requires_grad=True)
+    
+    @property    
+    def rate(self) -> torch.Tensor:
+        """Returns the rate parameter of the distribution."""
+        return torch.nn.functional.softplus(self._rate_unconstrained)
+    
+    @property
+    def distribution(self) -> torch.distributions.Distribution:
+        """Builds the distribution with the current parameters."""
+        d = self.distribution_class(
+            **self.params,
+            **self.module_args,
+            **self.other_args, 
+            rate = self.rate
+        )
+
+        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
+        if nbatch_dims > 0:
+            d = torch.distributions.Independent(d, nbatch_dims)
+
+        return d
+     
 
 class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
