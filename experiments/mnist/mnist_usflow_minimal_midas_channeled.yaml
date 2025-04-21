@@ -29,7 +29,7 @@ experiments:
       epochs:  100000
       patience:  29
       batch_size:  
-        __eval__: tune.choice([32])
+        __eval__: tune.choice([32, 64, 128])
       optim_cfg: 
         optimizer:
           __class__: torch.optim.Adam 
