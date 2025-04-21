@@ -10,7 +10,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  1
+    num_hyperopt_samples:  3
     gpus_per_trial:  2
     cpus_per_trial:  0
     tuner_params: 
@@ -50,7 +50,7 @@ experiments:
             high: 0.01
           prior_scale: 1.0
           coupling_blocks: &coupling_blocks
-            __eval__: tune.choice([4,5])
+            __eval__: tune.choice([3])
           lu_transform: 1
           householder: 1
           conditioner_cls: 
