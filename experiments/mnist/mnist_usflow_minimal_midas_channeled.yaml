@@ -10,7 +10,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  4
+    num_hyperopt_samples:  1
     gpus_per_trial:  2
     cpus_per_trial:  0
     tuner_params: 
@@ -29,7 +29,7 @@ experiments:
       epochs:  100000
       patience:  29
       batch_size:  
-        __eval__: tune.choice([1024])
+        __eval__: tune.choice([32])
       optim_cfg: 
         optimizer:
           __class__: torch.optim.Adam 
