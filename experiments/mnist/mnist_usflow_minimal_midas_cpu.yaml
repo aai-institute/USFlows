@@ -70,8 +70,7 @@ experiments:
           base_distribution: 
             __object__: src.veriflow.distributions.RadialDistribution
             device: cpu
-            p:
-              __eval__: math.inf
+            p: 1
             loc:
               __eval__: torch.zeros([16, 7, 7]).to("cpu")
             norm_distribution:
