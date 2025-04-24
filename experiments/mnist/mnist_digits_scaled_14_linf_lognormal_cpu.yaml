@@ -50,7 +50,7 @@ experiments:
                 __eval__: 0.001 * torch.ones(1).to("cpu") #0.01
           prior_scale: 5.0
           coupling_layers: &coupling_layers
-            __eval__: tune.choice([3])
+            __eval__: tune.choice([2])
           coupling_nn_layers: &coupling_nn_layers
             __eval__: "tune.choice([[100]])"
           nonlinearity: &nonlinearity
