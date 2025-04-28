@@ -51,7 +51,7 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 5.0
-          coupling_blocks: 1
+          coupling_blocks: 6
           lu_transform: 1
           householder: 0
           conditioner_cls: 
@@ -72,16 +72,21 @@ experiments:
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
-            __object__: src.veriflow.distributions.RadialMM      
-            device: cpu
-            p: 1.0
-            loc: 
-              __eval__: torch.randn([20, 16, 7, 7]).to("cpu") * .01
-            norm_distribution:
-              __object__: src.veriflow.distributions.LogNormal
+            class:
+              __class__: src.veriflow.distributions.RadialMM
+            params:      
+              device: cpu
+              p: 1.0
               loc: 
-                __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * 3
-              scale:
-                __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * .5
-            mixture_weights:
-              __eval__: torch.ones([20]).to("cpu") 
+                __eval__: torch.randn([20, 16, 7, 7]).to("cpu") 
+              norm_distribution:
+                class:
+                  __class__: src.veriflow.distributions.LogNormal
+                params:
+                  loc: 
+                    __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * 3
+                  scale:
+                    __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * .5
+                  n_batch_dims: 1
+              mixture_weights:
+                __eval__: torch.ones([20]).to("cpu") 
