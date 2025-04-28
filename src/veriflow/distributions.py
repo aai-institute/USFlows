@@ -136,7 +136,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
             module_args = {}
         self.params = ParameterDict(
             {
-                key: torch.nn.Parameter(value, requires_grad=True) if not isinstance(value, torch.nn.Parameter) else value
+                key: torch.nn.Parameter(value) if not isinstance(value, torch.nn.Parameter) else value
                 for key, value in params.items()
             }
         )
@@ -195,7 +195,7 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         self.generated_args[name] = generator
         
 
-class Gamma(torch.nn.Module, torch.distributions.Gamma):
+class Gamma(DistributionModule):
     """Wrapper class for the Gamma distribution."""
 
     def __init__(
@@ -207,7 +207,11 @@ class Gamma(torch.nn.Module, torch.distributions.Gamma):
         **kwargs
     ):
         """Initializes the Gamma distribution."""
-        torch.nn.Module.__init__(self)
+        super().__init__(
+            torch.distributions.Gamma,
+            *args,
+            **kwargs
+        )
         self._concentration_unconstrained = torch.nn.Parameter(
             inv_softplus(concentration),
             requires_grad=True
@@ -216,16 +220,17 @@ class Gamma(torch.nn.Module, torch.distributions.Gamma):
             inv_softplus(rate),
             requires_grad=True
         )
-        torch.distributions.Gamma.__init__(
-            self,
-            concentration=softplus(self._concentration_unconstrained),
-            rate=softplus(self._rate_unconstrained),
-            *args,
-            **kwargs
+        self.register_generated_arg(
+            "concentration",
+            lambda: softplus(self._concentration_unconstrained)
+        )
+        self.register_generated_arg(
+            "rate",
+            lambda: softplus(self._rate_unconstrained)
         )
         self.to(device)
 
-class LogNormal(torch.nn.Module, torch.distributions.LogNormal):
+class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
 
     def __init__(
@@ -237,22 +242,28 @@ class LogNormal(torch.nn.Module, torch.distributions.LogNormal):
         **kwargs
     ):
         """Initializes the LogNormal distribution."""
-        torch.nn.Module.__init__(self)
-        self._loc = torch.nn.Parameter(loc, requires_grad=True)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale), requires_grad=True
-        )
-        torch.distributions.LogNormal.__init__(
-            self,
-            loc=self._loc,
-            scale=softplus(self._scale_unconstrained),
+        super().__init__(
+            torch.distributions.LogNormal,
             *args,
             **kwargs
         )
+        self._loc = torch.nn.Parameter(loc)
+        self._scale_unconstrained = torch.nn.Parameter(
+            inv_softplus(scale)
+        )
+        self.register_generated_arg(
+            "scale",
+            lambda: softplus(self._scale_unconstrained)
+        )
+        self.register_generated_arg(
+            "loc",
+            lambda: self._loc
+        )
+        
         self.to(device)
 
 
-class Laplace(torch.nn.Module, torch.distributions.Laplace):
+class Laplace(DistributionModule):
     """Wrapper class for the Laplace distribution."""
 
     def __init__(
@@ -264,57 +275,74 @@ class Laplace(torch.nn.Module, torch.distributions.Laplace):
         **kwargs
     ):
         """Initializes the Laplace distribution."""
-        torch.nn.Module.__init__(self)
-        self._loc = torch.nn.Parameter(loc, requires_grad=True)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale), requires_grad=True
-        )
-        torch.distributions.Laplace.__init__(
-            self,
-            loc=self._loc,
-            scale=softplus(self._scale_unconstrained),
+        super().__init__(
+            torch.distributions.Laplace,
             *args,
             **kwargs
         )
+        self._loc = torch.nn.Parameter(loc)
+        self._scale_unconstrained = torch.nn.Parameter(
+            inv_softplus(scale)
+        )
+        self.register_generated_arg(
+            "scale",
+            lambda: softplus(self._scale_unconstrained)
+        )
+        self.register_generated_arg(
+            "loc",
+            lambda: self._loc
+        )
+        
         self.to(device)
         
 
 
-class Normal(torch.nn.Module, torch.distributions.Normal):
+class Normal(DistributionModule):
     """Wrapper class for the Normal distribution."""
 
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
         """Initializes the Normal distribution."""
-        torch.nn.Module.__init__(self)
-        self._loc = torch.nn.Parameter(loc, requires_grad=True)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale), requires_grad=True
-        )
-        torch.distributions.Normal.__init__(
-            self,
-            loc=self._loc,
-            scale=softplus(self._scale_unconstrained),
+        super().__init__(
+            torch.distributions.Normal,
             *args,
             **kwargs
         )
-class GMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
+        self._loc = torch.nn.Parameter(loc)
+        self._scale_unconstrained = torch.nn.Parameter(
+            inv_softplus(scale)
+        )
+        self.register_generated_arg(
+            "scale",
+            lambda: softplus(self._scale_unconstrained)
+        )
+        self.register_generated_arg(
+            "loc",
+            lambda: self._loc
+        )
+        self.to(self.device)
+class GMM(DistributionModule):
     """Wrapper class for the Gaussian Mixture Model (GMM) distribution."""
 
     def __init__(
         self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
     ):
         """Initializes the GMM distribution."""
-        torch.nn.Module.__init__(self)
+        super().__init__(
+            torch.distributions.MixtureSameFamily,
+            *args,
+            **kwargs
+        )
         self.normal_batch = Normal(loc, scale, n_batch_dims=1)
         self.mixture_distribution = Categorical(mixture_weights)
-        torch.distributions.MixtureSameFamily.__init__(
-            self,
-            mixture_distribution=self.mixture_distribution,
-            component_distribution=self.normal_batch,
-            batch_shape=self.mixture_distribution.batch_shape,
-            event_shape=self.normal_batch.event_shape,
-            validate_args=False,
+        self.register_generated_arg(
+            "mixture_distribution",
+            lambda: self.mixture_distribution
         )
+        self.register_generated_arg(
+            "component_distribution",
+            lambda: self.normal_batch
+        )
+        self.to(self.device)
         
 
 
@@ -428,7 +456,7 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
             raise ValueError("p must be positive.")
 
         self.device = device
-        self.loc = torch.nn.Parameter(loc.to(device), requires_grad=True)
+        self.loc = torch.nn.Parameter(loc.to(device))
         self.norm_distribution = norm_distribution
         self.p = p
         self.n_batch_dims = n_batch_dims
@@ -519,7 +547,7 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
         return log_dv
 
 
-class Categorical(torch.nn.Module, torch.distributions.Categorical):
+class Categorical(DistributionModule, torch.distributions.Categorical):
     """Wrapper class for the Categorical distribution."""
 
     def __init__(
@@ -530,14 +558,36 @@ class Categorical(torch.nn.Module, torch.distributions.Categorical):
         **kwargs
     ):
         """Initializes the Categorical distribution."""
-        torch.nn.Module.__init__(self)
-        self._logits = torch.nn.Parameter(logits, requires_grad=True)
+        DistributionModule.__init__(self, torch.distributions.Categorical, *args, **kwargs)
         torch.distributions.Categorical.__init__(
-            self, logits=self._logits, *args, **kwargs
+            self,
+            logits=logits,
+            validate_args=False,
+            *args,
+            **kwargs
         )
+        self._logits = torch.nn.Parameter(logits)
+        self.register_generated_arg(
+            "logits",
+            lambda: self.logits
+        )
+        
         self.to(device)
+        
+    @property
+    def logits(self) -> torch.Tensor:
+        """Returns the logits of the distribution."""
+        return self._logits
+    @logits.setter
+    def logits(self, value: torch.Tensor) -> None:
+        self._logits = torch.nn.Parameter(value)
+    
+    @property
+    def probs(self) -> torch.Tensor:
+        """Returns the probabilities of the distribution."""
+        return torch.nn.functional.softmax(self._logits, dim=-1)
 
-class RadialMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
+class RadialMM(DistributionModule):
 
     def __init__(
         self,
@@ -559,7 +609,11 @@ class RadialMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
             device: Compute deivce.
         """
         
-        torch.nn.Module.__init__(self, *args, **kwargs)
+        super().__init__(
+            torch.distributions.MixtureSameFamily,
+            *args,
+            **kwargs
+        )
         self.radial_batch = RadialDistribution(
             loc, 
             norm_distribution, 
@@ -581,14 +635,15 @@ class RadialMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
             logits=mixture_weights
         )
         
-        torch.distributions.MixtureSameFamily.__init__(
-            self,
-            mixture_distribution=self.mixture_distribution,
-            component_distribution=self.radial_batch,
-            validate_args=False,
-            *args,
-            **kwargs,
+        self.register_generated_arg(
+            "mixture_distribution",
+            lambda: self.mixture_distribution
         )
+        self.register_generated_arg(
+            "component_distribution",
+            lambda: self.radial_batch
+        )
+
         self.to(device)
 
    
