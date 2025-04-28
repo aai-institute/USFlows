@@ -128,6 +128,10 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     ):
         super().__init__(*args, **kwargs)
         self.distribution_class = distribution_class
+        if params is None:
+            params = {}
+        if module_args is None:
+            module_args = {}
         self.params = ParameterDict(
             {
                 key: torch.nn.Parameter(value, requires_grad=True) if not isinstance(value, torch.nn.Parameter) else value
@@ -489,63 +493,16 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
         return log_dv
 
 
-class Categorical(torch.distributions.Categorical, torch.nn.Module):
+class Categorical(torch.nn.Module, torch.distributions.Categorical):
     """Wrapper class for the Categorical distribution."""
 
     def __init__(self, logits: torch.Tensor, n_batch_dims: int = 0, *args, **kwargs):
         """Initializes the Categorical distribution."""
-        super().__init__(logits=logits, *args, **kwargs)
-        self.distribution_class = torch.distributions.Categorical
-        params = {"logits": logits}
-        other_args = {}
-        self.params = ParameterDict(
-            {
-                key: torch.nn.Parameter(value, requires_grad=True)
-                for key, value in params.items()
-            }
+        torch.nn.Module.__init__(self)
+        self._logits = torch.nn.Parameter(logits, requires_grad=True)
+        torch.distributions.Categorical.__init__(
+            self, logits=self._logits, *args, **kwargs
         )
-        self.other_args = ParameterDict(other_args)
-        self.n_batch_dims = n_batch_dims
-
-    @property
-    def event_shape(self) -> torch.Size:
-        """Returns the shape of the distribution."""
-        return self.distribution.event_shape
-
-    @property
-    def batch_shape(self) -> torch.Size:
-        """Returns the batch shape of the distribution."""
-        return self.distribution.batch_shape
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the distribution module. Synonymous to the
-        distribution's log_prob method."""
-        return self.distribution.log_prob(x)
-
-    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
-        """Samples batch of shape sample_shape from the distribution."""
-        if sample_shape is None:
-            sample_shape = ()
-        else:
-            sample_shape = tuple(sample_shape)
-
-        return self.distribution.sample(sample_shape)
-
-    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
-        """Computes the log probability of the points x under the distribution."""
-        return self.distribution.log_prob(x)
-
-    @property
-    def distribution(self) -> torch.distributions.Distribution:
-        """Builds the distribution with the current parameters."""
-        d = self.distribution_class(**self.params, **self.other_args)
-
-        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
-        if nbatch_dims > 0:
-            d = torch.distributions.Independent(d, nbatch_dims)
-
-        return d
-
 
 class RadialMM(DistributionModule):
 
