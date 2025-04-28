@@ -283,7 +283,7 @@ class USFlow(Flow):
 
     def __init__(
         self, 
-        base_distribution,
+        base_distribution: dist.Distribution,
         in_dims: List[int], 
         coupling_blocks: int,
         conditioner_cls: Type[torch.nn.Module],

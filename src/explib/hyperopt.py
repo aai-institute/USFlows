@@ -20,10 +20,11 @@ from ray import tune
 from ray.air import RunConfig, session
 
 from src.explib.base import Experiment
-from src.explib.config_parser import from_checkpoint
+from src.explib.config_parser import from_checkpoint, create_objects_from_classes
 from src.veriflow.flows import NiceFlow
 from src.veriflow.networks import AdditiveAffineNN
 from src.veriflow.transforms import ScaleTransform
+
 
 
 
@@ -78,6 +79,7 @@ class HyperoptExperiment(Experiment):
         Returns:
             Dict[str, float]: trial performance metrics
         """
+        config = create_objects_from_classes(config)
         writer = SummaryWriter()
         # warnings.simplefilter("error")
         torch.autograd.set_detect_anomaly(True)
