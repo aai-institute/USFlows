@@ -122,7 +122,6 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
         distribution_class: type[torch.distributions.Distribution],
         params: Dict[str, torch.tensor] = None,
         module_args: Dict[str, any] = None,
-        other_args: Dict[str, any] = None,
         n_batch_dims: int = 0,
         *args,
         **kwargs,
@@ -136,8 +135,8 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
             }
         )
         self.module_args = torch.nn.ModuleDict(module_args) 
-        self.other_args = other_args if other_args is not None else {}
         self.n_batch_dims = n_batch_dims
+        self.generated_args = dict()
 
     @property
     def event_shape(self) -> torch.Size:
@@ -170,13 +169,25 @@ class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
     @property
     def distribution(self) -> torch.distributions.Distribution:
         """Builds the distribution with the current parameters."""
-        d = self.distribution_class(**self.params, **self.module_args, **self.other_args)
+        generator_args = {
+            key: generator() for key, generator in self.generated_args.items()
+        }
+        d = self.distribution_class(
+            **self.params,
+            **self.module_args,
+            **generator_args
+        )
 
         nbatch_dims = len(d.batch_shape) - self.n_batch_dims
         if nbatch_dims > 0:
             d = torch.distributions.Independent(d, nbatch_dims)
 
         return d
+    
+    def register_generated_arg(self, name: str, generator: callable) -> None:
+        """Register a parameter to the module."""
+        self.generated_args[name] = generator
+        
 
 class Gamma(DistributionModule):
     """Wrapper class for the Gamma distribution."""
@@ -188,30 +199,21 @@ class Gamma(DistributionModule):
             "concentration": concentration
         }
         module_args = {}
-        super().__init__(distribution, trainable_args, module_args, *args, **kwargs)
-        self._rate_unconstrained = torch.nn.Parameter(rate, requires_grad=True)
+        super().__init__(
+            distribution, trainable_args, module_args, *args, **kwargs
+        )
+        self._rate_unconstrained = torch.nn.Parameter(
+            torch.log(rate), requires_grad=True
+        )
+        self.register_generated_arg(
+            "rate", 
+            lambda: torch.exp(self._rate_unconstrained)
+        )
     
     @property    
     def rate(self) -> torch.Tensor:
         """Returns the rate parameter of the distribution."""
-        return torch.nn.functional.softplus(self._rate_unconstrained)
-    
-    @property
-    def distribution(self) -> torch.distributions.Distribution:
-        """Builds the distribution with the current parameters."""
-        d = self.distribution_class(
-            **self.params,
-            **self.module_args,
-            **self.other_args, 
-            rate = self.rate
-        )
-
-        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
-        if nbatch_dims > 0:
-            d = torch.distributions.Independent(d, nbatch_dims)
-
-        return d
-     
+        return torch.exp(self._rate_unconstrained)
 
 class LogNormal(DistributionModule):
     """Wrapper class for the LogNormal distribution."""
@@ -219,9 +221,31 @@ class LogNormal(DistributionModule):
     def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
         """Initializes the LogNormal distribution."""
         distribution = torch.distributions.LogNormal
-        trainable_args = {"loc": loc, "scale": scale}
+        trainable_args = {}
         static_args = {}
-        super().__init__(distribution, trainable_args, static_args, *args, **kwargs)
+        super().__init__(
+            distribution,
+            trainable_args,
+            static_args,
+            *args,
+            **kwargs
+        )
+        self._scale_unconstrained = torch.nn.Parameter(
+            torch.log(scale),
+            requires_grad=True
+        )
+        self.loc = torch.nn.Parameter(loc, requires_grad=True)
+        self.register_generated_arg(
+            "scale", lambda: torch.exp(self._scale_unconstrained)
+        )
+        self.register_generated_arg(
+            "loc", lambda: self.loc
+        )
+        
+    @property
+    def scale(self) -> torch.Tensor:
+        """Returns the scale parameter of the distribution."""
+        return torch.exp(self._scale_unconstrained)
 
 
 class Laplace(DistributionModule):
@@ -339,7 +363,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
         return -self.log_surface_area_unit_ball
 
 
-class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
+class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
     """Implements radial distributions. More precisely, this class realizes
     Lp-radial distributions with specifiable redial distribution.
 
@@ -362,8 +386,9 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
         n_batch_dims: int = 0,
         device: str = "cpu",
     ):
-
-        super().__init__(
+        torch.nn.Module.__init__(self)
+        torch.distributions.Distribution.__init__(
+            self,
             event_shape=loc.shape[n_batch_dims:],
             validate_args=False,
             batch_shape=loc.shape[:n_batch_dims],
@@ -374,7 +399,7 @@ class RadialDistribution(torch.distributions.Distribution, torch.nn.Module):
             raise ValueError("p must be positive.")
 
         self.device = device
-        self.loc = loc.to(device)
+        self.loc = torch.nn.Parameter(loc, requires_grad=True)
         self.norm_distribution = norm_distribution
         self.p = p
         self.n_batch_dims = n_batch_dims
@@ -546,10 +571,23 @@ class RadialMM(DistributionModule):
             norm_distribution.sample().shape[0] == loc.shape[0]
         ), f"Non-aligned batch-shapes: {norm_distribution.sample().shape[0]} and {loc.shape[0]}"
         self.n_batch_dims = norm_distribution.n_batch_dims
-        norm_batch = RadialDistribution(
+        
+        
+        distribution_class = torch.distributions.MixtureSameFamily
+        trainable_args = {}
+        module_args = {}
+        super().__init__(
+            distribution_class,
+            trainable_args,
+            module_args,
+            n_batch_dims=self.n_batch_dims,
+            *args,
+            **kwargs,
+        )
+        
+        self.radial_batch = RadialDistribution(
             loc, norm_distribution, p, device=device, n_batch_dims=self.n_batch_dims
         )
-        dim = math.prod(norm_distribution.batch_shape)
 
         if mixture_weights is None:
             mixture_weights = torch.ones(norm_distribution.batch_shape)
@@ -560,22 +598,15 @@ class RadialMM(DistributionModule):
 
         # Move weights to the same device as the distribution
         mixture_weights = mixture_weights.to(device)
-        component_distribution = Categorical(
+        self.mixture_distribution = Categorical(
             logits=mixture_weights, n_batch_dims=self.n_batch_dims
         )
-        distribution_class = torch.distributions.MixtureSameFamily
-        trainable_args = {}
-        static_args = {
-            "mixture_distribution": component_distribution,
-            "component_distribution": norm_batch,
-        }
-        super().__init__(
-            distribution_class,
-            trainable_args,
-            static_args,
-            n_batch_dims=self.n_batch_dims,
-            *args,
-            **kwargs,
+        
+        self.register_generated_arg(
+            "mixture_distribution", lambda: self.mixture_distribution
+        )
+        self.register_generated_arg(
+            "component_distribution", lambda: self.radial_batch
         )
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
@@ -603,10 +634,14 @@ class GammaMM(DistributionModule):
     """Wrapper class for the Gamma Mixture Model (GMM) distribution."""
 
     def __init__(
-        self, concentration: torch.Tensor, rate: torch.Tensor, mixture_weights: torch.Tensor
+        self, 
+        concentration: torch.Tensor, 
+        rate: torch.Tensor, 
+        mixture_weights: torch.Tensor,
+        n_batch_dims: int = 0,
     ):
         """Initializes the GMM distribution."""
-        gamma_batch = Gamma(concentration, rate, n_batch_dims=1)
+        gamma_batch = Gamma(concentration, rate, n_batch_dims=n_batch_dims+1)
         mixture_distribution = Categorical(mixture_weights)
         distribution = torch.distributions.MixtureSameFamily
         trainable_args = {}
@@ -614,4 +649,4 @@ class GammaMM(DistributionModule):
             "mixture_distribution": mixture_distribution,
             "component_distribution": gamma_batch,
         }
-        super().__init__(distribution, trainable_args, static_args)
+        super().__init__(distribution, trainable_args, static_args, n_batch_dims=n_batch_dims)
