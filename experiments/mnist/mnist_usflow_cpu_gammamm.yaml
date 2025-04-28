@@ -27,6 +27,7 @@ experiments:
         type:
           __class__: src.explib.datasets.MnistSplit
         params:
+          dataloc: /Users/fariedabuzaid/Projects/veriflow/data
           space_to_depth_factor: 4
           device: cpu 
       batch_size:  
@@ -50,15 +51,15 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 5.0
-          coupling_blocks: 2
+          coupling_blocks: 1
           lu_transform: 1
           householder: 0
           conditioner_cls: 
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
             c_in: 16
-            c_hidden: 16
-            num_layers: 2
+            c_hidden: 32
+            num_layers: 1
             padding: 1
             dilation: 1
             stride: 1
@@ -71,18 +72,19 @@ experiments:
           nonlinearity: 
             __eval__: tune.choice([torch.nn.ReLU()])
           base_distribution: 
-            __object__: src.veriflow.distributions.RadialDistribution       
+            __object__: src.veriflow.distributions.RadialMM      
             device: cpu
             p: 1.0
             loc: 
-              __eval__: torch.zeros([16, 7, 7]).to("cpu")
+              __eval__: torch.randn([20, 16, 7, 7]).to("cpu") * .01
             norm_distribution:
-              __object__: src.veriflow.distributions.GammaMM
-              concentration: 
-                __eval__: torch.rand([100]).to("cpu") * 80
-              rate:
-                __eval__: torch.ones([100]).to("cpu") / 10
-              mixture_weights:
-                __eval__: torch.ones([100]).to("cpu") / 100
-
-            
+              __object__: src.veriflow.distributions.Independent
+              reinterpreted_batch_ndims: 3
+              base_distribution:
+                __object__: src.veriflow.distributions.LogNormal
+                loc: 
+                  __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * 3
+                scale:
+                  __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * .5
+            mixture_weights:
+              __eval__: torch.ones([20]).to("cpu") 
