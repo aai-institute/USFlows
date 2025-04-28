@@ -78,13 +78,10 @@ experiments:
             loc: 
               __eval__: torch.randn([20, 16, 7, 7]).to("cpu") * .01
             norm_distribution:
-              __object__: src.veriflow.distributions.Independent
-              reinterpreted_batch_ndims: 3
-              base_distribution:
-                __object__: src.veriflow.distributions.LogNormal
-                loc: 
-                  __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * 3
-                scale:
-                  __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * .5
+              __object__: src.veriflow.distributions.LogNormal
+              loc: 
+                __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * 3
+              scale:
+                __eval__: torch.ones([20, 1, 1, 1]).to("cpu") * .5
             mixture_weights:
               __eval__: torch.ones([20]).to("cpu") 
