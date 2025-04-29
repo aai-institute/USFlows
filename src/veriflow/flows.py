@@ -8,6 +8,7 @@ from pyro import distributions as dist
 from pyro.nn import DenseNN
 from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
 import torch
+from src.veriflow.sophia import SophiaG
 
 from src.veriflow.transforms import (
     ScaleTransform,
@@ -94,7 +95,7 @@ class Flow(torch.nn.Module):
     def fit(
         self,
         data_train: Dataset,
-        optim: torch.optim.Optimizer = torch.optim.Adam,
+        optim: torch.optim.Optimizer = SophiaG,
         optim_params: Dict[str, Any] = None,
         batch_size: int = 32,
         shuffle: bool = True,

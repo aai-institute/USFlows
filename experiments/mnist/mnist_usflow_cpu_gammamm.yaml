@@ -30,11 +30,12 @@ experiments:
           dataloc: /Users/fariedabuzaid/Projects/veriflow/data
           space_to_depth_factor: 4
           device: cpu 
+          digit: 0
       batch_size:  
         __eval__: tune.choice([32])
       optim_cfg: 
         optimizer:
-          __class__: torch.optim.Adam 
+          __class__: src.veriflow.sophia.SophiaG 
         params:
           lr: 
             __eval__: 1e-4
@@ -50,7 +51,7 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 12
+          coupling_blocks: 6
           lu_transform: 1
           householder: 0
           conditioner_cls: 
