@@ -94,7 +94,7 @@ class HyperoptExperiment(Experiment):
             else:
                 device = torch.device("cpu")
        
-        dataset = config["dataset"]["type"](**config["dataset"]["params"])
+        dataset = config["dataset"]
         data_train = dataset.get_train()
         data_test = dataset.get_test()
         data_val = dataset.get_val()
@@ -264,7 +264,8 @@ class HyperoptExperiment(Experiment):
             os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
             os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
         )
-        data_test = self.trial_config["dataset"].get_test()
+        cfg = create_objects_from_classes(self.trial_config)
+        data_test = cfg["dataset"].get_test()
         test_loss = 0
         for i in range(0, len(data_test), 100):
             j = min([len(data_test), i + 100])
