@@ -232,7 +232,7 @@ class HyperoptExperiment(Experiment):
         results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
         best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
-        self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
+        self._test_best_model(best_result, exppath, report_dir, device=self.device, exp_id=exptime)
         ray.shutdown()
     
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
@@ -263,14 +263,14 @@ class HyperoptExperiment(Experiment):
         best_model = from_checkpoint(
             os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
             os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
-        )
+        ).to(device)
         cfg = create_objects_from_classes(self.trial_config)
         data_test = cfg["dataset"].get_test()
         test_loss = 0
         for i in range(0, len(data_test), 100):
             j = min([len(data_test), i + 100])
             test_loss += float(
-                -best_model.log_prob(data_test[i:j][0]).sum()
+                -best_model.log_prob(data_test[i:j][0].to(device)).sum()
             )
         test_loss /= len(data_test)
         
