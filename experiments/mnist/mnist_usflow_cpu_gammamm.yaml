@@ -18,7 +18,7 @@ experiments:
       mode: min
     device: cpu
     trial_config:
-      epochs:  1 #00000
+      epochs:  100000
       patience:  20
       logging:
         images: false
@@ -39,7 +39,6 @@ experiments:
           lr: 
             __eval__: 1e-4
           weight_decay: 0.0
-      
       model_cfg: 
         type:
           __class__: src.veriflow.flows.USFlow
@@ -51,14 +50,14 @@ experiments:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 1
+          coupling_blocks: 12
           lu_transform: 1
           householder: 0
           conditioner_cls: 
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
             c_in: 16
-            c_hidden: 16
+            c_hidden: 32
             num_layers: 2
             padding: 1
             dilation: 1
@@ -76,9 +75,9 @@ experiments:
               __class__: src.veriflow.distributions.RadialMM
             params:      
               device: cpu
-              p: 1.0
+              p: 2.0
               loc: 
-                __eval__: torch.randn([20, 16, 7, 7]).to("cpu") 
+                __eval__: torch.randn([20, 16, 7, 7]).to("cpu") * 0.1
               norm_distribution:
                 class:
                   __class__: src.veriflow.distributions.LogNormal
