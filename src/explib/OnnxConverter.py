@@ -98,7 +98,7 @@ class OnnxConverter(Experiment):
                                confidence_threshold,
                                epistemic_uncertainty_postcond = False):
         network = maraboupy.Marabou.read_onnx(classifier_path)
-        for i in range(len(network.inputVars[0])):
+        for i in range(len(network.inputVars[0])): # inputVars_flow
             network.setLowerBound(i, 0)
             network.setUpperBound(i, 255)
 
