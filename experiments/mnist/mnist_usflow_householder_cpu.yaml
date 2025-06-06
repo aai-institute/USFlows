@@ -12,7 +12,7 @@ experiments:
       reduction_factor: 2
     num_hyperopt_samples:  3
     gpus_per_trial:  0
-    cpus_per_trial:  30
+    cpus_per_trial:  15
     tuner_params:
       metric: val_loss
       mode: min
@@ -74,8 +74,7 @@ experiments:
           base_distribution: 
             __object__: src.veriflow.distributions.RadialDistribution
             device: cpu
-            p:
-              __eval__: math.inf
+            p: 1.0
             loc:
               __eval__: torch.zeros([16, 7, 7]).to("cpu")
             norm_distribution:
