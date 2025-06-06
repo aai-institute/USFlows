@@ -12,7 +12,7 @@ experiments:
       reduction_factor: 2
     num_hyperopt_samples:  5
     gpus_per_trial:  0
-    cpus_per_trial:  10
+    cpus_per_trial:  30
     tuner_params:
       metric: val_loss
       mode: min
@@ -27,7 +27,7 @@ experiments:
         class:
           __class__: src.explib.datasets.MnistSplit
         params:
-          dataloc: /home/mustafa/Downloads/mnistdata
+          dataloc: /home/mustafa.yalciner/mnist_dataset
           space_to_depth_factor: 4
           device: cpu 
           digit: 0
