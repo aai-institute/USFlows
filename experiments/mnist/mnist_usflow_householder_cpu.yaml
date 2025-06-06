@@ -10,9 +10,9 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  3
+    num_hyperopt_samples:  10
     gpus_per_trial:  0
-    cpus_per_trial:  15
+    cpus_per_trial:  8
     tuner_params:
       metric: val_loss
       mode: min
@@ -32,13 +32,13 @@ experiments:
           device: cpu 
           digit: 0
       batch_size:  
-        __eval__: tune.choice([64])
+        __eval__: tune.choice([32,64])
       optim_cfg: 
         optimizer:
           __class__: src.veriflow.sophia.SophiaG 
         params:
           lr: 
-            __eval__: 1e-4
+            __eval__: tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
       model_cfg: 
         type:
