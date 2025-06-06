@@ -29,32 +29,32 @@ experiments:
         params:
           dataloc: /home/mustafa.yalciner/mnist_dataset
           space_to_depth_factor: 4
-          device: cpu 
+          device: cpu
           digit: 0
-      batch_size:  
+      batch_size:
         __eval__: tune.choice([64])
-      optim_cfg: 
+      optim_cfg:
         optimizer:
-          __class__: src.veriflow.sophia.SophiaG 
+          __class__: src.veriflow.sophia.SophiaG
         params:
-          lr: 
+          lr:
             __eval__: 1e-4
           weight_decay: 0.0
-      model_cfg: 
+      model_cfg:
         type:
           __class__: src.veriflow.flows.USFlow
         params:
           soft_training: false
           training_noise_prior:
             __object__: pyro.distributions.Uniform
-            low: 
+            low:
               __eval__: 1e-20
             high: 0.01
           prior_scale: 1.0
-          coupling_blocks: 3
+          coupling_blocks: 2
           lu_transform: 0
           householder: 1
-          conditioner_cls: 
+          conditioner_cls:
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
             c_in: 16
@@ -69,9 +69,9 @@ experiments:
             gating: false
           in_dims: [16, 7, 7]
           affine_conjugation: true
-          nonlinearity: 
+          nonlinearity:
             __eval__: tune.choice([torch.nn.ReLU()])
-          base_distribution: 
+          base_distribution:
             __object__: src.veriflow.distributions.RadialDistribution
             device: cpu
             p: 1.0
