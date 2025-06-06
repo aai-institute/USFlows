@@ -10,7 +10,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  5
+    num_hyperopt_samples:  3
     gpus_per_trial:  0
     cpus_per_trial:  30
     tuner_params:
@@ -32,7 +32,7 @@ experiments:
           device: cpu 
           digit: 0
       batch_size:  
-        __eval__: tune.choice([32])
+        __eval__: tune.choice([64])
       optim_cfg: 
         optimizer:
           __class__: src.veriflow.sophia.SophiaG 
