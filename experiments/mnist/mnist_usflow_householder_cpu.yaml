@@ -10,7 +10,7 @@ experiments:
       max_t: 1000000
       grace_period: 1000000
       reduction_factor: 2
-    num_hyperopt_samples:  10
+    num_hyperopt_samples:  8
     gpus_per_trial:  0
     cpus_per_trial:  8
     tuner_params:
@@ -32,13 +32,13 @@ experiments:
           device: cpu 
           digit: 0
       batch_size:  
-        __eval__: tune.choice([32,64])
+        __eval__: tune.choice([16,32])
       optim_cfg: 
         optimizer:
-          __class__: src.veriflow.sophia.SophiaG 
+          __class__: torch.optim.Adam
         params:
           lr: 
-            __eval__: tune.loguniform(1e-5, 1e-3)
+            __eval__: 1e-4
           weight_decay: 0.0
       model_cfg: 
         type:
