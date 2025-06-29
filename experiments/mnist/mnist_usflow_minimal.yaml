@@ -37,7 +37,7 @@ experiments:
           lr: 
             __eval__: 1e-4
           weight_decay: 0.0
-      
+
       model_cfg: 
         type:
           __class__: src.veriflow.flows.USFlow
