@@ -1,6 +1,6 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_ablation
+name: mnist_final_try
 experiments:
   - &exp_laplace0
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -19,7 +19,7 @@ experiments:
     device: cpu
     trial_config:
       epochs:  10000
-      patience:  25
+      patience:  29
       logging:
         images: false
         image_shape: [28, 28]
@@ -32,13 +32,12 @@ experiments:
           device: cpu
           digit: 0
       batch_size:
-        __eval__: tune.choice([64])
+        __eval__: tune.choice([32])
       optim_cfg:
         optimizer:
           __class__: torch.optim.Adam
         params:
-          lr:
-            __eval__: tune.loguniform(1e-5, 1e-3)
+          lr: 1e-4
           weight_decay: 0.0
       model_cfg:
         type:
@@ -59,7 +58,7 @@ experiments:
           conditioner_args:
             c_in: 16
             c_hidden: 32
-            num_layers: 2
+            num_layers: 1
             padding: 1
             dilation: 1
             stride: 1
