@@ -44,7 +44,7 @@ experiments:
         type:
           __class__: src.veriflow.flows.USFlow
         params:
-          soft_training: false
+          soft_training: true
           training_noise_prior:
             __object__: pyro.distributions.Uniform
             low:
@@ -53,7 +53,7 @@ experiments:
           prior_scale: 1.0
           coupling_blocks:  5
           lu_transform: 1
-          householder: 0
+          householder: 1
           conditioner_cls:
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
