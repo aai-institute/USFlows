@@ -37,7 +37,8 @@ experiments:
         optimizer:
           __class__: torch.optim.Adam
         params:
-          lr: 1e-4
+          lr:
+            __eval__: 1e-4
           weight_decay: 0.0
       model_cfg:
         type:
