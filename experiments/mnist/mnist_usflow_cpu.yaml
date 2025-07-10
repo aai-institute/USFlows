@@ -1,6 +1,6 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_final_try
+name: mnist_ablation_best_conf
 experiments:
   - &exp_laplace0
     __object__: src.explib.hyperopt.HyperoptExperiment
@@ -19,7 +19,7 @@ experiments:
     device: cpu
     trial_config:
       epochs:  10000
-      patience:  29
+      patience:  25
       logging:
         images: false
         image_shape: [28, 28]
@@ -38,13 +38,13 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: 1e-4
+            __eval__: tune.loguniform(1e-5, 1e-3)
           weight_decay: 0.0
       model_cfg:
         type:
           __class__: src.veriflow.flows.USFlow
         params:
-          soft_training: true
+          soft_training: false
           training_noise_prior:
             __object__: pyro.distributions.Uniform
             low:
@@ -53,13 +53,13 @@ experiments:
           prior_scale: 1.0
           coupling_blocks:  5
           lu_transform: 1
-          householder: 1
+          householder: 0
           conditioner_cls:
             __class__: src.veriflow.networks.ConvNet2D
           conditioner_args:
             c_in: 16
             c_hidden: 32
-            num_layers: 1
+            num_layers: 2
             padding: 1
             dilation: 1
             stride: 1
