@@ -12,7 +12,6 @@ from pyro.distributions import constraints
 from pyro.distributions.transforms import Permute
 from pyro.infer import SVI
 from pyro.nn import DenseNN
-from sklearn.datasets import load_digits
 from torch import linalg as LA
 from torch.distributions.transforms import Transform
 from torch.distributions.utils import lazy_property
@@ -20,7 +19,6 @@ from torch.functional import F
 from torch.nn import init
 from tqdm import tqdm
 
-from src.veriflow.linalg import solve_triangular
 
 class BaseTransform(dist.TransformModule):
     """Base class for transforms. Implemented as a thin layer on top of pyro's TransformModule. The baseTransform
@@ -1004,6 +1002,21 @@ class BlockAffineTransform(BaseTransform):
         )
     
     def simplify(self):
+        """ Simplifies the block affine transform to a block plane linear form.
+        Returns:
+            BaseTransform: simplified block plane linear transform
+        """
+        if len(self.in_dims) == 3:
+            return Bijective1x1Conv2d(
+                self.block_transform.matrix().view(
+                    self.block_size,
+                    self.block_size,
+                    1,
+                    1
+                ),
+                self.block_transform.bias().view(self.block_size)
+            )
+
         return self._to_block_plane_linear()
     
     def to(self, device):
@@ -1014,6 +1027,153 @@ class BlockAffineTransform(BaseTransform):
         """
         self.block_transform.to(device)
         return super().to(device)
+
+class Bijective1x1Conv2d(BaseTransform):
+    """
+    Bijective 1x1 Convolution Transform using provided weights.
+    
+    This transform applies a 1x1 convolution operation using provided weights
+    and bias. The operation is defined as:
+        y = W * x + b   (forward)
+        x = W^{-1} * (y - b)   (inverse)
+    
+    The transform is bijective if and only if the weight matrix is invertible.
+    Note: This implementation assumes bijectivity without enforcing it. It is not
+    intended for training.
+    
+    Args:
+        weight (torch.Tensor): Convolution kernel of shape (out_channels, in_channels, 1, 1)
+        bias (Optional[torch.Tensor]): Bias tensor of shape (out_channels,). Default: None.
+    """
+    bijective = True
+    domain = constraints.independent(constraints.real, 3)
+    codomain = constraints.independent(constraints.real, 3)
+    
+    def __init__(
+        self, 
+        weight: torch.Tensor, 
+        bias: Optional[torch.Tensor] = None,
+        *args, 
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        
+        # Validate weight dimensions
+        if weight.dim() != 4 or weight.shape[2] != 1 or weight.shape[3] != 1:
+            raise ValueError("Weight must be 4D tensor with shape (C, C, 1, 1)")
+        
+        self.in_channels = weight.shape[1]
+        self.out_channels = weight.shape[0]
+        
+        if self.in_channels != self.out_channels:
+            raise ValueError("Input and output channels must be equal for bijective 1x1 conv")
+        
+        # Register weight and bias as buffers since they're not trainable
+        self.register_buffer("weight", weight)
+        self.register_buffer("bias", bias if bias is not None else None)
+        
+        # Precompute inverse weight
+        self.register_buffer("inv_weight", None)
+        self.update_inverse_weight()
+        
+        # Create convolution layers for forward and inverse operations
+        self.forward_conv = nn.Conv2d(
+            self.in_channels,
+            self.out_channels,
+            kernel_size=1,
+            bias=False
+        )
+        self.forward_conv.weight = nn.Parameter(self.weight)
+        if self.bias is not None:
+            self.forward_conv.bias = nn.Parameter(self.bias)
+        
+        self.inverse_conv = nn.Conv2d(
+            self.in_channels,
+            self.out_channels,
+            kernel_size=1,
+            bias=False
+        )
+        self.inverse_conv.weight = nn.Parameter(self.inv_weight)
+
+    def update_inverse_weight(self):
+        """Compute and store the inverse weight matrix"""
+        # Extract weight matrix (out_channels, in_channels)
+        weight_matrix = self.weight.squeeze(-1).squeeze(-1)
+        
+        # Compute inverse weight matrix
+        inv_weight_matrix = torch.inverse(weight_matrix)
+        
+        # Reshape back to convolution kernel format
+        self.inv_weight = inv_weight_matrix.unsqueeze(-1).unsqueeze(-1)
+
+    def forward(self, x: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Apply the 1x1 convolution: y = W * x + b."""
+        return self.forward_conv(x)
+
+    def backward(self, y: torch.Tensor, context: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Invert the transformation: x = W^{-1} * (y - b)."""
+        # Subtract bias if present
+        if self.bias is not None:
+            bias = self.bias.view(1, self.out_channels, 1, 1)
+            y = y - bias
+        
+        return self.inverse_conv(y)
+
+    def log_abs_det_jacobian(
+        self, 
+        x: torch.Tensor, 
+        y: torch.Tensor, 
+        context: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Compute log|det J| = H * W * log|det(W)|.
+        The Jacobian determinant is the same for all spatial locations and batches.
+        """
+        # Get weight matrix
+        weight_matrix = self.weight.squeeze()
+        
+        # Compute log|det(W)| using stable slogdet
+        sign, log_abs_det_weight = torch.slogdet(weight_matrix)
+        
+        # Multiply by number of spatial locations (H * W)
+        spatial_locations = x.shape[2] * x.shape[3]
+        log_abs_det_total = log_abs_det_weight * spatial_locations
+        
+        # Return value per batch element
+        return log_abs_det_total * torch.ones(x.shape[0], device=x.device)
+
+    def is_feasible(self) -> bool:
+        """Check if weight matrix is invertible (|det(W)| > 0)."""
+        weight_matrix = self.weight.squeeze()
+        return torch.abs(torch.det(weight_matrix)) > 1e-6
+
+    def jitter(self, jitter: float = 1e-6) -> None:
+        """Add jitter to diagonal of weight matrix for numerical stability."""
+        weight_matrix = self.weight.squeeze()
+        
+        # Add scaled identity matrix
+        diag_jitter = jitter * torch.eye(
+            self.in_channels, 
+            device=weight_matrix.device, 
+            dtype=weight_matrix.dtype
+        )
+        new_weight = weight_matrix + diag_jitter
+        
+        # Update weight and recompute inverse
+        self.weight = new_weight.unsqueeze(-1).unsqueeze(-1)
+        self.forward_conv.weight = nn.Parameter(self.weight)
+        self.update_inverse_weight()
+        self.inverse_conv.weight = nn.Parameter(self.inv_weight)
+
+    def to(self, device):
+        """Move transform to specified device."""
+        self.weight = self.weight.to(device)
+        if self.bias is not None:
+            self.bias = self.bias.to(device)
+        self.inv_weight = self.inv_weight.to(device)
+        self.forward_conv.to(device)
+        self.inverse_conv.to(device)
+        return self        
     
 class LUTransform(AffineTransform):
     """Implementation of a linear bijection transform. Applies a transform $y = (\mathbf{L}\mathbf{U})^{-1}x$, where $\mathbf{L}$ is a
@@ -1217,6 +1377,7 @@ class LUTransform(AffineTransform):
         # Change of variables to input space
         log_prior += -x.sum()
         return log_prior
+    
 class SequentialAffineTransform(AffineTransform):
     """Implements a sequential affine transform. The transform is defined by a sequence of affine transforms $y = A_1 A_2 \ldots A_n x + b$.
     """
