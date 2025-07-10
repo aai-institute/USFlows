@@ -1,6 +1,6 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_ablation_best_conf
+name: mnist_ablation_best_conf_2
 experiments:
   - &exp_laplace0
     __object__: src.explib.hyperopt.HyperoptExperiment
