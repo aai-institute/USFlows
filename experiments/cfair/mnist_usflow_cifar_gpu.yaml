@@ -27,7 +27,7 @@ experiments:
         class:
           __class__: src.explib.datasets.CifarSplit  # <<< You need a dataset class for CIFAR
         params:
-          dataloc: /home/mustafa/Downloads/cifardata  # <<< Adjust path
+          dataloc: /home/mustafa.yalciner/cifardata  # <<< Adjust path
           device: cuda
           label: 0  # <<< If you're only using one class, keep this. Otherwise drop it
       batch_size:
