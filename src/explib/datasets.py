@@ -452,11 +452,8 @@ class CifarDequantized(DequantizedDataset):
             download=True,
             transform=transforms.ToTensor()
         )
-        print(cifar_dataset)
         data = [x for x, y in cifar_dataset if label is None or y == label]
-        print(f'data {len(data)}')
         labels = [y for x, y in cifar_dataset if label is None or y == label]
-        print(f'labels {len(labels)}')
 
         if not data:
             raise ValueError(f"No samples found for label={label} in CIFAR-10.")
