@@ -1,0 +1,84 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: cifar_ablation_best_conf_3
+experiments:
+  - &exp_laplace0
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: cifar0
+    scheduler:
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples:  1
+    gpus_per_trial:  0
+    cpus_per_trial:  10
+    tuner_params:
+      metric: val_loss
+      mode: min
+    device: cpu
+    trial_config:
+      epochs:  10000
+      patience:  25
+      logging:
+        images: false
+        image_shape: [3, 32, 32]  # CIFAR-10 is RGB with 32x32
+      dataset:
+        class:
+          __class__: src.explib.datasets.CifarSplit  # <<< You need a dataset class for CIFAR
+        params:
+          dataloc: /home/mustafa/Downloads/cifardata  # <<< Adjust path
+          device: cpu
+          label: 0  # <<< If you're only using one class, keep this. Otherwise drop it
+      batch_size:
+        __eval__: tune.choice([32])
+      optim_cfg:
+        optimizer:
+          __class__: torch.optim.Adam
+        params:
+          lr:
+            __eval__: tune.loguniform(1e-5, 1e-3)
+          weight_decay: 0.0
+      model_cfg:
+        type:
+          __class__: src.veriflow.flows.USFlow
+        params:
+          soft_training: false
+          training_noise_prior:
+            __object__: pyro.distributions.Uniform
+            low:
+              __eval__: 1e-20
+            high: 0.01
+          prior_scale: 1.0
+          coupling_blocks:  4
+          lu_transform: 1
+          householder: 0
+          conditioner_cls:
+            __class__: src.veriflow.networks.ConvNet2D
+          conditioner_args:
+            c_in: 3  # <<< CIFAR has 3 input channels
+            c_hidden: 64  # <<< You may want to increase hidden channels
+            num_layers: 3  # <<< Slightly deeper for CIFAR
+            padding: 1
+            dilation: 1
+            stride: 1
+            kernel_size: 3
+            rescale_hidden: 1
+            normalize_layers: false  # <<< Often helps on CIFAR
+            gating: false
+          in_dims: [3, 32, 32]  # <<< CIFAR input size
+          affine_conjugation: true
+          nonlinearity:
+            __eval__: tune.choice([torch.nn.ReLU()])
+          base_distribution:
+            __object__: src.veriflow.distributions.RadialDistribution
+            device: cpu
+            p: 1.0
+            loc:
+              __eval__: torch.zeros([3, 32, 32]).to("cpu")
+            norm_distribution:
+              __object__: src.veriflow.distributions.LogNormal
+              loc:
+                __eval__: torch.ones([1]).to("cpu") * 4.5
+              scale:
+                __eval__: torch.ones([1]).to("cpu") * .35

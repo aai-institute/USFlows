@@ -431,4 +431,101 @@ class Cifar10Dequantized(DequantizedDataset):
         path = os.path.join(dataloc, rel_path)
         if not os.path.exists(path):
             CIFAR10(dataloc, train=train, download=True)
-            
+
+
+class CifarDequantized(DequantizedDataset):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        train: bool = True,
+        label: T.Optional[int] = None,
+        flatten: bool = False,
+        device: torch.device = None,
+        space_to_depth_factor: int = 1,
+    ):
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+
+        cifar_dataset = CIFAR10(
+            root=dataloc,
+            train=train,
+            download=True,
+            transform=transforms.ToTensor()
+        )
+        print(cifar_dataset)
+        data = [x for x, y in cifar_dataset if label is None or y == label]
+        print(f'data {len(data)}')
+        labels = [y for x, y in cifar_dataset if label is None or y == label]
+        print(f'labels {len(labels)}')
+
+        if not data:
+            raise ValueError(f"No samples found for label={label} in CIFAR-10.")
+
+        dataset = torch.stack(data)
+        if flatten:
+            dataset = dataset.view(dataset.shape[0], -1)
+
+        self.labels = torch.tensor(labels, dtype=torch.long)
+
+        super().__init__(
+            dataset=dataset,
+            num_bits=8,
+            device=device,
+            space_to_depth_factor=space_to_depth_factor,
+        )
+
+    def __getitem__(self, index: int):
+        x = self.dataset[index]
+        x = self.transform(x)
+        y = self.labels[index]
+        print(f'labels shape: {self.labels.shape}')
+        print(f'y shape: {y.shape}')
+        print("y")
+        print(y[0])
+        return x, 0
+
+
+class CifarSplit(DataSplit):
+    def __init__(
+            self,
+            dataloc: os.PathLike = None,
+            val_split: float = 0.1,
+            label: T.Optional[int] = None,
+            flatten: bool = False,
+            device: torch.device = None,
+            space_to_depth_factor: int = 1,
+    ):
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+
+        full_train = CifarDequantized(
+            dataloc=dataloc,
+            train=True,
+            label=label,
+            flatten=flatten,
+            device=device,
+            space_to_depth_factor=space_to_depth_factor,
+        )
+
+        shuffle = torch.randperm(len(full_train))
+        val_size = int(len(full_train) * val_split)
+        self.val = torch.utils.data.Subset(full_train, shuffle[:val_size])
+        self.train = torch.utils.data.Subset(full_train, shuffle[val_size:])
+
+        self.test = CifarDequantized(
+            dataloc=dataloc,
+            train=False,
+            label=label,
+            flatten=flatten,
+            device=device,
+            space_to_depth_factor=space_to_depth_factor,
+        )
+
+    def get_train(self) -> torch.utils.data.Dataset:
+        return self.train
+
+    def get_test(self) -> torch.utils.data.Dataset:
+        return self.test
+
+    def get_val(self) -> torch.utils.data.Dataset:
+        return self.val
