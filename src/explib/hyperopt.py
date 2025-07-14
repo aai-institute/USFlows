@@ -21,9 +21,9 @@ from ray.air import RunConfig, session
 
 from src.explib.base import Experiment
 from src.explib.config_parser import from_checkpoint, create_objects_from_classes
-from src.veriflow.flows import NiceFlow
-from src.veriflow.networks import AdditiveAffineNN
-from src.veriflow.transforms import ScaleTransform
+from src.usflows.flows import NiceFlow
+from src.usflows.networks import AdditiveAffineNN
+from src.usflows.transforms import ScaleTransform
 
 
 

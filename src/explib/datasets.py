@@ -365,8 +365,7 @@ class MnistDequantized(DequantizedDataset):
         else:
             x = self.dataset[index]
         x = self.transform(x)
-        
-        assert x.shape.__len__() == 4, f"Expected 4D tensor, got {x.shape}"
+
         return x, 0
 
 class MnistSplit(DataSplit):

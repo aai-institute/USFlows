@@ -1,6 +1,6 @@
 import torch
 
-from src.veriflow.transforms import ScaleTransform, Permute, LUTransform, LeakyReLUTransform
+from src.usflows.transforms import ScaleTransform, Permute, LUTransform, LeakyReLUTransform
 
 def test_scale_transform():
     """Test scale transform."""

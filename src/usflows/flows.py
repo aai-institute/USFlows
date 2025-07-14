@@ -8,9 +8,10 @@ from pyro import distributions as dist
 from pyro.nn import DenseNN
 from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
 import torch
-from src.veriflow.sophia import SophiaG
+from src.usflows.distributions import RadialDistribution
+from src.usflows.sophia import SophiaG
 
-from src.veriflow.transforms import (
+from src.usflows.transforms import (
     ScaleTransform,
     MaskedCoupling,
     LUTransform,
@@ -21,7 +22,7 @@ from src.veriflow.transforms import (
     HouseholderTransform,
     SequentialAffineTransform
 )
-from src.veriflow.networks import ConvNet2D, ConditionalDenseNN
+from src.usflows.networks import ConvNet2D, ConditionalDenseNN
 
 class Flow(torch.nn.Module):
     """Base implementation of a flow model"""
@@ -33,21 +34,42 @@ class Flow(torch.nn.Module):
 
     def forward(self, x: torch.Tensor):
         """Dummy implementation of forward method for onnx export. The self.export attribute
-        determines whether the log_prob or the sample function is exported to onnx"""
+        determines whether the log_prob or the sample function is exported to onnx.
+        To obtain the typical foward behavior, use the _forward method."""
         if self.export == "log_prob":
             return self.log_prob(x)
         elif self.export == "sample":
             return self.sample()
         elif self.export == "forward":
-            for layer in self.layers:
-                x = layer.forward(x)
-            return x
+            return self._forward(x)
         elif self.export == "backward":
-            for layer in reversed(self.layers):
-                x = layer.backward(x)
-            return x
+            return self.backward(x)
         else:
             raise ValueError(f"Unknown export mode {self.export}")
+    
+    def _forward(self, x: torch.Tensor):
+        """Internal forward method that applies all layers in the flow
+        
+        Args:
+            x: input tensor to the flow.
+        Returns:
+            x: output tensor after applying all layers in the flow.
+        """
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
+
+    def backward(self, x: torch.Tensor):
+        """Internal backward method that applies all layers in the flow in reverse order
+        
+        Args:
+            x: input tensor to the flow.
+        Returns:
+            x: output tensor after applying all layers in the flow in reverse order.
+        """
+        for layer in reversed(self.layers):
+            x = layer.backward(x)
+        return x
 
     def __init__(
         self,
@@ -91,6 +113,7 @@ class Flow(torch.nn.Module):
         to maximum likelihood training (improper uniform prior).
         """
         return 0
+    
 
     def fit(
         self,
@@ -273,6 +296,92 @@ class Flow(torch.nn.Module):
         """Moves the base distribution to the given device"""
         pass
 
+    def calibrated_latent_radial_udl_profile(self, q: float, calibration_dataset: torch.Tensor, r_max: float = 10000, n_samples: int = 10000) -> torch.Tensor:
+        """
+        Computes the radial_udl_profile of the base distribution that contains a q's fraction of the latent representations of the calibration set.
+        Base distribution must be of type RadialDistribution in order for the method to be defined.
+
+        Args:
+            self: A USFlow with a base distribution of type RadialDistribution.
+            q (float): The fraction of latent representations to be contained in the UDL profile.
+            calibration_dataset (torch.Tensor): The calibration dataset.
+            r_max (float): Maximum radius for the radial profile.
+            n_samples (int): Number of samples for the radial profile.
+
+        Returns:
+            torch.Tensor: Upper density level set of the distribution given as tensor of shape n_intervals x 2.
+                        Each row represents an interval [a,b] where a is the lower bound and b is the upper bound of the radial component.
+        """
+        if not isinstance(self.base_distribution, RadialDistribution):
+            raise TypeError("The base distribution of the flow must be of type RadialDistribution.")
+
+        # Get latent representations
+        with torch.no_grad():
+            latent_representations = self.backward(calibration_dataset)
+            latent_log_probs = self.base_distribution.log_prob(latent_representations)
+        
+        latent_log_probs, _ = torch.sort(latent_log_probs, descending=True)
+        threshold_idx = int(len(latent_log_probs) * q)
+        threshold = latent_log_probs[threshold_idx]
+
+        log_prob_max = latent_log_probs[0]
+        print(f"logprob {latent_log_probs.mean()}")  # Debugging line to check norms
+
+        # Compute radial UDL profile
+        baseprofile = self.base_distribution.radial_udl_profile(threshold=threshold, r_max=r_max, n_samples=n_samples)
+        tail = self.base_distribution.radial_ldl_profile(threshold=log_prob_max, r_max=r_max, n_samples=n_samples)
+
+        print(f"base profile {baseprofile}, tail {tail}")  # Debugging line to check shapes
+
+        def intersect_intervals(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+            """gets two unions of disjoint intervals as nx2 vectors and returns the intersection of these intervals
+            
+            Args:
+                a: first union of disjoint intervals as nx2 vector.
+                b: second union of disjoint intervals as nx2 vector.
+            Returns:
+                A tensor of shape (m, 2) where m is the number of intervals in the intersection.
+            
+            Example:
+            >>> a = torch.tensor([[0, 2], [3, 5], [6, 8]])
+            >>> b = torch.tensor([[1, 3], [5, 7]])
+            >>> intersect_intervals(a, b)
+            tensor([[1, 2],
+                    [7, 8]])
+            """
+            # copy the intervals to avoid modifying the input tensors
+            a = a.clone()
+            b = b.clone()
+
+            max_val = max(a.max(), b.max())
+
+            def sort_intervals(a, b) -> torch.Tensor:
+                if a[0, 0] <= b[0, 0]:
+                    a, b = b, a 
+                return a, b
+
+            # ensure that the intervals are sorted by their start values
+            a, b = sort_intervals(a, b)
+            a = a[a[:, 0].argsort()]
+            b = b[b[:, 0].argsort()]
+
+            result = []
+            while len(a) > 0 and len(b) > 0:
+                a, b = sort_intervals(a, b)
+                h = a.min()
+                b_intersect = b[b[:, 0] <= h].clone()
+                b_intersect[:, 1] = torch.minimum(b_intersect[:, 1], h)
+
+                result.append(b_intersect)
+                a = a[1:]
+
+
+            return torch.cat(result, dim=0)
+        
+        profile = intersect_intervals(baseprofile, tail)
+
+        return profile
+
 class USFlow(Flow):
     """Implementation of a uniformly scaling flow architecture by using 
     bijective 1X1 convolutions (parametrized by LU decomposed weight matrices),
@@ -388,6 +497,10 @@ class USFlow(Flow):
             *args,
             **kwargs
         )
+
+        if not isinstance(self.base_distribution, RadialDistribution):
+            # Remove special methods that are only defined for RadialDistribution
+            delattr(self, "calibrated_latent_radial_udl_profile")
         
     @classmethod
     def create_checkerboard_mask(

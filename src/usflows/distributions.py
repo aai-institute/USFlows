@@ -1,7 +1,7 @@
-from typing import Dict, Iterable, Union
-from src.veriflow.transforms import Rotation, CompositeRotation
-from src.veriflow.linalg import random_orthonormal_matrix
-from src.veriflow.utils import inv_softplus
+from typing import Dict, Iterable, Optional, Union
+from src.usflows.transforms import Rotation, CompositeRotation
+from src.usflows.linalg import random_orthonormal_matrix
+from src.usflows.utils import inv_softplus
 import torch
 from torch.distributions import constraints
 from torch.nn import ParameterDict
@@ -320,11 +320,12 @@ class Normal(DistributionModule):
             lambda: self._loc
         )
         self.to(self.device)
+
 class GMM(DistributionModule):
     """Wrapper class for the Gaussian Mixture Model (GMM) distribution."""
 
     def __init__(
-        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor
+        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor, device: str = "cpu", *args, **kwargs
     ):
         """Initializes the GMM distribution."""
         super().__init__(
@@ -332,6 +333,7 @@ class GMM(DistributionModule):
             *args,
             **kwargs
         )
+        self.device = device
         self.normal_batch = Normal(loc, scale, n_batch_dims=1)
         self.mixture_distribution = Categorical(mixture_weights)
         self.register_generated_arg(
@@ -420,7 +422,7 @@ class UniformUnitLpBall(torch.distributions.Distribution):
         return -self.log_surface_area_unit_ball
 
 
-class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
+class RadialDistribution(torch.nn.Module):
     """Implements radial distributions. More precisely, this class realizes
     Lp-radial distributions with specifiable redial distribution.
 
@@ -438,18 +440,16 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
     def __init__(
         self,
         loc: torch.Tensor,
-        norm_distribution: torch.distributions.Distribution,
+        norm_distribution: DistributionModule,
         p: float,
         n_batch_dims: int = 0,
         device: str = "cpu",
     ):
         torch.nn.Module.__init__(self)
-        torch.distributions.Distribution.__init__(
-            self,
-            event_shape=loc.shape[n_batch_dims:],
-            validate_args=False,
-            batch_shape=loc.shape[:n_batch_dims],
-        )
+        self.norm_distribution = norm_distribution
+        self.event_shape=loc.shape[n_batch_dims:]
+        self.batch_shape=loc.shape[:n_batch_dims]
+        
         if not isinstance(p, float):
             raise ValueError("p must be a float.")
         if p <= 0:
@@ -457,13 +457,117 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
 
         self.device = device
         self.loc = torch.nn.Parameter(loc.to(device))
-        self.norm_distribution = norm_distribution
         self.p = p
         self.n_batch_dims = n_batch_dims
         self.dim = torch.prod(torch.tensor(loc.shape[self.n_batch_dims :]))
         self.shape = loc.shape
         self.unit_ball_distribution = UniformUnitLpBall(self.dim, p)
         self.to(self.device)
+        
+    
+    def _merge_intervals(self, intervals: torch.Tensor) -> torch.Tensor:
+            """returns start and end of consecutive intervals of indices"""
+            if len(intervals) == 1:
+                return torch.tensor([[intervals[0], intervals[0]]])
+            
+            intervals = intervals.sort().values
+            merged = []
+            start = intervals[0]
+            end = intervals[0]
+            for i in range(1, len(intervals)):
+                if intervals[i] == end + 1:
+                    end = intervals[i]
+                else:
+                    merged.append([start, end])
+                    start = intervals[i]
+                    end = intervals[i]
+            merged.append([start, end])
+            return torch.tensor(merged, device=self.device)
+    
+
+    def radial_udl_profile(self, q: Optional[float] = None, threshold: Optional[float] = None, r_max: float = 100000, n_samples: int = 10000) -> torch.Tensor:
+        """Computes an approximate representation of the upper density level set of distribution as intervals radial intervals.
+        
+        Args:
+            q: probability level.
+        Returns:
+            Tensor: Upper density level set of the distribution given as tensor of shape n_intervals x 2. Each row reresents an interval [a,b] where a is the lower bound and b is the upper bound of the radial component.
+        """
+        if q is not None and threshold is not None:
+            raise ValueError("Only one of 'q' or 'threshold' can be provided.")
+        if q is None and threshold is None:
+            raise ValueError("Either 'q' or 'threshold' must be provided.")
+
+        rs = torch.linspace(1e-20, r_max, n_samples, device=self.device).reshape(-1, 1)
+
+        # radial profile function 
+        profile = self.norm_distribution.log_prob(rs) - self.log_delta_volume(self.p, rs).flatten()
+        
+        # compute threshold
+        if q is not None:
+            sample = self.norm_distribution.sample((n_samples,)).to(self.device)
+            logprob = self.norm_distribution.log_prob(sample) - self.log_delta_volume(self.p, sample).flatten()
+            sorted_logprob, _ = torch.sort(logprob, descending=True)
+            threshold_idx = int(n_samples * q)
+            threshold = sorted_logprob[threshold_idx]
+
+        # compute intervals
+        indices = torch.arange(n_samples, device=self.device)
+        indices = indices[profile > threshold]
+
+    
+        
+        return rs.flatten()[self._merge_intervals(indices)]    
+    
+    def radial_ldl_profile(self, q: Optional[float] = None, threshold: Optional[float] = None, r_max: float = 100000, n_samples: int = 10000) -> torch.Tensor:
+        """Computes an approximate representation of the lower density level set of distribution as intervals radial intervals.
+        
+        Args:
+            q: probability level.
+        Returns:
+            Tensor: Lower density level set of the distribution given as tensor of shape n_intervals x 2. Each row reresents an interval [a,b] where a is the lower bound and b is the upper bound of the radial component.
+        """
+        if q is not None and threshold is not None:
+            raise ValueError("Only one of 'q' or 'threshold' can be provided.")
+        if q is None and threshold is None:
+            raise ValueError("Either 'q' or 'threshold' must be provided.")
+
+        rs = torch.linspace(1e-20, r_max, n_samples, device=self.device).reshape(-1, 1)
+
+        # radial profile function 
+        profile = self.norm_distribution.log_prob(rs) - self.log_delta_volume(self.p, rs).flatten()
+        
+        # compute threshold
+        if q is not None:
+            sample = self.norm_distribution.sample((n_samples,)).to(self.device)
+            logprob = self.norm_distribution.log_prob(sample) - self.log_delta_volume(self.p, sample).flatten()
+            sorted_logprob, _ = torch.sort(logprob, descending=False)
+            threshold_idx = int(n_samples * q)
+            threshold = sorted_logprob[threshold_idx]
+
+        # compute intervals
+        indices = torch.arange(n_samples, device=self.device)
+        indices = indices[profile <= threshold]
+
+        return rs.flatten()[self._merge_intervals(indices)]
+
+    def r_profile(self, r: torch.Tensor) -> torch.Tensor:
+        """Computes the radial profile of the distribution at radius r.
+        
+        Args:
+            r: radius (batch)
+        Returns:
+            Tensor: Radial profile of the distribution at radius r.
+        """
+        if isinstance(r, torch.Tensor):
+            r = r.to(self.device)
+        else:
+            r = torch.tensor(r, device=self.device)
+
+        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1)).squeeze(-1)
+        log_dV = self.log_delta_volume(self.p, r)
+
+        return log_prob_norm - log_dV      
 
     def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
         """Samples batch of shape sample_shape from the distribution."""
@@ -495,15 +599,11 @@ class RadialDistribution(torch.nn.Module, torch.distributions.Distribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Computes the log probability of the points x under the distribution."""
         x = x - self.loc
-        dims = tuple(
-            reversed(-(torch.arange(len(self.event_shape)).to(self.device) + 1))
-        )
-        r = x.norm(dim=dims, p=self.p)
-        if len(self.norm_distribution.batch_shape) > 0:
-            log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1))
-            log_prob_norm = log_prob_norm.squeeze(-1)
-        else:
-            log_prob_norm = self.norm_distribution.log_prob(r)
+
+        event_dims = tuple(range(x.dim() - len(self.event_shape), x.dim()))
+        r = x.norm(p=self.p, dim=event_dims)
+
+        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1))
         log_dV = self.log_delta_volume(self.p, r)
 
         return log_prob_norm - log_dV

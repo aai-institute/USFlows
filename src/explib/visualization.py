@@ -4,7 +4,7 @@ import numpy as np
 from src.explib import datasets
 import torch
 
-from src.veriflow.flows import Flow
+from src.usflows.flows import Flow
 
 Norm = Literal[-1, 1, 2]
 SampleType = Literal["conditional", "boundary", "boundary_basis"]

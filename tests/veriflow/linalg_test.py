@@ -1,5 +1,5 @@
 import torch
-from src.veriflow.linalg import solve_triangular
+from src.usflows.linalg import solve_triangular
 
 test_size = 10
 tol =  1e-5
