@@ -296,7 +296,7 @@ class Flow(torch.nn.Module):
         """Moves the base distribution to the given device"""
         pass
 
-    def calibrated_latent_radial_udl_profile(self, q: float, calibration_dataset: torch.Tensor, r_max: float = 10000, n_samples: int = 10000) -> torch.Tensor:
+    def calibrated_latent_radial_udl_profile(self, q: float, calibration_dataset: torch.Tensor, r_max: float = 10000, n_samples: int = 10000, cut_to_data_tail: bool = True) -> torch.Tensor:
         """
         Computes the radial_udl_profile of the base distribution that contains a q's fraction of the latent representations of the calibration set.
         Base distribution must be of type RadialDistribution in order for the method to be defined.
@@ -329,9 +329,7 @@ class Flow(torch.nn.Module):
 
         # Compute radial UDL profile
         baseprofile = self.base_distribution.radial_udl_profile(threshold=threshold, r_max=r_max, n_samples=n_samples)
-        tail = self.base_distribution.radial_ldl_profile(threshold=log_prob_max, r_max=r_max, n_samples=n_samples)
 
-        print(f"base profile {baseprofile}, tail {tail}")  # Debugging line to check shapes
 
         def intersect_intervals(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
             """gets two unions of disjoint intervals as nx2 vectors and returns the intersection of these intervals
@@ -353,32 +351,35 @@ class Flow(torch.nn.Module):
             a = a.clone()
             b = b.clone()
 
-            max_val = max(a.max(), b.max())
-
             def sort_intervals(a, b) -> torch.Tensor:
-                if a[0, 0] <= b[0, 0]:
+                if a[0, 0] > b[0, 0]:
                     a, b = b, a 
                 return a, b
 
             # ensure that the intervals are sorted by their start values
-            a, b = sort_intervals(a, b)
             a = a[a[:, 0].argsort()]
             b = b[b[:, 0].argsort()]
+            a, b = sort_intervals(a, b)
 
             result = []
             while len(a) > 0 and len(b) > 0:
                 a, b = sort_intervals(a, b)
-                h = a.min()
-                b_intersect = b[b[:, 0] <= h].clone()
+                h = a[0,1]
+                b_intersect = b[b[:, 0] <= h]
                 b_intersect[:, 1] = torch.minimum(b_intersect[:, 1], h)
 
                 result.append(b_intersect)
                 a = a[1:]
+                b = b[b[:, 0] > h]
 
 
             return torch.cat(result, dim=0)
         
-        profile = intersect_intervals(baseprofile, tail)
+        if cut_to_data_tail:
+            tail = self.base_distribution.radial_ldl_profile(threshold=log_prob_max, r_max=r_max, n_samples=n_samples)
+            profile = intersect_intervals(baseprofile, tail)
+        else:
+            profile = baseprofile
 
         return profile
 
