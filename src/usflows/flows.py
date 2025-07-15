@@ -323,7 +323,6 @@ class Flow(torch.nn.Module):
         threshold = latent_log_probs[threshold_idx]
 
         log_prob_max = latent_log_probs[0]
-        print(f"logprob {latent_log_probs.mean()}")  # Debugging line to check norms
 
         # Compute radial UDL profile
         baseprofile = self.base_distribution.radial_udl_profile(threshold=threshold, r_max=r_max, n_samples=n_samples)
