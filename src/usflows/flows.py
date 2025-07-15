@@ -367,7 +367,6 @@ class Flow(torch.nn.Module):
 
                 result.append(b_intersect)
                 a = a[1:]
-                b = b[b[:, 0] > h]
 
 
             return torch.cat(result, dim=0)
