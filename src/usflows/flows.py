@@ -3,8 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from pyro import distributions as dist
-from pyro.nn import DenseNN
-from typing import Callable, List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
+from typing import List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
 import torch
 from src.usflows.distributions import RadialDistribution
 from src.usflows.sophia import SophiaG
@@ -19,7 +18,6 @@ from src.usflows.transforms import (
     HouseholderTransform,
     SequentialAffineTransform
 )
-from src.usflows.networks import ConvNet2D, ConditionalDenseNN
 
 class Flow(torch.nn.Module):
     """Base implementation of a flow model"""
