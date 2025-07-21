@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from pyro import distributions as dist
 from typing import List, Dict, Literal, Any, Iterable, Optional, Type, Union, Tuple
 import torch
-from src.usflows.distributions import RadialDistribution
+from src.usflows.distributions import RadialDistribution, Independent
 from src.usflows.sophia import SophiaG
 
 from src.usflows.transforms import (
@@ -96,7 +96,7 @@ class Flow(torch.nn.Module):
         # rather than a single transform.
         batch_shape = self.base_distribution.batch_shape
         if len(batch_shape) > 0:
-            self.base_distribution = dist.Independent(
+            self.base_distribution = Independent(
                 self.base_distribution, len(batch_shape)
             )
 

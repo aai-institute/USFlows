@@ -2,15 +2,13 @@ from typing import Dict, Iterable, Optional, Union
 from src.usflows.transforms import Rotation, CompositeRotation
 from src.usflows.linalg import random_orthonormal_matrix
 from src.usflows.utils import inv_softplus
-import torch
-from torch.distributions import constraints
-from torch.nn import ParameterDict
-from torch.distributions import Distribution, Chi2
-from torch.nn.functional import softplus
 import pyro
-from pyro.distributions.torch_distribution import TorchDistributionMixin
 import math
 
+import torch
+from torch.nn.functional import softplus
+from torch.distributions import constraints, Distribution, Chi2, Independent as DIndependent
+from torch.nn import Module, Parameter
 
 class RotatedLaplace(torch.distributions.Distribution):
     """Implements a Laplace distribution that is rotated so that the bounding
@@ -107,245 +105,155 @@ class Chi(Distribution):
         return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
 
 
-class DistributionModule(torch.nn.Module, torch.distributions.Distribution):
-    """Wrapper class to treat pyro distributions as PyTorch modules.
-
-
-    Args:
-        distribution_class: Pyro distribution to wrap.
-        trainable_args: Dictionary of trainable parameters.
-            Initial parameters need to be given as tensors.
-        static_args: Dictionary of static (non-trainable) parameters.
-        n_batch_dims: Number of batch dimensions.
-    """
-
+class DistributionModule(Module):
+    """Wrapper class to treat distributions as PyTorch modules with learnable parameters."""
+    
     def __init__(
         self,
-        distribution_class: type[torch.distributions.Distribution],
-        params: Dict[str, torch.tensor] = None,
-        module_args: Dict[str, any] = None,
+        distribution_class: type,
         n_batch_dims: int = 0,
-        *args,
-        **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.distribution_class = distribution_class
-        if params is None:
-            params = {}
-        if module_args is None:
-            module_args = {}
-        self.params = ParameterDict(
-            {
-                key: torch.nn.Parameter(value) if not isinstance(value, torch.nn.Parameter) else value
-                for key, value in params.items()
-            }
-        )
-        self.module_args = torch.nn.ModuleDict(module_args) 
         self.n_batch_dims = n_batch_dims
-        self.generated_args = dict()
+        
+    @property
+    def distribution(self) -> Distribution:
+        params = self._get_distribution_params()
+        d = self.distribution_class(**params)
+        
+        # Handle batch dimensions
+        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
+        if nbatch_dims > 0:
+            d = DIndependent(d, nbatch_dims)
+        return d
+
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        """Should be implemented by subclasses to return current parameters"""
+        raise NotImplementedError
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.log_prob(x)
+
+    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
+        return self.distribution.sample(sample_shape)
+
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        return self.distribution.log_prob(x)
 
     @property
     def event_shape(self) -> torch.Size:
-        """Returns the shape of the distribution."""
         return self.distribution.event_shape
 
     @property
     def batch_shape(self) -> torch.Size:
-        """Returns the batch shape of the distribution."""
         return self.distribution.batch_shape
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the distribution module. Synonymous to the
-        distribution's log_prob method."""
-        return self.distribution.log_prob(x)
-
-    def sample(self, sample_shape: Iterable[int] = None) -> torch.Tensor:
-        """Samples batch of shape sample_shape from the distribution."""
-        if sample_shape is None:
-            sample_shape = ()
-        else:
-            sample_shape = tuple(sample_shape)
-
-        return self.distribution.sample(sample_shape)
-
-    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
-        """Computes the log probability of the points x under the distribution."""
-        return self.distribution.log_prob(x)
-
-    @property
-    def distribution(self) -> torch.distributions.Distribution:
-        """Builds the distribution with the current parameters."""
-        generator_args = {
-            key: generator() for key, generator in self.generated_args.items()
-        }
-        d = self.distribution_class(
-            **self.params,
-            **self.module_args,
-            **generator_args
-        )
-
-        nbatch_dims = len(d.batch_shape) - self.n_batch_dims
-        if nbatch_dims > 0:
-            d = torch.distributions.Independent(d, nbatch_dims)
-
-        return d
-    
-    def register_generated_arg(self, name: str, generator: callable) -> None:
-        """Register a parameter to the module."""
-        self.generated_args[name] = generator
         
 
 class Gamma(DistributionModule):
-    """Wrapper class for the Gamma distribution."""
-
     def __init__(
         self,
         concentration: torch.Tensor,
         rate: torch.Tensor,
         device: str = "cpu",
-        *args,
-        **kwargs
     ):
-        """Initializes the Gamma distribution."""
-        super().__init__(
-            torch.distributions.Gamma,
-            *args,
-            **kwargs
-        )
-        self._concentration_unconstrained = torch.nn.Parameter(
-            inv_softplus(concentration),
-            requires_grad=True
-        )
-        self._rate_unconstrained = torch.nn.Parameter(
-            inv_softplus(rate),
-            requires_grad=True
-        )
-        self.register_generated_arg(
-            "concentration",
-            lambda: softplus(self._concentration_unconstrained)
-        )
-        self.register_generated_arg(
-            "rate",
-            lambda: softplus(self._rate_unconstrained)
-        )
+        super().__init__(torch.distributions.Gamma)
+        # Use unconstrained parameters + constraints
+        self.concentration_unconstrained = Parameter(inv_softplus(concentration))
+        self.rate_unconstrained = Parameter(inv_softplus(rate))
         self.to(device)
 
-class LogNormal(DistributionModule):
-    """Wrapper class for the LogNormal distribution."""
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        return {
+            "concentration": softplus(self.concentration_unconstrained),
+            "rate": softplus(self.rate_unconstrained)
+        }
 
+class LogNormal(DistributionModule):
     def __init__(
         self,
         loc: torch.Tensor, 
         scale: torch.Tensor, 
         device: str = "cpu",
-        *args, 
-        **kwargs
     ):
-        """Initializes the LogNormal distribution."""
-        super().__init__(
-            torch.distributions.LogNormal,
-            *args,
-            **kwargs
-        )
-        self._loc = torch.nn.Parameter(loc)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale)
-        )
-        self.register_generated_arg(
-            "scale",
-            lambda: softplus(self._scale_unconstrained)
-        )
-        self.register_generated_arg(
-            "loc",
-            lambda: self._loc
-        )
-        
+        super().__init__(torch.distributions.LogNormal)
+        self.loc = Parameter(loc)
+        self.scale_unconstrained = Parameter(inv_softplus(scale))
         self.to(device)
 
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        return {
+            "loc": self.loc,
+            "scale": softplus(self.scale_unconstrained)
+        }
 
 class Laplace(DistributionModule):
-    """Wrapper class for the Laplace distribution."""
-
     def __init__(
         self,
         loc: torch.Tensor,
         scale: torch.Tensor,
         device: str = "cpu",
-        *args,
-        **kwargs
     ):
-        """Initializes the Laplace distribution."""
-        super().__init__(
-            torch.distributions.Laplace,
-            *args,
-            **kwargs
-        )
-        self._loc = torch.nn.Parameter(loc)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale)
-        )
-        self.register_generated_arg(
-            "scale",
-            lambda: softplus(self._scale_unconstrained)
-        )
-        self.register_generated_arg(
-            "loc",
-            lambda: self._loc
-        )
-        
+        super().__init__(torch.distributions.Laplace)
+        self.loc = Parameter(loc)
+        self.scale_unconstrained = Parameter(inv_softplus(scale))
         self.to(device)
-        
 
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        return {
+            "loc": self.loc,
+            "scale": softplus(self.scale_unconstrained)
+        }
 
 class Normal(DistributionModule):
-    """Wrapper class for the Normal distribution."""
+    def __init__(
+        self, 
+        loc: torch.Tensor, 
+        scale: torch.Tensor,
+        device: str = "cpu",
+    ):
+        super().__init__(torch.distributions.Normal)
+        self.loc = Parameter(loc)
+        self.scale_unconstrained = Parameter(inv_softplus(scale))
+        self.to(device)
 
-    def __init__(self, loc: torch.Tensor, scale: torch.Tensor, *args, **kwargs):
-        """Initializes the Normal distribution."""
-        super().__init__(
-            torch.distributions.Normal,
-            *args,
-            **kwargs
-        )
-        self._loc = torch.nn.Parameter(loc)
-        self._scale_unconstrained = torch.nn.Parameter(
-            inv_softplus(scale)
-        )
-        self.register_generated_arg(
-            "scale",
-            lambda: softplus(self._scale_unconstrained)
-        )
-        self.register_generated_arg(
-            "loc",
-            lambda: self._loc
-        )
-        self.to(self.device)
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        return {
+            "loc": self.loc,
+            "scale": softplus(self.scale_unconstrained)
+        }
+
+class Categorical(DistributionModule):
+    def __init__(
+        self,
+        logits: torch.Tensor,
+        device: str = "cpu",
+    ):
+        super().__init__(torch.distributions.Categorical)
+        self.logits = Parameter(logits)
+        self.to(device)
+
+    def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        return {"logits": self.logits}
 
 class GMM(DistributionModule):
-    """Wrapper class for the Gaussian Mixture Model (GMM) distribution."""
-
     def __init__(
-        self, loc: torch.Tensor, scale: torch.Tensor, mixture_weights: torch.Tensor, device: str = "cpu", *args, **kwargs
+        self, 
+        loc: torch.Tensor, 
+        scale: torch.Tensor, 
+        mixture_weights: torch.Tensor, 
+        device: str = "cpu",
     ):
-        """Initializes the GMM distribution."""
-        super().__init__(
-            torch.distributions.MixtureSameFamily,
-            *args,
-            **kwargs
-        )
-        self.device = device
+        super().__init__(torch.distributions.MixtureSameFamily)
         self.normal_batch = Normal(loc, scale, n_batch_dims=1)
         self.mixture_distribution = Categorical(mixture_weights)
-        self.register_generated_arg(
-            "mixture_distribution",
-            lambda: self.mixture_distribution
-        )
-        self.register_generated_arg(
-            "component_distribution",
-            lambda: self.normal_batch
-        )
-        self.to(self.device)
-        
+        self.to(device)
+
+    def _get_distribution_params(self) -> Dict[str, Distribution]:
+        return {
+            "mixture_distribution": self.mixture_distribution.distribution,
+            "component_distribution": self.normal_batch.distribution
+        }
 
 
 
@@ -769,32 +677,40 @@ class LMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
         )
         self.to(device)
 
-class GammaMM(torch.nn.Module, torch.distributions.MixtureSameFamily):
-    """Wrapper class for the Gamma Mixture Model (GMM) distribution."""
-
+class GammaMM(DistributionModule):
     def __init__(
         self, 
         concentration: torch.Tensor, 
         rate: torch.Tensor, 
         mixture_weights: torch.Tensor,
-        n_batch_dims: int = 0,
         device: str = "cpu",
-        *args,
-        **kwargs,
     ):
-        """Initializes the GMM distribution."""
-        torch.nn.Module.__init__(self)
-        self._gamma_batch = Gamma(concentration, rate, n_batch_dims=n_batch_dims+1)
-        self._mixture_distribution = Categorical(mixture_weights)
-        torch.distributions.MixtureSameFamily.__init__(
-            self,
-            mixture_distribution=self._mixture_distribution,
-            component_distribution=self._gamma_batch,
-            validate_args=False,
-            *args,
-            **kwargs,
-        )
+        super().__init__(torch.distributions.MixtureSameFamily)
+        # Store unconstrained parameters
+        self.concentration_unconstrained = Parameter(inv_softplus(concentration))
+        self.rate_unconstrained = Parameter(inv_softplus(rate))
+        self.mixture_logits = Parameter(mixture_weights)
         self.to(device)
+
+    def _get_distribution_params(self) -> Dict[str, Union[Distribution, torch.Tensor]]:
+        # Apply constraints
+        concentration = softplus(self.concentration_unconstrained)
+        rate = softplus(self.rate_unconstrained)
+        
+        # Move component dimension to last position
+        comp_dim = 0  # Component dimension is first
+        permute_order = list(range(1, concentration.dim())) + [comp_dim]
+        concentration_perm = concentration.permute(*permute_order)
+        rate_perm = rate.permute(*permute_order)
+        
+        # Create distributions
+        comp_dist = torch.distributions.Gamma(concentration_perm, rate_perm)
+        mix_dist = torch.distributions.Categorical(logits=self.mixture_logits)
+        
+        return {
+            "mixture_distribution": mix_dist,
+            "component_distribution": comp_dist
+        }
 
 class Independent(torch.nn.Module, torch.distributions.Independent):
     """Wrapper class for the Independent distribution."""

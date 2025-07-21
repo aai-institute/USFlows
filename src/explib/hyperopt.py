@@ -21,7 +21,6 @@ from ray.air import RunConfig, session
 
 from src.explib.base import Experiment
 from src.explib.config_parser import from_checkpoint, create_objects_from_classes
-from src.usflows.flows import NiceFlow
 from src.usflows.networks import AdditiveAffineNN
 from src.usflows.transforms import ScaleTransform
 
