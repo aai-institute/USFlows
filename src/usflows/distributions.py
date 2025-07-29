@@ -10,6 +10,12 @@ from torch.nn.functional import softplus
 from torch.distributions import constraints, Distribution, Chi2, Independent as DIndependent
 from torch.nn import Module, Parameter
 
+import torch.nn as nn
+import torch.distributions as dist
+import torch.distributions.transforms as transforms
+import pyro.distributions as pyro_dist
+
+
 class RotatedLaplace(torch.distributions.Distribution):
     """Implements a Laplace distribution that is rotated so that the bounding
     box of the density contours is of minimal (Euclidean) volume."""
@@ -731,4 +737,159 @@ class Independent(torch.nn.Module, torch.distributions.Independent):
             reinterpreted_batch_ndims=reinterpreted_batch_ndims,
             *args,
             **kwargs
+        )
+
+
+# ======================== New Distributions ========================
+class Frechet(dist.TransformedDistribution):
+    """Frechet distribution (inverse Weibull) defined via transformation of Weibull."""
+    arg_constraints = {
+        "scale": constraints.positive,
+        "concentration": constraints.positive
+    }
+    
+    def __init__(self, scale, concentration, validate_args=None):
+        base_dist = dist.Weibull(1/scale, concentration, validate_args=validate_args)
+        super().__init__(base_dist, transforms.ReciprocalTransform(), validate_args=validate_args)
+        self.scale = scale
+        self.concentration = concentration
+
+# ======================== Mixture Model Base Class ========================
+class MixtureModel(DistributionModule):
+    """Base class for mixture models of distributions on R_>=0."""
+    
+    def __init__(
+        self,
+        distribution_class,
+        param_names,
+        param_constraints,
+        *params,
+        mixture_weights,
+        device="cpu"
+    ):
+        super().__init__(distribution_class=dist.MixtureSameFamily)
+        self.component_distribution_class = distribution_class
+        self.param_names = param_names
+        self.param_constraints = param_constraints
+        
+        # Store unconstrained parameters
+        self.unconstrained_params = nn.ParameterList()
+        for i, (name, param) in enumerate(zip(param_names, params)):
+            constraint = param_constraints.get(name)
+            if constraint == constraints.positive:
+                self.unconstrained_params.append(nn.Parameter(inv_softplus(param)))
+            else:
+                self.unconstrained_params.append(nn.Parameter(param))
+        
+        # Mixture weights (logits)
+        self.mixture_logits = nn.Parameter(mixture_weights)
+        self.to(device)
+    
+    def _get_constrained_params(self):
+        params = []
+        for i, name in enumerate(self.param_names):
+            constraint = self.param_constraints.get(name)
+            param = self.unconstrained_params[i]
+            if isinstance(constraint, type(constraints.positive)) and constraint.lower_bound == 0.0:
+                params.append(softplus(param))
+            else:
+                params.append(param)
+        return params
+    
+    def _get_distribution_params(self):
+        # Apply constraints
+        params = self._get_constrained_params()
+        
+        # Permute component dimension to last
+        permute_order = list(range(1, params[0].dim())) + [0]
+        params_perm = [p.permute(permute_order) for p in params]
+        
+        # Create component distribution
+        comp_dist = self.component_distribution_class(**dict(zip(self.param_names, params_perm)))
+        
+        # Permute mixture logits
+        logits_perm = self.mixture_logits.permute(permute_order)
+        mix_dist = dist.Categorical(logits=logits_perm)
+        
+        return {
+            "mixture_distribution": mix_dist,
+            "component_distribution": comp_dist
+        }
+
+# ======================== Specific Mixture Models ========================
+class LogNormalMM(MixtureModel):
+    """Mixture of Log-Normal distributions."""
+    def __init__(self, loc, scale, mixture_weights, device="cpu"):
+        param_constraints = {"loc": None, "scale": constraints.positive}
+        super().__init__(
+            dist.LogNormal,
+            ["loc", "scale"],
+            param_constraints,
+            loc,
+            scale,
+            mixture_weights=mixture_weights,
+            device=device
+        )
+
+class WeibullMM(MixtureModel):
+    """Mixture of Weibull distributions."""
+    def __init__(self, scale, concentration, mixture_weights, device="cpu"):
+        param_constraints = {
+            "scale": constraints.positive,
+            "concentration": constraints.positive
+        }
+        super().__init__(
+            dist.Weibull,
+            ["scale", "concentration"],
+            param_constraints,
+            scale,
+            concentration,
+            mixture_weights=mixture_weights,
+            device=device
+        )
+
+class FrechetMM(MixtureModel):
+    """Mixture of Frechet distributions."""
+    def __init__(self, scale, concentration, mixture_weights, device="cpu"):
+        param_constraints = {
+            "scale": constraints.positive,
+            "concentration": constraints.positive
+        }
+        super().__init__(
+            Frechet,
+            ["scale", "concentration"],
+            param_constraints,
+            scale,
+            concentration,
+            mixture_weights=mixture_weights,
+            device=device
+        )
+
+class GumbelMM(MixtureModel):
+    """Mixture of Gumbel distributions (support: R, use with caution)."""
+    def __init__(self, loc, scale, mixture_weights, device="cpu"):
+        param_constraints = {"loc": None, "scale": constraints.positive}
+        super().__init__(
+            dist.Gumbel,
+            ["loc", "scale"],
+            param_constraints,
+            loc,
+            scale,
+            mixture_weights=mixture_weights,
+            device=device
+        )
+
+class GeneralizedExtremeValueMM(MixtureModel):
+    """Mixture of Generalized Extreme Value distributions (using Pyro)."""
+    def __init__(self, loc, scale, concentration, mixture_weights, device="cpu"):
+        param_constraints = {"scale": constraints.positive}
+        super().__init__(
+            pyro_dist.GeneralizedExtremeValue,
+            ["loc", "scale", "concentration"],
+            param_constraints,
+            loc,
+            scale,
+            concentration,
+            mixture_weights=mixture_weights,
+            device=device
         )
