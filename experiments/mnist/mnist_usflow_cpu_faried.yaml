@@ -30,7 +30,7 @@ experiments:
           dataloc: /home/mustafa.yalciner/mnist_dataset # /home/mustafa/Downloads/mnistdata
           space_to_depth_factor: 4
           device: cpu
-          digit: 0
+          digit: 1
       batch_size:
         __eval__: tune.choice([32])
       optim_cfg:
@@ -83,13 +83,6 @@ experiments:
                 __eval__: torch.ones([1]).to("cpu") * 4.5
               scale:
                 __eval__: torch.ones([1]).to("cpu") * .35
-  - &digit_1
-    __overwrites__: *digit_0
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 1
   - &digit_2
     __overwrites__: *digit_0
     experiments:
