@@ -12,13 +12,13 @@ experiments:
       reduction_factor: 2
     num_hyperopt_samples:  1
     gpus_per_trial:  0
-    cpus_per_trial: 50
+    cpus_per_trial: 20
     tuner_params:
       metric: val_loss
       mode: min
     device: cpu
     trial_config:
-      epochs:  100000
+      epochs:  2500
       patience:  25
       logging:
         images: false
@@ -27,7 +27,7 @@ experiments:
         class:
           __class__: src.explib.datasets.MnistSplit
         params:
-          dataloc: /home/mustafa.yalciner/mnist_dataset # /home/mustafa/Downloads/mnistdata
+          dataloc: /home/mustafa.yalciner/mnist_dataset #  /home/mustafa/Downloads/mnistdata
           space_to_depth_factor: 4
           device: cpu
           digit: 1
@@ -38,7 +38,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-6, 1e-4)
+            __eval__: tune.loguniform(1e-4, 1e-3)
           weight_decay: 0.0
       model_cfg:
         type:
@@ -85,64 +85,55 @@ experiments:
                 __eval__: torch.ones([1]).to("cpu") * .35
   - &digit_2
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 2
+    trial_config:
+      dataset:
+        params:
+          digit: 2
   - &digit_3
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 3
+    trial_config:
+      dataset:
+        params:
+          digit: 3
   - &digit_4
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 4
+    trial_config:
+      dataset:
+        params:
+          digit: 4
   - &digit_5
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 5
+    trial_config:
+      dataset:
+        params:
+          digit: 5
   - &digit_6
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 6
+    trial_config:
+      dataset:
+        params:
+          digit: 6
   - &digit_7
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 7
+    trial_config:
+      dataset:
+        params:
+          digit: 7
   - &digit_8
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 8
+    trial_config:
+      dataset:
+        params:
+          digit: 8
   - &digit_9
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 9
+    trial_config:
+      dataset:
+        params:
+          digit: 9
   - &digit_0
     __overwrites__: *digit_1
-    experiments:
-      trial_config:
-        dataset:
-          params:
-            digit: 0
+    trial_config:
+      dataset:
+        params:
+          digit: 0
