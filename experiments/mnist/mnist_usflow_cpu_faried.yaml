@@ -2,7 +2,7 @@
 __object__: src.explib.base.ExperimentCollection
 name: mnist_all_digits
 experiments:
-  - &digit_0
+  - &digit_1
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: mnist_all_digits
     scheduler:
@@ -84,58 +84,65 @@ experiments:
               scale:
                 __eval__: torch.ones([1]).to("cpu") * .35
   - &digit_2
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 2
   - &digit_3
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 3
   - &digit_4
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 4
   - &digit_5
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 5
   - &digit_6
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 6
   - &digit_7
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 7
   - &digit_8
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 8
   - &digit_9
-    __overwrites__: *digit_0
+    __overwrites__: *digit_1
     experiments:
       trial_config:
         dataset:
           params:
             digit: 9
+  - &digit_0
+    __overwrites__: *digit_1
+    experiments:
+      trial_config:
+        dataset:
+          params:
+            digit: 0
