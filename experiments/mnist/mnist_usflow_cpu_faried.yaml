@@ -27,7 +27,7 @@ experiments:
         class:
           __class__: src.explib.datasets.MnistSplit
         params:
-          dataloc: /home/mustafa/Downloads/mnistdata # /home/mustafa.yalciner/mnist_dataset
+          dataloc: /home/mustafa.yalciner/mnist_dataset # /home/mustafa/Downloads/mnistdata
           space_to_depth_factor: 4
           device: cpu
           digit: 0
