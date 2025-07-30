@@ -6,7 +6,9 @@ from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import chi2, binned_statistic
 from sklearn.metrics import mutual_info_score
-from torch.distributions import MultivariateNormal
+import scipy.stats as stats
+from scipy.stats import binomtest, wilcoxon
+from sklearn.neighbors import KernelDensity
 
 class RadialFlowEvaluator:
     def __init__(self, flow, data, device='cpu'):
@@ -261,3 +263,203 @@ class RadialFlowEvaluator:
         gamma = 1.0 / (2 * sigma**2)
         K = torch.exp(-gamma * pairwise_dist)
         return K
+    
+    def test_uniformity_simplex(self, alpha=0.05, method='energy', n_samples_ref=1000, n_boot=1000):
+        """
+        Test uniformity of normalized absolute latents on the simplex.
+        
+        Args:
+            alpha: Significance level
+            method: 'energy' for energy distance test, 'bhattacharyya' for transformed residuals test
+            n_samples_ref: Number of reference samples for energy distance
+            n_boot: Number of bootstrap samples for p-value calculation
+            
+        Returns:
+            p_value: Computed p-value for uniformity test
+            reject: Boolean indicating rejection of uniformity
+        """
+        if self.p != 1:
+            raise ValueError("Uniformity test requires L1 norm (p=1), current p={}".format(self.p))
+            
+        # Compute absolute values and normalize to simplex
+        abs_latents = torch.abs(self.latents)
+        row_sums = abs_latents.sum(dim=1, keepdim=True)
+        valid_rows = (row_sums > 1e-8).squeeze()
+        
+        if valid_rows.sum() < 10:  # Ensure sufficient valid samples
+            raise ValueError("Insufficient non-zero latent vectors for uniformity test")
+            
+        u = abs_latents[valid_rows] / row_sums[valid_rows]
+        u_np = u.cpu().numpy()
+        
+        if method == 'energy':
+            return self._energy_uniformity_test(u_np, alpha, n_samples_ref, n_boot)
+        elif method == 'bhattacharyya':
+            return self._bhattacharyya_uniformity_test(u_np, alpha)
+        else:
+            raise ValueError("Unknown method: {}".format(method))
+
+    def _energy_uniformity_test(self, u, alpha, n_samples_ref, n_boot):
+        """Energy distance test for uniformity on simplex"""
+        d = u.shape[1]
+        n = u.shape[0]
+        
+        # Generate reference uniform sample
+        ref = self._simulate_uniform_simplex(n_samples_ref, d)
+        
+        # Compute observed energy distance
+        stat_obs = self._energy_distance(u, ref)
+        
+        # Bootstrap distribution under null
+        stat_boot = []
+        for _ in range(n_boot):
+            boot_sample = self._simulate_uniform_simplex(n, d)
+            stat_boot.append(self._energy_distance(boot_sample, ref))
+        
+        # Calculate p-value
+        p_value = np.mean(np.array(stat_boot) >= stat_obs)
+        reject = p_value < alpha
+        return p_value, reject
+
+    def _bhattacharyya_uniformity_test(self, u, alpha):
+        """Bhattacharyya transformation test for uniformity"""
+        # Transform to negative logs
+        y = -np.log(u)
+        
+        # Compute residuals (centered logs)
+        residuals = y - y.mean(axis=1, keepdims=True)
+        
+        # Flatten residuals and test against standard Gumbel
+        flat_residuals = residuals.flatten()
+        ks_stat, p_value = stats.kstest(flat_residuals, 'gumbel_r')
+        reject = p_value < alpha
+        return p_value, reject
+
+    def _simulate_uniform_simplex(self, n, d):
+        """Generate uniform samples on simplex using exponential distribution"""
+        exp_samples = np.random.exponential(scale=1.0, size=(n, d))
+        row_sums = exp_samples.sum(axis=1, keepdims=True)
+        return exp_samples / row_sums
+
+    def _energy_distance(self, X, Y):
+        """Compute energy distance between samples X and Y"""
+        n = X.shape[0]
+        m = Y.shape[0]
+        
+        # Compute pairwise distances
+        xx = np.sum(X**2, axis=1)
+        yy = np.sum(Y**2, axis=1)
+        xy = np.dot(X, Y.T)
+        
+        d_xx = xx[:, None] + xx[None, :] - 2 * np.dot(X, X.T)
+        d_yy = yy[:, None] + yy[None, :] - 2 * np.dot(Y, Y.T)
+        d_xy = xx[:, None] + yy[None, :] - 2 * xy
+        
+        term1 = np.sum(np.sqrt(d_xy)) / (n * m)
+        term2 = np.sum(np.sqrt(d_xx)) / (n * n)
+        term3 = np.sum(np.sqrt(d_yy)) / (m * m)
+        
+        return 2 * term1 - term2 - term3
+
+    def test_sign_symmetry(self, alpha=0.05, method='sign', combine='stouffer'):
+        """
+        Test sign symmetry with options for high-dimensional aggregation.
+        
+        Args:
+            alpha: Significance level
+            method: 'sign' or 'wilcoxon'
+            combine: 'fisher', 'stouffer', or None for Bonferroni
+            
+        Returns:
+            result: Dictionary containing p-values and rejection decision
+        """
+        if self.p != 1:
+            raise ValueError("Sign symmetry test requires L1 norm (p=1), current p={}".format(self.p))
+            
+        p_values = []
+        z_scores = []  # For Stouffer's method
+        
+        # Compute p-values for each dimension
+        for j in range(self.latents.shape[1]):
+            coord = self.latents[:, j].cpu().numpy()
+            
+            if method == 'sign':
+                n_pos = (coord > 0).sum()
+                test_result = binomtest(n_pos, len(coord), p=0.5, alternative='two-sided')
+                p_val = test_result.pvalue
+                z_scores.append((n_pos - len(coord)/2) / np.sqrt(len(coord)/4))
+                
+            elif method == 'wilcoxon':
+                _, p_val = wilcoxon(coord, zero_method='wilcox', alternative='two-sided')
+                # For Fisher only (Stouffer not recommended with Wilcoxon in high-d)
+                z_scores.append(norm.ppf(1 - p_val/2) * np.sign(np.median(coord)))
+                
+            p_values.append(p_val)
+        
+        # Handle different combination methods
+        combined_p = None
+        if combine == 'fisher':
+            chi2_stat = -2 * np.sum(np.log(p_values))
+            df = 2 * len(p_values)
+            combined_p = 1 - chi2.cdf(chi2_stat, df)
+            reject = combined_p < alpha
+            
+        elif combine == 'stouffer':
+            if method != 'sign':
+                raise ValueError("Stouffer method requires sign test")
+            z_combined = np.sum(z_scores) / np.sqrt(len(z_scores))
+            combined_p = 2 * (1 - norm.cdf(np.abs(z_combined)))  # Two-sided
+            reject = combined_p < alpha
+            
+        else:  # Bonferroni
+            per_test_alpha = alpha / self.dim
+            reject = any(p < per_test_alpha for p in p_values)
+        
+        return {
+            'p_values': p_values,
+            'reject': reject,
+            'combined_p': combined_p,
+            'method': f"{method} with {combine}" if combine else f"{method} with Bonferroni"
+        }
+
+    def test_l1_radial_symmetry(self, alpha=0.05, sign_method='wilcoxon', 
+                               sign_combine='fisher', uniform_method='energy'):
+        """
+        Combined test with improved high-dimensional handling.
+        
+        Args:
+            alpha: Overall significance level
+            sign_method: 'sign' or 'wilcoxon'
+            sign_combine: 'fisher', 'stouffer', or None
+            uniform_method: 'energy' or 'bhattacharyya'
+            
+        Returns:
+            result: Dictionary with test outcomes
+        """
+        if self.p != 1:
+            raise ValueError("L1-radial test requires p=1, current p={}".format(self.p))
+            
+        # Test sign symmetry with alpha/2
+        sign_result = self.test_sign_symmetry(
+            alpha=alpha/2, 
+            method=sign_method, 
+            combine=sign_combine
+        )
+        
+        # Test uniformity with alpha/2
+        uniformity_pval, uniformity_reject = self.test_uniformity_simplex(
+            alpha=alpha/2, method=uniform_method
+        )
+        
+        # Combine results
+        l1_radial_rejected = sign_result['reject'] or uniformity_reject
+        
+        return {
+            'sign_pvals': sign_result['p_values'],
+            'sign_reject': sign_result['reject'],
+            'sign_combined_p': sign_result['combined_p'],
+            'sign_method': sign_result['method'],
+            'uniformity_pval': uniformity_pval,
+            'uniformity_reject': uniformity_reject,
+            'l1_radial_rejected': l1_radial_rejected
+        }
