@@ -38,7 +38,7 @@ experiments:
           __class__: torch.optim.Adam
         params:
           lr:
-            __eval__: tune.loguniform(1e-4, 1e-3)
+            __eval__: 1e^-4
           weight_decay: 0.0
       model_cfg:
         type:
