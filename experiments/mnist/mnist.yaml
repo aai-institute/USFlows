@@ -90,23 +90,3 @@ experiments:
               scale:
                 __eval__: torch.ones([1]).to("cpu") * .35
               device: cpu
-  - &exp_normal
-    __overwrites__: *exp_rad_logN
-    name: mnist_full_MACow
-    skip: false
-    trial_config:
-      optim_cfg: 
-        params:
-          lr: 
-            __eval__: 1e-5
-      model_cfg: 
-          params:
-            lu_transform: 0
-            affine_conjugation: false
-            base_distribution:
-              __exact__: 
-                __object__: pyro.distributions.Normal
-                loc: 
-                  __eval__: torch.zeros([16, 7, 7]).to("cpu")
-                scale: 
-                  __eval__: torch.ones([16, 7, 7]).to("cpu")
