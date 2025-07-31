@@ -47,8 +47,8 @@ class DequantizedDataset(torch.utils.data.Dataset):
                 .permute(0, 1, 3, 5, 2, 4)                # Reorder axes to (c, n, n, k, k)
                 .reshape(n, c * f * f, h//f, w//f)               # Combine channels and blocks into (k²c, n, n)
             )
-            
-        self.dataset = self.dataset.to(device)
+
+        self.dataset = self.dataset.to(device) 
         self.num_bits = num_bits
         self.num_levels = 2**num_bits
         self.transform = transforms.Compose(
@@ -57,6 +57,7 @@ class DequantizedDataset(torch.utils.data.Dataset):
                 transforms.Lambda(lambda x: x + torch.rand_like(x) / self.num_levels),
             ]
         )
+        
 
     def __getitem__(self, index: int):
         x, y = self.dataset[index]
@@ -257,7 +258,9 @@ class FashionMnistDequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
-        scale: bool = False
+        scale: bool = False,
+        *args,
+        **kwargs,
     ):
         rel_path = (
             "FashionMNIST/raw/train-images-idx3-ubyte"
@@ -281,10 +284,13 @@ class FashionMnistDequantized(DequantizedDataset):
             path = os.path.join(dataloc, rel_path)
             labels = idx2numpy.convert_from_file(path)
             dataset = dataset[labels == label]
-        super().__init__(dataset, num_bits=8)
+        super().__init__(dataset, num_bits=8, *args, **kwargs)
 
     def __getitem__(self, index: int):
-        x = Tensor(self.dataset[index].copy())
+        if not isinstance(self.dataset, torch.Tensor):
+            x = Tensor(self.dataset[index].copy())
+        else:
+            x = self.dataset[index]
         x = self.transform(x)
         return x, 0
 
@@ -295,11 +301,12 @@ class FashionMnistSplit(DataSplit):
         dataloc: os.PathLike = None,
         val_split: float = 0.1,
         label: T.Optional[int] = None,
+        space_to_depth_factor: int = 1,
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = FashionMnistDequantized(self.dataloc, train=True, label=label)
+        self.train = FashionMnistDequantized(self.dataloc, train=True, label=label, space_to_depth_factor=space_to_depth_factor)
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -307,7 +314,7 @@ class FashionMnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label)
+        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label, space_to_depth_factor=space_to_depth_factor)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train

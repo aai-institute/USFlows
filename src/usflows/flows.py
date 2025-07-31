@@ -431,6 +431,7 @@ class USFlow(Flow):
             )
         self.householder = householder
         
+        mask = self.mask_Generator(in_dims)
         for i in range(coupling_blocks):
             
             affine_layers = []
@@ -458,14 +459,8 @@ class USFlow(Flow):
                 )
                 layers.append(block_affine_layer)
             
-            mask = self.mask_Generator(in_dims)
             coupling_layer = MaskedCoupling(
                 mask,
-                conditioner_cls(**conditioner_args),
-            )
-            layers.append(coupling_layer)
-            coupling_layer = MaskedCoupling(
-                1 - mask,
                 conditioner_cls(**conditioner_args),
             )
             layers.append(coupling_layer)
@@ -473,6 +468,8 @@ class USFlow(Flow):
             # Inverse affine transformation
             if affine_conjugation and block_affine_layer is not None:
                 layers.append(InverseTransform(block_affine_layer))
+            # alternate mask
+            mask = 1 - mask
             
         # Scale layer
         lu_layer = LUTransform(in_dims[0], prior_scale) 
@@ -493,9 +490,6 @@ class USFlow(Flow):
             **kwargs
         )
 
-        if not isinstance(self.base_distribution, RadialDistribution):
-            # Remove special methods that are only defined for RadialDistribution
-            delattr(self, "calibrated_latent_radial_udl_profile")
         
     @classmethod
     def create_checkerboard_mask(

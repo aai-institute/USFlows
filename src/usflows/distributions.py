@@ -739,22 +739,6 @@ class Independent(torch.nn.Module, torch.distributions.Independent):
             **kwargs
         )
 
-
-# ======================== New Distributions ========================
-class Frechet(dist.TransformedDistribution):
-    """Frechet distribution (inverse Weibull) defined via transformation of Weibull."""
-    arg_constraints = {
-        "scale": constraints.positive,
-        "concentration": constraints.positive
-    }
-    
-    def __init__(self, scale, concentration, validate_args=None):
-        base_dist = dist.Weibull(1/scale, concentration, validate_args=validate_args)
-        super().__init__(base_dist, transforms.ReciprocalTransform(), validate_args=validate_args)
-        self.scale = scale
-        self.concentration = concentration
-
-# ======================== Mixture Model Base Class ========================
 class MixtureModel(DistributionModule):
     """Base class for mixture models of distributions on R_>=0."""
     
@@ -815,8 +799,11 @@ class MixtureModel(DistributionModule):
             "mixture_distribution": mix_dist,
             "component_distribution": comp_dist
         }
+    
+    @property
+    def distribution(self) -> Distribution:
+        return super().distribution
 
-# ======================== Specific Mixture Models ========================
 class LogNormalMM(MixtureModel):
     """Mixture of Log-Normal distributions."""
     def __init__(self, loc, scale, mixture_weights, device="cpu"):
@@ -848,48 +835,3 @@ class WeibullMM(MixtureModel):
             device=device
         )
 
-class FrechetMM(MixtureModel):
-    """Mixture of Frechet distributions."""
-    def __init__(self, scale, concentration, mixture_weights, device="cpu"):
-        param_constraints = {
-            "scale": constraints.positive,
-            "concentration": constraints.positive
-        }
-        super().__init__(
-            Frechet,
-            ["scale", "concentration"],
-            param_constraints,
-            scale,
-            concentration,
-            mixture_weights=mixture_weights,
-            device=device
-        )
-
-class GumbelMM(MixtureModel):
-    """Mixture of Gumbel distributions (support: R, use with caution)."""
-    def __init__(self, loc, scale, mixture_weights, device="cpu"):
-        param_constraints = {"loc": None, "scale": constraints.positive}
-        super().__init__(
-            dist.Gumbel,
-            ["loc", "scale"],
-            param_constraints,
-            loc,
-            scale,
-            mixture_weights=mixture_weights,
-            device=device
-        )
-
-class GeneralizedExtremeValueMM(MixtureModel):
-    """Mixture of Generalized Extreme Value distributions (using Pyro)."""
-    def __init__(self, loc, scale, concentration, mixture_weights, device="cpu"):
-        param_constraints = {"scale": constraints.positive}
-        super().__init__(
-            pyro_dist.GeneralizedExtremeValue,
-            ["loc", "scale", "concentration"],
-            param_constraints,
-            loc,
-            scale,
-            concentration,
-            mixture_weights=mixture_weights,
-            device=device
-        )
