@@ -431,3 +431,52 @@ class Cifar10Dequantized(DequantizedDataset):
         if not os.path.exists(path):
             CIFAR10(dataloc, train=train, download=True)
             
+
+class TabularData(SimpleSplit):
+    def __init__(self,
+                 dataloc: os.PathLike,
+                 save_split_dir: os.PathLike,
+                 drop_columns,
+                 first_run: bool = False,
+                 train: bool = True,
+                 device: torch.device = None
+                 ):
+        path = dataloc
+        train_split_directory = f'{save_split_dir}/train.csv'
+        val_split_directory = f'{save_split_dir}/val.csv'
+        test_split_directory = f'{save_split_dir}/test.csv'
+        if first_run:
+            if not os.path.exists(path):
+                print(f'Dataset not found {path}')
+                exit(-1)
+            tabular_data = pd.read_csv(path, delimiter=",")
+            tabular_data = tabular_data.drop(columns = drop_columns)
+
+            if tabular_data is None:
+                print(f'Could not read tabular data.')
+            self.dataloc = dataloc
+            train_nd, val_nd, test_nd = \
+                np.split(tabular_data.sample(frac=1, random_state=42),
+                         [int(.6 * len(tabular_data)), int(.8 * len(tabular_data))])
+            train_df = pd.DataFrame(train_nd)
+            val_df = pd.DataFrame(val_nd)
+            test_df = pd.DataFrame(test_nd)
+            train_df.to_csv(train_split_directory, index=False)
+            val_df.to_csv(val_split_directory, index=False)
+            test_df.to_csv(test_split_directory, index=False)
+        else:
+            if not os.path.exists(train_split_directory):
+                print(f'Train dataset not found in {train_split_directory}')
+                exit(-1)
+            if not os.path.exists(val_split_directory):
+                print(f'Validation dataset not found in {val_split_directory}')
+                exit(-1)
+            if not os.path.exists(test_split_directory):
+                print(f'Test dataset not found in {test_split_directory}')
+                exit(-1)
+            train_nd = pd.read_csv(train_split_directory)
+            val_nd = pd.read_csv(val_split_directory)
+            test_nd = pd.read_csv(test_split_directory)
+        super().__init__(train = torch.from_numpy(train_nd.to_numpy(copy=True).copy()).float().to(device),
+                         test = torch.from_numpy(test_nd.to_numpy(copy=True).copy()).float().to(device),
+                         val = torch.from_numpy(val_nd.to_numpy(copy=True).copy()).float().to(device))

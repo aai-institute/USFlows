@@ -158,7 +158,7 @@ class Flow(torch.nn.Module):
             losses = []
             if shuffle:
                 perm = np.random.choice(N, N, replace=False)
-                data_train_shuffle = data_train[perm][0]
+                data_train_shuffle = data_train[perm]
 
             for idx in range(0, N, batch_size):
                 end = min(idx + batch_size, N)

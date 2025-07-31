@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from scipy.stats import wasserstein_distance, ks_2samp
+from scipy.stats import wasserstein_distance, ks_2samp, norm
 from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import chi2, binned_statistic
@@ -9,6 +9,10 @@ from sklearn.metrics import mutual_info_score
 import scipy.stats as stats
 from scipy.stats import binomtest, wilcoxon
 from sklearn.neighbors import KernelDensity
+import pandas as pd
+
+from src.explib.config_parser import from_checkpoint
+
 
 class RadialFlowEvaluator:
     def __init__(self, flow, data, device='cpu'):
@@ -149,9 +153,9 @@ class RadialFlowEvaluator:
         
         # Get theoretical CDF (if available)
         base_norm_dist = self.flow.base_distribution.norm_distribution
-        if hasattr(base_norm_dist.distribution, 'cdf'):
+        if hasattr(base_norm_dist, 'cdf'):
             # Use analytical CDF if available
-            theoretical_cdf = base_norm_dist.distribution.cdf(
+            theoretical_cdf = base_norm_dist.cdf(
                 torch.tensor(sorted_norms).to(self.device)
             ).detach().cpu().numpy()
         else:
@@ -463,3 +467,44 @@ class RadialFlowEvaluator:
             'uniformity_reject': uniformity_reject,
             'l1_radial_rejected': l1_radial_rejected
         }
+
+if __name__ == '__main__':
+
+    path_to_model_dir = "/home/mustafa/repos/VeriFlow/experimental_results/aaai/tabular/concrete_diabetes_cancer/0_concrete_flow_done/"
+    pkl = path_to_model_dir + "concrete_flow_exp_2025-07-31 13:42:58.791105_81acd_00000_best_config.pkl"
+    pt = path_to_model_dir + "concrete_flow_exp_2025-07-31 13:42:58.791105_81acd_00000_best_model.pt"
+    model = from_checkpoint(pkl, pt)
+
+    test_path = "/home/mustafa/repos/VeriFlow/experiments/tabular/concrete_cancer_diabetes/concrete/test.csv"
+    df = pd.read_csv(test_path)
+    # Convert to torch tensor (all columns including 'target')
+    data_tensor = torch.tensor(df.values, dtype=torch.float32)
+
+    evaluator = RadialFlowEvaluator(model, data_tensor)
+    #print(evaluator.test_l1_radial_symmetry())
+    #print(evaluator.test_sign_symmetry())
+    #print(evaluator.wasserstein_norm_distance())
+    #print(evaluator.binned_uniformity_test())
+    #print(evaluator.hs_independence_test())
+    ax = evaluator.pp_plot_norms()
+    fig = ax.get_figure()
+    fig.savefig("pp_plot.png", bbox_inches='tight', dpi=300)
+    plt.close(fig)  # optional: to avoid displaying in notebooks or leaking memory
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
