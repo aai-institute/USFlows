@@ -38,7 +38,7 @@ experiments:
         
         model_cfg: 
           type:
-            __class__: &model src.veriflow.flows.NiceFlow
+            __class__: &model src.usflows.flows.USFlow
           params:
             use_lu: false
             coupling_layers: &coupling_layers 

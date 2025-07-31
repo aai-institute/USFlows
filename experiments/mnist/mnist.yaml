@@ -35,7 +35,7 @@ experiments:
         __eval__: tune.choice([32])
       optim_cfg: 
         optimizer:
-          __class__: torch.optim.Adam 
+          __class__: src.usflows.sophia.SophiaG
         params:
           lr: 
             __eval__: 1e-4
