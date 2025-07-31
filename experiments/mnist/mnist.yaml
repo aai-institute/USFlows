@@ -29,7 +29,6 @@ experiments:
           dataloc: /home/faried/Projects/USFlows/data/mnist
           space_to_depth_factor: 4
           device: cpu
-          digit: 0
       epochs: 200000
       patience: 5
       batch_size: 
