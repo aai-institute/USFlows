@@ -6,7 +6,6 @@ experiments:
     __object__: src.explib.hyperopt.HyperoptExperiment
     name: mnist_full_radial_logN
     device: cpu
-    skip: true
     scheduler: &scheduler 
       __object__: ray.tune.schedulers.ASHAScheduler
       max_t: 1000000
