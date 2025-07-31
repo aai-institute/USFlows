@@ -1,6 +1,6 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: concrete_diabetes_cancer
+name: tabular_flow
 experiments:
   - &concrete
     __object__: src.explib.hyperopt.HyperoptExperiment

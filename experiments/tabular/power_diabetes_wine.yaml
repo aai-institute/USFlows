@@ -1,0 +1,223 @@
+---
+__object__: src.explib.base.ExperimentCollection
+name: tabular_flow
+experiments:
+  - &power
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: power_flow
+    device: "cpu"
+    scheduler:  
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: 1
+    gpus_per_trial: 0
+    cpus_per_trial: 10
+    tuner_params:
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [5, 1]
+      dataset:
+        __object__: src.explib.datasets.TabularData
+        dataloc: "/home/mustafa/Downloads/datasets/tabular_data/trashcan/this_should_be_empty/"
+        save_split_dir: "/home/mustafa/Downloads/datasets/tabular_data/power"
+        drop_columns: []
+        first_run: false
+        device: "cpu"
+      epochs:  20000  # 200000
+      patience: 20
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg:
+        optimizer:
+          __class__: torch.optim.Adam
+        params:
+          lr:
+            __eval__: tune.loguniform(1e-4, 1e-3)
+          weight_decay: 0.0
+      model_cfg:
+        type:
+          __class__:  src.usflows.flows.USFlow
+        params:
+          in_dims: [5]
+          coupling_blocks: 2
+          conditioner_cls:
+            __class__: pyro.nn.DenseNN
+          conditioner_args:
+            input_dim: 5
+            hidden_dims: [10]
+            param_dims: [5]
+          affine_conjugation: true
+          lu_transform: 1
+          householder: 0
+          soft_training: false
+          masktype: checkerboard
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(5).to("cpu")
+            scale:
+              __eval__: torch.ones(5).to("cpu")
+          prior_scale: 1.0
+          base_distribution:
+            __object__: src.usflows.distributions.RadialDistribution
+            device: "cpu"
+            p: 1.0
+            loc:
+              __eval__: torch.zeros(5).to("cpu")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones([1]).to("cpu") * 4.5
+              scale:
+                __eval__: torch.ones([1]).to("cpu") * .35
+  - &wine
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: wine_flow
+    device: "cpu"
+    scheduler:
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: 1
+    gpus_per_trial: 0
+    cpus_per_trial: 10
+    tuner_params:
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [ 5, 1 ]
+      dataset:
+        __object__: src.explib.datasets.TabularData
+        dataloc: "/home/mustafa/Downloads/datasets/tabular_data/trashcan/this_should_be_empty/"
+        save_split_dir: "/home/mustafa/Downloads/datasets/tabular_data/wine"
+        drop_columns: [ ]
+        first_run: false
+        device: "cpu"
+      epochs: 20000  # 200000
+      patience: 100
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg:
+        optimizer:
+          __class__: torch.optim.Adam
+        params:
+          lr:
+            __eval__: tune.loguniform(1e-4, 1e-3)
+          weight_decay: 0.0
+      model_cfg:
+        type:
+          __class__: src.usflows.flows.USFlow
+        params:
+          in_dims: [ 12 ]
+          coupling_blocks: 2
+          conditioner_cls:
+            __class__: pyro.nn.DenseNN
+          conditioner_args:
+            input_dim: 12
+            hidden_dims: [ 24 ]
+            param_dims: [ 12 ]
+          affine_conjugation: true
+          lu_transform: 1
+          householder: 0
+          soft_training: false
+          masktype: checkerboard
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(12).to("cpu")
+            scale:
+              __eval__: torch.ones(12).to("cpu")
+          prior_scale: 1.0
+          base_distribution:
+            __object__: src.usflows.distributions.RadialDistribution
+            device: "cpu"
+            p: 1.0
+            loc:
+              __eval__: torch.zeros(12).to("cpu")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones([1]).to("cpu") * 4.5
+              scale:
+                __eval__: torch.ones([1]).to("cpu") * .35
+  - &diabetes
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: diabetes_flow
+    device: "cpu"
+    scheduler:
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples: 1
+    gpus_per_trial: 0
+    cpus_per_trial: 10
+    tuner_params:
+      metric: val_loss
+      mode: min
+    trial_config:
+      logging:
+        images: false
+        "image_shape": [ 9, 1 ]
+      dataset:
+        __object__: src.explib.datasets.TabularData
+        dataloc: "/home/mustafa/Downloads/datasets/tabular_data/trashcan/this_should_be_empty/"
+        save_split_dir: "/home/mustafa/Downloads/datasets/tabular_data/diabetes"
+        drop_columns: [ ]
+        first_run: false
+        device: "cpu"
+      epochs: 20000  # 200000
+      patience: 100
+      batch_size:
+        __eval__: tune.choice([16])
+      optim_cfg:
+        optimizer:
+          __class__: torch.optim.Adam
+        params:
+          lr:
+            __eval__: tune.loguniform(1e-4, 1e-3)
+          weight_decay: 0.0
+      model_cfg:
+        type:
+          __class__: src.usflows.flows.USFlow
+        params:
+          in_dims: [ 9 ]
+          coupling_blocks: 2
+          conditioner_cls:
+            __class__: pyro.nn.DenseNN
+          conditioner_args:
+            input_dim: 9
+            hidden_dims: [ 18 ]
+            param_dims: [ 9 ]
+          affine_conjugation: true
+          lu_transform: 1
+          householder: 0
+          soft_training: false
+          masktype: checkerboard
+          training_noise_prior:
+            __object__: pyro.distributions.Laplace
+            loc:
+              __eval__: torch.zeros(9).to("cpu")
+            scale:
+              __eval__: torch.ones(9).to("cpu")
+          prior_scale: 1.0
+          base_distribution:
+            __object__: src.usflows.distributions.RadialDistribution
+            device: "cpu"
+            p: 1.0
+            loc:
+              __eval__: torch.zeros(9).to("cpu")
+            norm_distribution:
+              __object__: pyro.distributions.LogNormal # loc=0, scale=1
+              loc:
+                __eval__: torch.ones([1]).to("cpu") * 4.5
+              scale:
+                __eval__: torch.ones([1]).to("cpu") * .35
