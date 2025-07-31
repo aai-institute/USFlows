@@ -274,7 +274,7 @@ class FashionMnistDequantized(DequantizedDataset):
         dataset = idx2numpy.convert_from_file(path)
         if scale:
             dataset = dataset[:, ::3, ::3]
-        dataset = dataset.reshape(dataset.shape[0], -1)
+        #dataset = dataset.reshape(dataset.shape[0], -1)
         if label is not None:
             rel_path = (
                 "FashionMNIST/raw/train-labels-idx1-ubyte"
