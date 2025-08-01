@@ -25,10 +25,10 @@ experiments:
         "image_shape": [28, 28]
       dataset: &dataset
         class:
-          __class__: src.explib.datasets.FashionMnistSplit
+          __class__: src.explib.datasets.Cifar10Split
         params:
           space_to_depth_factor: 4
-          dataloc: /home/faried/Projects/USFlows/data/fashion
+          dataloc: /home/faried/Projects/USFlows/data/cifar10
 
       epochs: &epochs 200000
       patience: &patience 1
