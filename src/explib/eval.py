@@ -12,6 +12,12 @@ from sklearn.neighbors import KernelDensity
 import pandas as pd
 
 from src.explib.config_parser import from_checkpoint
+import os
+import torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 
 
 class RadialFlowEvaluator:
@@ -468,39 +474,111 @@ class RadialFlowEvaluator:
             'l1_radial_rejected': l1_radial_rejected
         }
 
+def pp_plot_multiple_norms(evaluators, labels, colors=None, n_samples=10000):
+    """
+    Plot multiple PP-curves on the same axis.
+
+    Args:
+        evaluators: List of RadialFlowEvaluator instances.
+        labels: List of labels for each model.
+        colors: Optional list of colors.
+        n_samples: Number of samples for theoretical CDF.
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for i, evaluator in enumerate(evaluators):
+        label = labels[i]
+        color = None if colors is None else colors[i % len(colors)]
+        _pp_plot_single(evaluator, ax, n_samples, label, color)
+
+    ax.plot([0, 1], [0, 1], 'k--', label="y = x")
+    ax.set_title('PP-plot of Norm Distributions')
+    ax.set_xlabel('Theoretical CDF (Base Distribution)')
+    ax.set_ylabel('Empirical CDF (Data Latents)')
+    ax.grid(True)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("pp_plot_combined-mixure.png", dpi=300)
+    fig.savefig("pp_plot_combined-mixure.pgf", dpi=300)
+    plt.close(fig)
+
+
+def _pp_plot_single(evaluator, ax, n_samples, label=None, color=None):
+    """
+    Plot a single evaluator on a shared axis.
+    """
+    latent_norms = torch.norm(evaluator.latents, p=evaluator.p, dim=1).cpu().numpy()
+    n = len(latent_norms)
+    empirical_cdf = np.arange(1, n + 1) / n
+    sorted_norms = np.sort(latent_norms)
+
+    base_norm_dist = evaluator.flow.base_distribution.norm_distribution
+    if hasattr(base_norm_dist, 'cdf'):
+        theoretical_cdf = base_norm_dist.cdf(
+            torch.tensor(sorted_norms).to(evaluator.device)
+        ).detach().cpu().numpy()
+    else:
+        sample_norms = base_norm_dist.sample((n_samples,)).detach().cpu().numpy()
+        sample_sorted = np.sort(sample_norms)
+        theoretical_cdf = np.searchsorted(sample_sorted, sorted_norms) / n_samples
+
+    ax.plot(theoretical_cdf, empirical_cdf, label=label, color=color, alpha=0.8)
+
+
 if __name__ == '__main__':
 
-    path_to_model_dir = "/home/mustafa/repos/VeriFlow/experimental_results/aaai/tabular/concrete_diabetes_cancer/0_concrete_flow_done/"
-    pkl = path_to_model_dir + "concrete_flow_exp_2025-07-31 13:42:58.791105_81acd_00000_best_config.pkl"
-    pt = path_to_model_dir + "concrete_flow_exp_2025-07-31 13:42:58.791105_81acd_00000_best_model.pt"
-    model = from_checkpoint(pkl, pt)
+    plt.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        "text.usetex": False,
+        "pgf.rcfonts": False,
+        "font.size": 14,
+        "axes.labelsize": 16,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12
+    })
 
-    test_path = "/home/mustafa/repos/VeriFlow/experiments/tabular/concrete_cancer_diabetes/concrete/test.csv"
-    df = pd.read_csv(test_path)
-    # Convert to torch tensor (all columns including 'target')
-    data_tensor = torch.tensor(df.values, dtype=torch.float32)
+    plt.style.use('ggplot')
+    base_dir = "/home/mustafa/repos/VeriFlow/experimental_results/aaai/tabular/mixure/tabular_flow_mixure"
+    subfolders = sorted(os.listdir(base_dir))
+    colors = ['C0', 'C1', 'C2', 'C3', 'C4']  # Add more if needed
 
-    evaluator = RadialFlowEvaluator(model, data_tensor)
-    #print(evaluator.test_l1_radial_symmetry())
-    #print(evaluator.test_sign_symmetry())
-    #print(evaluator.wasserstein_norm_distance())
-    #print(evaluator.binned_uniformity_test())
-    #print(evaluator.hs_independence_test())
-    ax = evaluator.pp_plot_norms()
-    fig = ax.get_figure()
-    fig.savefig("pp_plot.png", bbox_inches='tight', dpi=300)
-    plt.close(fig)  # optional: to avoid displaying in notebooks or leaking memory
+    evaluators = []
+    labels = []
 
+    for subfolder in subfolders:
+        model_dir = os.path.join(base_dir, subfolder)
+        if not os.path.isdir(model_dir):
+            continue
 
+        # Locate model files
+        pkl_files = [f for f in os.listdir(model_dir) if f.endswith(".pkl")]
+        pt_files = [f for f in os.listdir(model_dir) if f.endswith(".pt")]
+        test_path = os.path.join(model_dir, "test.csv")
 
+        if not pkl_files or not pt_files or not os.path.isfile(test_path):
+            print(f"Skipping {model_dir} (missing files)")
+            continue
 
+        pkl_path = os.path.join(model_dir, pkl_files[0])
+        pt_path = os.path.join(model_dir, pt_files[0])
+        model = from_checkpoint(pkl_path, pt_path)
 
+        # Load test set
+        df = pd.read_csv(test_path)
+        data_tensor = torch.tensor(df.values, dtype=torch.float32)
 
+        evaluator = RadialFlowEvaluator(model, data_tensor)
+        evaluators.append(evaluator)
 
+        # Label derived from folder name
+        labels.append(subfolder)
 
-
-
-
+    if evaluators:
+        pp_plot_multiple_norms(evaluators, labels, colors=colors)
+        print("Saved combined PP-plot to 'pp_plot_combined.png'")
+    else:
+        print("No valid models found.")
 
 
 
