@@ -429,12 +429,95 @@ class Cifar10Dequantized(DequantizedDataset):
         dataloc: os.PathLike = None,
         train: bool = True,
         label: T.Optional[int] = None,
+        space_to_depth_factor: int = 1,
+        device: torch.device = None,
+        *args,
+        **kwargs,
     ):
-        if train:
-            rel_path = "CIFAR10/raw/data_batch_1"
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+        
+        # Transform to convert PIL image to tensor in [0,1]
+        transform_to_tensor = transforms.ToTensor()
+        full_dataset = CIFAR10(root=dataloc, train=train, download=True, transform=transform_to_tensor)
+        
+        # Collect all images and labels
+        data = []
+        labels = []
+        for img, lbl in full_dataset:
+            data.append(img)
+            labels.append(lbl)
+        data = torch.stack(data, dim=0)  # Shape: (N, 3, 32, 32)
+        # Convert from [0,1] float to [0,255] uint8
+        data = (data * 255).to(torch.uint8)
+        labels = torch.tensor(labels, dtype=torch.long)
+        
+        # Filter by label if specified
+        if label is not None:
+            mask = (labels == label)
+            data = data[mask]
+        
+        super().__init__(
+            data,
+            num_bits=8,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device,
+            *args,
+            **kwargs
+        )
+
+    def __getitem__(self, index: int):
+        if not isinstance(self.dataset, torch.Tensor):
+            x = torch.tensor(self.dataset[index].copy())
         else:
-            rel_path = "CIFAR10/raw/test_batch"
-        path = os.path.join(dataloc, rel_path)
-        if not os.path.exists(path):
-            CIFAR10(dataloc, train=train, download=True)
+            x = self.dataset[index]
+        x = self.transform(x)
+        return x, 0  # Return dummy label 0
+
+
+class Cifar10Split(DataSplit):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        val_split: float = 0.1,
+        label: T.Optional[int] = None,
+        space_to_depth_factor: int = 1,
+        device: torch.device = None,
+    ):
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data")
+        self.dataloc = dataloc
+        
+        # Create training dataset
+        self.train = Cifar10Dequantized(
+            self.dataloc,
+            train=True,
+            label=label,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device
+        )
+        
+        # Split training data into train and validation
+        shuffle = torch.randperm(len(self.train))
+        val_size = int(len(self.train) * val_split)
+        self.val = torch.utils.data.Subset(self.train, shuffle[:val_size])
+        self.train = torch.utils.data.Subset(self.train, shuffle[val_size:])
+        
+        # Create test dataset
+        self.test = Cifar10Dequantized(
+            self.dataloc,
+            train=False,
+            label=label,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device
+        )
+
+    def get_train(self) -> torch.utils.data.Dataset:
+        return self.train
+
+    def get_test(self) -> torch.utils.data.Dataset:
+        return self.test
+
+    def get_val(self) -> torch.utils.data.Dataset:
+        return self.val
             
