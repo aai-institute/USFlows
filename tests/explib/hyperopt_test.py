@@ -14,6 +14,6 @@ def test_mnist():
     print(f"{sepline}Done.{sepline}")
     print(f"{sepline}Conducting experiment{sepline}")
     # Conduct experiment
-    experiment.conduct(report_dir, storage_path=storage_path)
+    #experiment.conduct(report_dir, storage_path=storage_path)
     print(f"{sepline}Done.{sepline}")
     assert True

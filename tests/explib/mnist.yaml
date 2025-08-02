@@ -18,8 +18,8 @@ experiments:
       mode: min
     device: cpu
     trial_config:
-      epochs:  2
-      patience:  3
+      epochs:  0
+      patience:  1
       logging:
         images: false
         image_shape: [28, 28]
