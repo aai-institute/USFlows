@@ -1,6 +1,6 @@
 import torch
 
-from src.veriflow.transforms import ScaleTransform, Permute, LUTransform, LeakyReLUTransform
+from src.usflows.transforms import ScaleTransform, Permute, LUTransform, LeakyReLUTransform
 
 def test_scale_transform():
     """Test scale transform."""
@@ -40,13 +40,13 @@ def test_lu_transform():
     with torch.no_grad():
         transform.L_raw.copy_(torch.tril(torch.ones(dim, dim)))
         transform.U_raw.copy_(torch.eye(dim))
-        transform.bias.copy_(torch.zeros(dim))
+        transform.bias_vector.copy_(torch.zeros(dim))
     x = torch.ones(dim)
     
     # Test forward, inverse, and log det
-    y = transform.backward(x) # LU-factorization parametrizes inverse
+    y = transform(x) # LU-factorization parametrizes inverse
     assert (y == (torch.arange(dim) + 1.)).all()
-    assert (transform(y) == x).all()
+    assert (transform.backward(y) == x).all()
     log_det = transform.log_abs_det_jacobian(x, y)
     assert log_det == 0
     

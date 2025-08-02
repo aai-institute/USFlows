@@ -1,3 +1,4 @@
+from glob import glob
 import io
 import json
 import logging
@@ -18,11 +19,11 @@ import ray
 from ray import tune
 from ray.air import RunConfig, session
 
-from src.explib.base import Experiment
-from src.explib.config_parser import from_checkpoint
-from src.veriflow.flows import NiceFlow
-from src.veriflow.networks import AdditiveAffineNN
-from src.veriflow.transforms import ScaleTransform
+from src.usflows.explib.base import Experiment
+from src.usflows.explib.config_parser import from_checkpoint, create_objects_from_classes
+from src.usflows.networks import AdditiveAffineNN
+from src.usflows.transforms import ScaleTransform
+
 
 
 
@@ -77,6 +78,7 @@ class HyperoptExperiment(Experiment):
         Returns:
             Dict[str, float]: trial performance metrics
         """
+        config = create_objects_from_classes(config)
         writer = SummaryWriter()
         # warnings.simplefilter("error")
         torch.autograd.set_detect_anomaly(True)
@@ -185,6 +187,7 @@ class HyperoptExperiment(Experiment):
         if storage_path is None:
             storage_path = os.path.expanduser("~")
         
+        self.temp_dir = os.path.join(storage_path, "temp")
         ray.init(_temp_dir=f"{storage_path}/temp/")
         #ray.init()
         
@@ -228,7 +231,7 @@ class HyperoptExperiment(Experiment):
         results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
         best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
-        self._test_best_model(best_result, exppath, report_dir, exp_id=exptime)
+        self._test_best_model(best_result, exppath, report_dir, device=self.device, exp_id=exptime)
         ray.shutdown()
     
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
@@ -236,10 +239,21 @@ class HyperoptExperiment(Experiment):
         id = f"exp_{exp_id}_{trial_id}"
         for d in os.listdir(expdir):
             if trial_id in d:
-                shutil.copyfile(
-                    os.path.join(expdir, d, f"checkpoint.pt"), 
-                    os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
-                )
+                # Workaround for Ray not saving the checkpoint
+                # in the right directory in newer versions
+                try:
+                    shutil.copyfile(
+                        os.path.join(expdir, d, f"checkpoint.pt"), 
+                        os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
+                    )
+                except:
+                    chkpt_path = glob(f"{self.temp_dir}/session_latest/**/checkpoint.pt", recursive=True)[0]
+                    shutil.copyfile(
+                        chkpt_path, 
+                        os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
+                    )
+                    
+                # Copy the best config   
                 shutil.copyfile(
                     os.path.join(expdir, d, "params.pkl"), 
                     os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl")
@@ -248,16 +262,14 @@ class HyperoptExperiment(Experiment):
         best_model = from_checkpoint(
             os.path.join(report_dir, f"{self.name}_{id}_best_config.pkl"),
             os.path.join(report_dir, f"{self.name}_{id}_best_model.pt")
-        )
-        best_model = best_model.to(self.device)
-        print(f"best model device {best_model.device}")
-        data_test = self.trial_config["dataset"].get_test()
-        print(f"test data device {data_test[:10][0].device}")
+        ).to(device)
+        cfg = create_objects_from_classes(self.trial_config)
+        data_test = cfg["dataset"].get_test()
         test_loss = 0
         for i in range(0, len(data_test), 100):
             j = min([len(data_test), i + 100])
             test_loss += float(
-                -best_model.log_prob(data_test[i:j][0]).sum()
+                -best_model.log_prob(data_test[i:j][0].to(device)).sum()
             )
         test_loss /= len(data_test)
         

@@ -206,6 +206,25 @@ def parse_raw_config(d: dict) -> Any:
         return result
     else:
         return d
+    
+def create_objects_from_classes(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates objects from classes in the given dictionary.
+
+    Args:
+        cfg: The dictionary containing the classes and their parameters.
+    Returns:
+        The dictionary with the objects.
+    """
+
+    if isinstance(cfg, dict):
+        if "class" in cfg:
+            cfg["params"] = create_objects_from_classes(cfg["params"])
+            cfg = cfg["class"](**cfg["params"])
+        else:
+            for k, v in cfg.items():
+                cfg[k] = create_objects_from_classes(v)
+
+    return cfg
 
 def from_checkpoint(params: str, state_dict: str) -> Any:
     """Loads a model from a checkpoint.
@@ -217,11 +236,10 @@ def from_checkpoint(params: str, state_dict: str) -> Any:
         The loaded model.
     """
     spec = load(open(params, "rb"))["model_cfg"]
+    spec = create_objects_from_classes(spec)
     model = spec["type"](**spec["params"])
     
     state_dict = torch.load(state_dict)
     model.load_state_dict(state_dict)
     
     return model
-    
-    
