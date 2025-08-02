@@ -19,8 +19,8 @@ import ray
 from ray import tune
 from ray.air import RunConfig, session
 
-from src.explib.base import Experiment
-from src.explib.config_parser import from_checkpoint, create_objects_from_classes
+from src.usflows.explib.base import Experiment
+from src.usflows.explib.config_parser import from_checkpoint, create_objects_from_classes
 from src.usflows.networks import AdditiveAffineNN
 from src.usflows.transforms import ScaleTransform
 

@@ -4,7 +4,12 @@ version = "0.1.0"
 description = ""
 authors = ["Faried Abu Zaid <fariedaz@gmail.com>"]
 readme = "README.md"
-packages = [{include = "src"}, {include = "scripts"}]
+packages = [{include = "src/usflows"}, {include = "scripts"}]
+
+#
+#[tool.setuptools.packages.find]
+#where = ["src"] 
+#
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"

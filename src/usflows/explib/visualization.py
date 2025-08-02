@@ -1,7 +1,7 @@
 from typing import Dict, Iterable, Literal
 from matplotlib import pyplot as plt
 import numpy as np
-from src.explib import datasets
+from src.usflows.explib import datasets
 import torch
 
 from src.usflows.flows import Flow
