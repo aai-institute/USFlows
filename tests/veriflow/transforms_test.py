@@ -44,9 +44,9 @@ def test_lu_transform():
     x = torch.ones(dim)
     
     # Test forward, inverse, and log det
-    y = transform.backward(x) # LU-factorization parametrizes inverse
+    y = transform(x) # LU-factorization parametrizes inverse
     assert (y == (torch.arange(dim) + 1.)).all()
-    assert (transform(y) == x).all()
+    assert (transform.backward(y) == x).all()
     log_det = transform.log_abs_det_jacobian(x, y)
     assert log_det == 0
     

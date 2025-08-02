@@ -1,64 +1,93 @@
 ---
 __object__: src.explib.base.ExperimentCollection
-name: mnist_basedist_comparison
+name: mnist_ablation_best_veriflow
 experiments:
-    - &exp_nice
-      __object__: src.explib.hyperopt.HyperoptExperiment
-      name: mnist_nice
-      scheduler: &scheduler 
-        __object__: ray.tune.schedulers.ASHAScheduler
-        max_t: 10000
-        grace_period: 10000
-        reduction_factor: 2
-      num_hyperopt_samples: &num_hyperopt_samples 1
-      gpus_per_trial: &gpus_per_trial 0
-      cpus_per_trial: &cpus_per_trial 1
-      tuner_params: &tuner_params
-        metric: val_loss
-        mode: min
-      trial_config:
-        logging:
-              images: true
-              image_shape: [10, 10]
-        dataset: &dataset
-          __object__: src.explib.datasets.MnistSplit
-          scale: true
-          digit: 0
-        epochs: &epochs 20
-        patience: &patience 5
-        batch_size: &batch_size 
-          __eval__: tune.choice([32])
-        optim_cfg: &optim 
-          optimizer:
-            __class__: torch.optim.Adam 
-          params:
-            lr: 
-              __eval__: tune.loguniform(1e-2, 5e-4)
-            weight_decay: 0.0
-        
-        model_cfg: 
-          type:
-            __class__: &model src.usflows.flows.USFlow
-          params:
-            use_lu: false
-            coupling_layers: &coupling_layers 
-              __eval__: tune.choice([3])
-            coupling_nn_layers: &coupling_nn_layers 
-              __eval__: tune.choice([[100]*2])
-            nonlinearity: &nonlinearity 
-              __eval__: tune.choice([torch.nn.ReLU()])
-            split_dim: &split_dim 50
-            base_distribution: 
-              __object__: pyro.distributions.Laplace
-              loc: 
-                __eval__: torch.zeros(100)
-              scale: 
-                __eval__: torch.ones(100)
-            masktype: &permutation half
-    - &exp_lunice
-      __overwrites__: *exp_nice
-      model_cfg: 
-        name: mnist_lunice
+  - &exp_laplace0
+    __object__: src.explib.hyperopt.HyperoptExperiment
+    name: mnist0
+    scheduler:
+      __object__: ray.tune.schedulers.ASHAScheduler
+      max_t: 1000000
+      grace_period: 1000000
+      reduction_factor: 2
+    num_hyperopt_samples:  1
+    gpus_per_trial:  0
+    cpus_per_trial:  16
+    tuner_params:
+      metric: val_loss
+      mode: min
+    device: cpu
+    trial_config:
+      epochs:  2
+      patience:  3
+      logging:
+        images: false
+        image_shape: [28, 28]
+      dataset:
+        class:
+          __class__: src.explib.datasets.MnistSplit
         params:
-          soft_training: true
-
+          dataloc: /home/faried/Projects/USFlows/data/mnist
+          space_to_depth_factor: 4
+          device: cpu
+          digit: 0
+      batch_size:
+        __eval__: tune.choice([32])
+      optim_cfg:
+        optimizer:
+          __class__: src.usflows.sophia.SophiaG
+        params:
+          lr:
+            __eval__: 1e-3
+          weight_decay: 0.0
+      model_cfg:
+        type:
+          __class__: src.usflows.flows.USFlow
+        params:
+          soft_training: 
+            __eval__: tune.choice([False])
+          training_noise_prior:
+            __object__: pyro.distributions.Uniform
+            low:
+              __eval__: 1e-20
+            high: 0.01
+          prior_scale: 1.0
+          coupling_blocks: 
+            __eval__: tune.choice([2])
+          lu_transform: 1
+          householder: 1
+          conditioner_cls:
+            __class__: src.usflows.networks.ConvNet2D
+          conditioner_args:
+            c_in: 16
+            c_hidden: 
+              __eval__: tune.choice([32])
+            num_layers: 
+              __eval__: tune.choice([1])
+            padding: same
+            kernel_size: 3
+            rescale_hidden: 1
+            normalize_layers: 
+              __eval__: tune.choice([True])
+            gating: 
+              __eval__: tune.choice([True])
+          in_dims: [16, 7, 7]
+          affine_conjugation: true
+          nonlinearity:
+            __eval__: tune.choice([torch.nn.ReLU()])
+          base_distribution:
+            __object__: src.usflows.distributions.RadialDistribution
+            device: cpu
+            p: 
+              __eval__: float("1")
+            loc:
+              __eval__: torch.zeros([16, 7, 7]).to("cpu")
+            norm_distribution:
+              __object__: src.usflows.distributions.GammaMM
+              concentration:
+                __eval__: torch.rand([50]).to("cpu") * 75
+              rate:
+                __eval__: torch.rand([50]).to("cpu")
+              mixture_weights:
+                __eval__: torch.ones([50]).to("cpu") / 50
+              device: cpu
