@@ -53,16 +53,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: install setuptools
         run: pip${{ matrix.python-version }} install setuptools
-      - name: Build requirments.txt
-        uses: divideprojects/poetry-export-requirements-action@v1
-        with:
-          without-hashes: true
-          outfile-name: requirements.txt
       #----------------------------------------------
       # install dependencies if cache does not exist
       #----------------------------------------------
-      - name: Install dependencies
-        run: pip${{ matrix.python-version }} install -r requirements.txt
       - name: Install pytest
         run: pip${{ matrix.python-version }} install pytest
       #----------------------------------------------
