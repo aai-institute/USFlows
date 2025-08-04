@@ -84,11 +84,13 @@ experiments:
             loc:
               __eval__: torch.zeros([16, 7, 7]).to("cpu")
             norm_distribution:
-              __object__: src.usflows.distributions.LogNormal
-              loc:
-                __eval__: torch.ones([1]).to("cpu") * 6
-              scale:
-                __eval__: torch.ones([1]).to("cpu") * .35
+              __object__: src.usflows.distributions.GammaMM
+              concentration:
+                __eval__: torch.rand([20]).to("cpu") * 75
+              rate:
+                __eval__: torch.rand([20]).to("cpu")
+              mixture_weights:
+                __eval__: torch.ones([20]).to("cpu") / 20
               device: cpu
   - __overwrites__: *exp_rad_logN
     name: fashion1_radial_logN
