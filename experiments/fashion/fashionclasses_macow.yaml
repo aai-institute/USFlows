@@ -24,7 +24,7 @@ experiments:
         "image_shape": [28, 28]
       dataset: &dataset
         class:
-          __class__: src.usflow.explib.datasets.FashionMnistSplit
+          __class__: src.usflows.explib.datasets.FashionMnistSplit
         params:
           space_to_depth_factor: 4
           dataloc: /home/mustafa.yalciner/fashion_dataset
