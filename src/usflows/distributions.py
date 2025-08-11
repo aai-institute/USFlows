@@ -242,26 +242,6 @@ class Categorical(DistributionModule):
     def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
         return {"logits": self.logits}
 
-class GMM(DistributionModule):
-    def __init__(
-        self, 
-        loc: torch.Tensor, 
-        scale: torch.Tensor, 
-        mixture_weights: torch.Tensor, 
-        device: str = "cpu",
-    ):
-        super().__init__(torch.distributions.MixtureSameFamily)
-        self.normal_batch = Normal(loc, scale, n_batch_dims=1)
-        self.mixture_distribution = Categorical(mixture_weights)
-        self.to(device)
-
-    def _get_distribution_params(self) -> Dict[str, Distribution]:
-        return {
-            "mixture_distribution": self.mixture_distribution.distribution,
-            "component_distribution": self.normal_batch.distribution
-        }
-
-
 
 class UniformUnitLpBall(torch.distributions.Distribution):
     """Implements a uniform distribution on the unit ball."""
@@ -517,7 +497,7 @@ class RadialDistribution(torch.nn.Module):
         event_dims = tuple(range(x.dim() - len(self.event_shape), x.dim()))
         r = x.norm(p=self.p, dim=event_dims)
 
-        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1))
+        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1)).squeeze(-1)
         log_dV = self.log_delta_volume(self.p, r)
 
         return log_prob_norm - log_dV
@@ -785,15 +765,17 @@ class MixtureModel(DistributionModule):
         params = self._get_constrained_params()
         
         # Permute component dimension to last
-        permute_order = list(range(1, params[0].dim())) + [0]
-        params_perm = [p.permute(permute_order) for p in params]
-        
+        #params_perm = []
+        #for i, name in enumerate(self.param_names):
+        #    permute_order = list(range(1, params[i].dim())) + [0]
+        #    params_perm.append(params[i].permute(permute_order))
+
         # Create component distribution
-        comp_dist = self.component_distribution_class(**dict(zip(self.param_names, params_perm)))
+        comp_dist = self.component_distribution_class(**dict(zip(self.param_names, params)))
         
         # Permute mixture logits
-        logits_perm = self.mixture_logits.permute(permute_order)
-        mix_dist = dist.Categorical(logits=logits_perm)
+        #logits_perm = self.mixture_logits.permute(permute_order)
+        mix_dist = dist.Categorical(logits=self.mixture_logits)
         
         return {
             "mixture_distribution": mix_dist,
@@ -803,6 +785,30 @@ class MixtureModel(DistributionModule):
     @property
     def distribution(self) -> Distribution:
         return super().distribution
+
+
+class GMM(MixtureModel):
+    def __init__(
+        self, 
+        loc: torch.Tensor, 
+        covariance_matrix: torch.Tensor, 
+        mixture_weights: torch.Tensor, 
+        device: str = "cpu",
+    ):
+        param_constraints = {
+            "loc": constraints.real,
+            "covariance_matrix": constraints.positive_definite
+        }
+
+        super().__init__(
+            dist.MultivariateNormal,
+            ["loc", "covariance_matrix"],
+            param_constraints,
+            loc,
+            covariance_matrix,
+            mixture_weights=mixture_weights,
+            device=device
+        )
 
 class LogNormalMM(MixtureModel):
     """Mixture of Log-Normal distributions."""
@@ -834,4 +840,3 @@ class WeibullMM(MixtureModel):
             mixture_weights=mixture_weights,
             device=device
         )
-

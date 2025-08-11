@@ -205,7 +205,7 @@ class SyntheticDataset(torch.utils.data.Dataset):
         """
         super().__init__(*args, **kwargs)
         if isinstance(generator, str):
-            generator = GENERATORS[generator]
+            generator = GENERATORS[generator]   
 
         self.dataset = generator(**params)[0]
 
@@ -521,3 +521,66 @@ class Cifar10Split(DataSplit):
     def get_val(self) -> torch.utils.data.Dataset:
         return self.val
             
+
+class DistributionDataset(torch.utils.data.Dataset):
+    """
+    Dataset that generates samples from a given distribution.
+    """
+    
+    def __init__(
+        self,
+        distribution: torch.distributions.Distribution,
+        num_samples: int,
+        device: torch.device = None,
+    ):
+        """
+        Initialize dataset with a distribution and number of samples.
+        
+        Args:
+            distribution: Distribution to sample from
+            num_samples: Number of samples to generate
+            device: Device to store samples on
+        """
+        super().__init__()
+        self.distribution = distribution
+        self.num_samples = num_samples
+        self.device = device
+        self.data = self.distribution.sample((num_samples,)).to(device)
+        
+        # Dummy labels for compatibility
+        self.labels = torch.zeros(num_samples, dtype=torch.long, device=device)
+    
+    def __getitem__(self, index: int):
+        return self.data[index], self.labels[index]
+    
+    def __len__(self):
+        return self.num_samples
+
+
+class DistributionSplit(SimpleSplit):
+    """
+    Data split that generates train/val/test from a distribution.
+    """
+    
+    def __init__(
+        self,
+        distribution: torch.distributions.Distribution,
+        num_train: int,
+        num_val: int,
+        num_test: int,
+        device: torch.device = None,
+    ):
+        """
+        Create train/val/test splits from a distribution.
+        
+        Args:
+            distribution: Distribution to sample from
+            num_train: Number of training samples
+            num_val: Number of validation samples
+            num_test: Number of test samples
+            device: Device to store samples on
+        """
+        train = DistributionDataset(distribution, num_train, device)
+        val = DistributionDataset(distribution, num_val, device)
+        test = DistributionDataset(distribution, num_test, device)
+        super().__init__(train, test, val)

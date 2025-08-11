@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from scipy.stats import wasserstein_distance, ks_2samp
+from scipy.stats import wasserstein_distance, ks_2samp, norm
 from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import chi2, binned_statistic
@@ -9,6 +9,15 @@ from sklearn.metrics import mutual_info_score
 import scipy.stats as stats
 from scipy.stats import binomtest, wilcoxon
 from sklearn.neighbors import KernelDensity
+import pandas as pd
+
+from src.usflows.explib.config_parser import from_checkpoint
+from src.usflows.distributions import Independent
+import os
+import torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 class RadialFlowEvaluator:
     def __init__(self, flow, data, device='cpu'):
@@ -28,7 +37,11 @@ class RadialFlowEvaluator:
 
         # Precompute latent representations
         with torch.no_grad():
-            self.latents = self.flow.backward(self.data) - flow.base_distribution.loc.to(device)
+            if isinstance(self.flow.base_distribution, Independent):
+                loc = self.flow.base_distribution._base_distribution.loc.to(device)
+            else:
+                loc = self.flow.base_distribution.loc.to(device)
+            self.latents = self.flow.backward(self.data) - loc
             self.latents = self.latents.view(self.latents.shape[0], -1)
         # Get p-norm from base distribution
         self.p = flow.base_distribution.p
@@ -72,18 +85,6 @@ class RadialFlowEvaluator:
         1. Quantiles of empirical latent norms
         2. Quantiles of base norm distribution samples
         """
-        plt.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            "text.usetex": False,
-            "pgf.rcfonts": False,
-            "font.size": 14,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 13,
-            "ytick.labelsize": 13,
-            "legend.fontsize": 12
-        })
-        plt.style.use('ggplot')
-
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
         base_norm_dist = self.flow.base_distribution.norm_distribution
         sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
@@ -109,17 +110,6 @@ class RadialFlowEvaluator:
         1. Empirical latent norms distribution
         2. Base norm distribution
         """
-        plt.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            "text.usetex": False,
-            "pgf.rcfonts": False,
-            "font.size": 14,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 13,
-            "ytick.labelsize": 13,
-            "legend.fontsize": 12
-        })
-        plt.style.use('ggplot')
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
         base_norm_dist = self.flow.base_distribution.norm_distribution
         sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
@@ -162,18 +152,6 @@ class RadialFlowEvaluator:
         Returns:
             ax: Matplotlib axis
         """
-        plt.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            "text.usetex": False,
-            "pgf.rcfonts": False,
-            "font.size": 14,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 13,
-            "ytick.labelsize": 13,
-            "legend.fontsize": 12
-        })
-        plt.style.use('ggplot')
-
         # Get empirical latent norms
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
         
@@ -184,9 +162,9 @@ class RadialFlowEvaluator:
         
         # Get theoretical CDF (if available)
         base_norm_dist = self.flow.base_distribution.norm_distribution
-        if hasattr(base_norm_dist.distribution, 'cdf'):
+        if hasattr(base_norm_dist, 'cdf'):
             # Use analytical CDF if available
-            theoretical_cdf = base_norm_dist.distribution.cdf(
+            theoretical_cdf = base_norm_dist.cdf(
                 torch.tensor(sorted_norms).to(self.device)
             ).detach().cpu().numpy()
         else:
@@ -499,82 +477,114 @@ class RadialFlowEvaluator:
             'l1_radial_rejected': l1_radial_rejected
         }
 
-    def nll_norm_scatter_plot(self, ref_distribution, ax=None, n_samples=10000):
-        """
-        Scatter plot of log-probabilities of latent norms vs base distribution.
-        
-        Args:
-            ref_distribution: Reference distribution for nll computation
-            ax: Matplotlib axis (optional)
-            n_samples: Number of samples for base distribution
-        """
-        plt.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            "text.usetex": False,
-            "pgf.rcfonts": False,
-            "font.size": 14,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 13,
-            "ytick.labelsize": 13,
-            "legend.fontsize": 12
-        })
-        plt.style.use('ggplot')
+def pp_plot_multiple_norms(evaluators, labels, colors=None, n_samples=10000):
+    """
+    Plot multiple PP-curves on the same axis.
 
-        if ax is None:
-            fig, ax = plt.subplots()
+    Args:
+        evaluators: List of RadialFlowEvaluator instances.
+        labels: List of labels for each model.
+        colors: Optional list of colors.
+        n_samples: Number of samples for theoretical CDF.
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-        # Sample from the reference distribution
-        base_samples = ref_distribution.sample((n_samples,)).to(self.device)
-        base_samples = base_samples.view(base_samples.shape[0], -1)
+    for i, evaluator in enumerate(evaluators):
+        label = labels[i]
+        color = None if colors is None else colors[i % len(colors)]
+        _pp_plot_single(evaluator, ax, n_samples, label, color)
 
-        # Compute log-probabilities
-        with torch.no_grad():
-            nlls = -ref_distribution.log_prob(base_samples).cpu().numpy()
-            latent_norms = self.flow.backward(base_samples).norm(p=self.p, dim=1).cpu().numpy()
+    ax.plot([0, 1], [0, 1], 'k--', label="y = x")
+    ax.set_title('PP-plot of Norm Distributions')
+    ax.set_xlabel('Theoretical CDF (Base Distribution)')
+    ax.set_ylabel('Empirical CDF (Data Latents)')
+    ax.grid(True)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("pp_plot_combined-mixure.png", dpi=300)
+    fig.savefig("pp_plot_combined-mixure.pgf", dpi=300)
+    plt.close(fig)
 
-        # Scatter plot
-        ax.scatter(nlls, latent_norms, alpha=0.5)
-        ax.set_xlabel("Negative Log-Likelihood")
-        ax.set_ylabel("Latent Norm")
-        ax.set_title("Negative Log-Likelihood vs Latent Norm")
 
-        return ax
-    
-    def logprob_reference_scatter_plot(self, ref_distribution, ax=None, n_samples=10000):
-        """
-        Scatter estimated log-probs against reference distribution log-probs.
-        Args:
-            ref_distribution: Reference distribution for log-prob computation
-            ax: Matplotlib axis (optional)
-            n_samples: Number of samples for base distribution
-        """
-        plt.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            "text.usetex": False,
-            "pgf.rcfonts": False,
-            "font.size": 14,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 13,
-            "ytick.labelsize": 13,
-            "legend.fontsize": 12
-        })
-        plt.style.use('ggplot')
+def _pp_plot_single(evaluator, ax, n_samples, label=None, color=None):
+    """
+    Plot a single evaluator on a shared axis.
+    """
+    latent_norms = torch.norm(evaluator.latents, p=evaluator.p, dim=1).cpu().numpy()
+    n = len(latent_norms)
+    empirical_cdf = np.arange(1, n + 1) / n
+    sorted_norms = np.sort(latent_norms)
 
-        if ax is None:
-            fig, ax = plt.subplots()
+    base_norm_dist = evaluator.flow.base_distribution.norm_distribution
+    if hasattr(base_norm_dist, 'cdf'):
+        theoretical_cdf = base_norm_dist.cdf(
+            torch.tensor(sorted_norms).to(evaluator.device)
+        ).detach().cpu().numpy()
+    else:
+        sample_norms = base_norm_dist.sample((n_samples,)).detach().cpu().numpy()
+        sample_sorted = np.sort(sample_norms)
+        theoretical_cdf = np.searchsorted(sample_sorted, sorted_norms) / n_samples
 
-        # Sample from the reference distribution
-        base_samples = ref_distribution.sample((n_samples,)).to(self.device)
+    ax.plot(theoretical_cdf, empirical_cdf, label=label, color=color, alpha=0.8)
 
-        # Compute log-probabilities
-        with torch.no_grad():
-            ref_log_probs = ref_distribution.log_prob(base_samples).cpu().numpy()
-            learned_log_probs = self.flow.log_prob(base_samples).cpu().numpy()
+if __name__ == '__main__':
 
-        # Scatter plot
-        ax.scatter(ref_log_probs, learned_log_probs, alpha=0.5)
-        ax.set_xlabel("Reference Log-Probability")
-        ax.set_ylabel("Estimated Log-Probability")
-        ax.set_title("Log-Probability Comparison")
+    plt.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        "text.usetex": False,
+        "pgf.rcfonts": False,
+        "font.size": 14,
+        "axes.labelsize": 16,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12
+    })
 
-        return ax
+    plt.style.use('ggplot')
+    base_dir = "/home/faried/Projects/USFlows/reports/mnist_ablation_best_veriflow"
+    subfolders = sorted(os.listdir(base_dir))
+    colors = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']  # Add more if needed
+
+    evaluators = []
+    labels = []
+
+    for subfolder in subfolders:
+        model_dir = os.path.join(base_dir, subfolder)
+        if not os.path.isdir(model_dir):
+            continue
+        i = int(subfolder[-1])
+
+        # Locate model files
+        pkl_files = sorted([f for f in os.listdir(model_dir) if f.endswith(".pkl")])
+        pt_files = sorted([f for f in os.listdir(model_dir) if f.endswith(".pt")])
+
+        if not pkl_files or not pt_files:
+            print(f"Skipping {model_dir} (missing files)")
+            continue
+
+        pkl_path = os.path.join(model_dir, pkl_files[-1])
+        pt_path = os.path.join(model_dir, pt_files[-1])
+        model = from_checkpoint(pkl_path, pt_path)
+
+        # Load test set
+        from src.usflows.explib.datasets import MnistDequantized
+        mnisti = MnistDequantized(dataloc="/home/faried/Projects/USFlows/data/mnist", space_to_depth_factor=4, digit=i, train=False)[:1000][0]
+
+        evaluator = RadialFlowEvaluator(model, mnisti)
+        evaluators.append(evaluator)
+
+        # Label derived from folder name
+        labels.append(f"MNIST Digit ${i}$")
+
+    if evaluators:
+        pp_plot_multiple_norms(evaluators, labels, colors=colors)
+        print("Saved combined PP-plot to 'pp_plot_combined.png'")
+    else:
+        print("No valid models found.")
+
+
+
+
+
+
+
