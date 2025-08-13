@@ -555,6 +555,19 @@ class DistributionDataset(torch.utils.data.Dataset):
     
     def __len__(self):
         return self.num_samples
+    
+    def to(self, device: torch.device):
+        """
+        Move dataset to a different device.
+        
+        Args:
+            device: Device to move samples to
+        """
+        self.data = self.data.to(device)
+        self.labels = self.labels.to(device)
+        self.device = device
+        return self
+
 
 
 class DistributionSplit(SimpleSplit):
