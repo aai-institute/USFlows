@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -10,8 +11,10 @@ import scipy.stats as stats
 from scipy.stats import binomtest, wilcoxon
 from sklearn.neighbors import KernelDensity
 
+from src.usflows.distributions import RadialDistribution
+
 class RadialFlowEvaluator:
-    def __init__(self, flow, data, device='cpu'):
+    def __init__(self, flow, data, device='cpu', p: Optional[float] = None, norm_distribution: Optional[torch.distributions.Distribution] = None, loc: Optional[torch.Tensor] = None):
         """
         Evaluator for USFlow models with RadialDistribution base distribution.
         
@@ -26,13 +29,33 @@ class RadialFlowEvaluator:
         
         self.dim = torch.prod(torch.tensor(self.data.shape[1:])).item()
 
+        if isinstance(flow.base_distribution, RadialDistribution):
+            # Get p-norm from base distribution
+            self.p = flow.base_distribution.p
+            self.norm_distribution = flow.base_distribution.norm_distribution
+        else:
+            if p is None:
+                raise ValueError("p-norm must be specified for non-RadialDistribution base distributions")
+            if not isinstance(p, (int, float)):
+                raise TypeError("p must be an integer or float")
+            if p <= 0:
+                raise ValueError("p must be a positive number")
+            self.p = p
+            self.norm_distribution = norm_distribution
+
+        if hasattr(flow.base_distribution, 'loc'):
+            self.loc = flow.base_distribution.loc.to(device)
+        else:
+            if loc is None:
+                raise ValueError("loc must be specified for non-RadialDistribution base distributions")
+            self.loc = loc.to(device)
+
         # Precompute latent representations
         with torch.no_grad():
-            self.latents = self.flow.backward(self.data) - flow.base_distribution.loc.to(device)
+            self.latents = self.flow.backward(self.data) - self.loc
             self.latents = self.latents.view(self.latents.shape[0], -1)
-        # Get p-norm from base distribution
-        self.p = flow.base_distribution.p
-    
+        
+
     def wasserstein_norm_distance(self, n_samples=10000):
         """
         Compute Wasserstein distance between:
@@ -46,7 +69,7 @@ class RadialFlowEvaluator:
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
         
         # Sample from base norm distribution
-        base_norm_dist = self.flow.base_distribution.norm_distribution
+        base_norm_dist = self.norm_distribution
         sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
         
         # Compute Wasserstein distance
@@ -61,7 +84,7 @@ class RadialFlowEvaluator:
             p_value: Associated p-value
         """
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
-        base_norm_dist = self.flow.base_distribution.norm_distribution
+        base_norm_dist = self.norm_distribution
         sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
         
         return ks_2samp(latent_norms, sample_norms)
@@ -85,7 +108,7 @@ class RadialFlowEvaluator:
         plt.style.use('ggplot')
 
         latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
-        base_norm_dist = self.flow.base_distribution.norm_distribution
+        base_norm_dist = self.norm_distribution
         sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
         
         latent_quantiles = np.quantile(latent_norms, np.linspace(0, 1, 100))
@@ -120,9 +143,11 @@ class RadialFlowEvaluator:
             "legend.fontsize": 12
         })
         plt.style.use('ggplot')
-        latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
-        base_norm_dist = self.flow.base_distribution.norm_distribution
-        sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
+
+        with torch.no_grad():
+            latent_norms = torch.norm(self.latents, p=self.p, dim=1).cpu().numpy()
+            base_norm_dist = self.norm_distribution
+            sample_norms = base_norm_dist.sample((n_samples,)).cpu().numpy()
         
         # Create KDE models
         kde_latent = KernelDensity(kernel='gaussian', bandwidth=0.2).fit(latent_norms.reshape(-1, 1))
@@ -183,10 +208,10 @@ class RadialFlowEvaluator:
         sorted_norms = np.sort(latent_norms)
         
         # Get theoretical CDF (if available)
-        base_norm_dist = self.flow.base_distribution.norm_distribution
-        if hasattr(base_norm_dist.distribution, 'cdf'):
+        base_norm_dist = self.norm_distribution
+        if hasattr(base_norm_dist, 'cdf'):
             # Use analytical CDF if available
-            theoretical_cdf = base_norm_dist.distribution.cdf(
+            theoretical_cdf = base_norm_dist.cdf(
                 torch.tensor(sorted_norms).to(self.device)
             ).detach().cpu().numpy()
         else:
@@ -530,7 +555,7 @@ class RadialFlowEvaluator:
         # Compute log-probabilities
         with torch.no_grad():
             nlls = -ref_distribution.log_prob(base_samples).cpu().numpy()
-            latent_norms = self.flow.backward(base_samples).norm(p=self.p, dim=1).cpu().numpy()
+            latent_norms = (self.flow.backward(base_samples) - self.loc).norm(p=self.p, dim=1).cpu().numpy()
 
         # Scatter plot
         ax.scatter(nlls, latent_norms, alpha=0.5)
