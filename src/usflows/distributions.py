@@ -54,20 +54,22 @@ class RotatedLaplace(torch.distributions.Distribution):
 
 class Chi(Distribution):
     arg_constraints = {"df": constraints.positive}
-    support = constraints.positive
+    support = constraints.positive # This will be updated to include scale
     has_enumerate_support = False
 
-    def __init__(self, df: int, validate_args=None):
+    def __init__(self, df: int, scale: float = 1.0, validate_args=None):
         """
         Initialize the Chi distribution with degrees of freedom `df`.
         Args:
             df (Tensor): degrees of freedom.
+            scale (float): scale parameter.
             validate_args (bool, optional): Whether to validate input parameters. Default: None.
         """
         self.chi2 = Chi2(df)
         self.df = df
+        self.scale = scale
         super(Chi, self).__init__(
-            self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args
+            self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args # This will be updated to include scale
         )
 
     def sample(self, sample_shape=torch.Size()):
@@ -78,18 +80,18 @@ class Chi(Distribution):
         Returns:
             Tensor: A sample of the specified shape.
         """
-        return torch.sqrt(self.chi2.sample(sample_shape))
+        return self.scale * torch.sqrt(self.chi2.sample(sample_shape))
 
     def log_prob(self, value):
         """
         Calculate the log probability of a given value.
         Args:
             value (Tensor): The value at which to evaluate the log probability.
-        Returns:
-            Tensor: The log probability of the value.
+            Returns: Tensor: The log probability of the value.
         """
+        value = value / self.scale
         y = value**2
-        return self.chi2.log_prob(y) + torch.log(value * 2)
+        return self.chi2.log_prob(y) + torch.log(value * 2) - torch.log(torch.tensor(self.scale))
 
     def cdf(self, value):
         """
@@ -98,7 +100,8 @@ class Chi(Distribution):
             value (Tensor): The value at which to evaluate the CDF.
         Returns:
             Tensor: The CDF of the value.
-        """
+        """ 
+        value = value / self.scale
         y = value**2
         return self.chi2.cdf(y)
 
@@ -108,7 +111,7 @@ class Chi(Distribution):
         Returns:
             Tensor: The entropy of the distribution.
         """
-        return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
+        return self.chi2.entropy() / 2 + torch.log(torch.tensor(2)) + torch.log(torch.tensor(self.scale))
 
 
 class DistributionModule(Module):
@@ -224,9 +227,14 @@ class Normal(DistributionModule):
         self.to(device)
 
     def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        if self.scale_unconstrained.dim() == 0:
+            # If scale is a scalar, we need to expand it to match loc's shape
+            scale = softplus(self.scale_unconstrained).expand_as(self.loc)
+        else:
+            scale = softplus(self.scale_unconstrained)
         return {
             "loc": self.loc,
-            "scale": softplus(self.scale_unconstrained)
+            "scale": scale
         }
 
 class Categorical(DistributionModule):
