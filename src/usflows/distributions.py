@@ -54,20 +54,22 @@ class RotatedLaplace(torch.distributions.Distribution):
 
 class Chi(Distribution):
     arg_constraints = {"df": constraints.positive}
-    support = constraints.positive
+    support = constraints.positive # This will be updated to include scale
     has_enumerate_support = False
 
-    def __init__(self, df: int, validate_args=None):
+    def __init__(self, df: int, scale: float = 1.0, validate_args=None):
         """
         Initialize the Chi distribution with degrees of freedom `df`.
         Args:
             df (Tensor): degrees of freedom.
+            scale (float): scale parameter.
             validate_args (bool, optional): Whether to validate input parameters. Default: None.
         """
         self.chi2 = Chi2(df)
         self.df = df
+        self.scale = scale
         super(Chi, self).__init__(
-            self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args
+            self.chi2._batch_shape, self.chi2._event_shape, validate_args=validate_args # This will be updated to include scale
         )
 
     def sample(self, sample_shape=torch.Size()):
@@ -78,18 +80,18 @@ class Chi(Distribution):
         Returns:
             Tensor: A sample of the specified shape.
         """
-        return torch.sqrt(self.chi2.sample(sample_shape))
+        return self.scale * torch.sqrt(self.chi2.sample(sample_shape))
 
     def log_prob(self, value):
         """
         Calculate the log probability of a given value.
         Args:
             value (Tensor): The value at which to evaluate the log probability.
-        Returns:
-            Tensor: The log probability of the value.
+            Returns: Tensor: The log probability of the value.
         """
+        value = value / self.scale
         y = value**2
-        return self.chi2.log_prob(y) + torch.log(value * 2)
+        return self.chi2.log_prob(y) + torch.log(value * 2) - torch.log(torch.tensor(self.scale))
 
     def cdf(self, value):
         """
@@ -98,7 +100,8 @@ class Chi(Distribution):
             value (Tensor): The value at which to evaluate the CDF.
         Returns:
             Tensor: The CDF of the value.
-        """
+        """ 
+        value = value / self.scale
         y = value**2
         return self.chi2.cdf(y)
 
@@ -108,7 +111,7 @@ class Chi(Distribution):
         Returns:
             Tensor: The entropy of the distribution.
         """
-        return self.chi2.entropy() / 2 + torch.log(torch.tensor(2))
+        return self.chi2.entropy() / 2 + torch.log(torch.tensor(2)) + torch.log(torch.tensor(self.scale))
 
 
 class DistributionModule(Module):
@@ -224,9 +227,14 @@ class Normal(DistributionModule):
         self.to(device)
 
     def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
+        if self.scale_unconstrained.dim() == 0:
+            # If scale is a scalar, we need to expand it to match loc's shape
+            scale = softplus(self.scale_unconstrained).expand_as(self.loc)
+        else:
+            scale = softplus(self.scale_unconstrained)
         return {
             "loc": self.loc,
-            "scale": softplus(self.scale_unconstrained)
+            "scale": scale
         }
 
 class Categorical(DistributionModule):
@@ -241,26 +249,6 @@ class Categorical(DistributionModule):
 
     def _get_distribution_params(self) -> Dict[str, torch.Tensor]:
         return {"logits": self.logits}
-
-class GMM(DistributionModule):
-    def __init__(
-        self, 
-        loc: torch.Tensor, 
-        scale: torch.Tensor, 
-        mixture_weights: torch.Tensor, 
-        device: str = "cpu",
-    ):
-        super().__init__(torch.distributions.MixtureSameFamily)
-        self.normal_batch = Normal(loc, scale, n_batch_dims=1)
-        self.mixture_distribution = Categorical(mixture_weights)
-        self.to(device)
-
-    def _get_distribution_params(self) -> Dict[str, Distribution]:
-        return {
-            "mixture_distribution": self.mixture_distribution.distribution,
-            "component_distribution": self.normal_batch.distribution
-        }
-
 
 
 class UniformUnitLpBall(torch.distributions.Distribution):
@@ -517,7 +505,7 @@ class RadialDistribution(torch.nn.Module):
         event_dims = tuple(range(x.dim() - len(self.event_shape), x.dim()))
         r = x.norm(p=self.p, dim=event_dims)
 
-        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1))
+        log_prob_norm = self.norm_distribution.log_prob(r.unsqueeze(-1)).squeeze(-1)
         log_dV = self.log_delta_volume(self.p, r)
 
         return log_prob_norm - log_dV
@@ -785,15 +773,17 @@ class MixtureModel(DistributionModule):
         params = self._get_constrained_params()
         
         # Permute component dimension to last
-        permute_order = list(range(1, params[0].dim())) + [0]
-        params_perm = [p.permute(permute_order) for p in params]
-        
+        #params_perm = []
+        #for i, name in enumerate(self.param_names):
+        #    permute_order = list(range(1, params[i].dim())) + [0]
+        #    params_perm.append(params[i].permute(permute_order))
+
         # Create component distribution
-        comp_dist = self.component_distribution_class(**dict(zip(self.param_names, params_perm)))
+        comp_dist = self.component_distribution_class(**dict(zip(self.param_names, params)))
         
         # Permute mixture logits
-        logits_perm = self.mixture_logits.permute(permute_order)
-        mix_dist = dist.Categorical(logits=logits_perm)
+        #logits_perm = self.mixture_logits.permute(permute_order)
+        mix_dist = dist.Categorical(logits=self.mixture_logits)
         
         return {
             "mixture_distribution": mix_dist,
@@ -803,6 +793,30 @@ class MixtureModel(DistributionModule):
     @property
     def distribution(self) -> Distribution:
         return super().distribution
+
+
+class GMM(MixtureModel):
+    def __init__(
+        self, 
+        loc: torch.Tensor, 
+        covariance_matrix: torch.Tensor, 
+        mixture_weights: torch.Tensor, 
+        device: str = "cpu",
+    ):
+        param_constraints = {
+            "loc": constraints.real,
+            "covariance_matrix": constraints.positive_definite
+        }
+
+        super().__init__(
+            dist.MultivariateNormal,
+            ["loc", "covariance_matrix"],
+            param_constraints,
+            loc,
+            covariance_matrix,
+            mixture_weights=mixture_weights,
+            device=device
+        )
 
 class LogNormalMM(MixtureModel):
     """Mixture of Log-Normal distributions."""
@@ -834,4 +848,3 @@ class WeibullMM(MixtureModel):
             mixture_weights=mixture_weights,
             device=device
         )
-

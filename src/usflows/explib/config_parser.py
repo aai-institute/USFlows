@@ -1,7 +1,7 @@
 from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
 from pickle import load
 
 import yaml
@@ -9,6 +9,7 @@ import yaml
 # Convenience import for direct access in config files via "__eval__"
 from ray import tune
 import torch
+import pyro
 
 def update_nested_dict(d: Dict[str, Any], u: Dict[str, Any]) -> Dict[str, Any]:
     """Updates the dictionary d with the dictionary u.
