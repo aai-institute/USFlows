@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 from sklearn.datasets import make_blobs, make_checkerboard, make_circles, make_moons
 from torch import Tensor
 from torchvision.datasets import MNIST, FashionMNIST, CIFAR10
+from PIL import Image
 
 
 # Base dataset classes
@@ -597,3 +598,264 @@ class DistributionSplit(SimpleSplit):
         val = DistributionDataset(distribution, num_val, device)
         test = DistributionDataset(distribution, num_test, device)
         super().__init__(train, test, val)
+
+# MVTec AD Dataset
+class MVTecADDequantized(DequantizedDataset):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        train: bool = True,
+        category: str = "bottle",
+        is_anomaly: bool = False,
+        device: torch.device = None,
+        space_to_depth_factor: int = 1,
+        download: bool = True,
+        *args,
+        **kwargs,
+    ):
+        """
+        MVTec AD dataset for anomaly detection.
+        
+        Args:
+            dataloc: Path to the dataset directory
+            train: Whether to load training or test data
+            category: Category/class of objects (e.g., 'bottle', 'cable', 'capsule')
+            is_anomaly: Whether to load anomalous samples (only applicable for test set)
+            device: Device to store data on
+            space_to_depth_factor: Factor for space-to-depth transformation
+            download: Whether to download the dataset if not found
+        """
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data", "mvtec_ad")
+            
+        # Create directory if it doesn't exist
+        os.makedirs(dataloc, exist_ok=True)
+        
+        # Check if dataset exists, download if needed
+        category_path = os.path.join(dataloc, category)
+        if not os.path.exists(category_path) and download:
+            self._download_mvtec_ad(dataloc, category)
+            
+        # Define paths
+        split = "train" if train else "test"
+        base_path = os.path.join(dataloc, category, split)
+        
+        if not os.path.exists(base_path):
+            raise RuntimeError(f"MVTec AD dataset not found at {base_path}. "
+                              "Set download=True to download it automatically.")
+        
+        if train or not is_anomaly:
+            # For training or normal test samples
+            img_dir = os.path.join(base_path, "good")
+            
+            # Check if the good directory exists
+            if not os.path.exists(img_dir):
+                raise RuntimeError(f"Good images directory not found at {img_dir}. "
+                                  "The dataset structure might be incorrect.")
+                
+            img_paths = [os.path.join(img_dir, f) 
+                        for f in os.listdir(img_dir) 
+                        if f.endswith(('.png', '.jpg', '.jpeg'))]
+        else:
+            # For anomalous test samples, we need to handle multiple anomaly types
+            anomaly_dirs = [d for d in os.listdir(base_path) 
+                           if os.path.isdir(os.path.join(base_path, d)) and d != "good"]
+            
+            # Check if there are any anomaly directories
+            if not anomaly_dirs:
+                raise RuntimeError(f"No anomaly directories found in {base_path}.")
+                
+            img_paths = []
+            for anomaly_type in anomaly_dirs:
+                anomaly_dir = os.path.join(base_path, anomaly_type)
+                img_paths.extend([os.path.join(anomaly_dir, f) 
+                                for f in os.listdir(anomaly_dir) 
+                                if f.endswith(('.png', '.jpg', '.jpeg'))])
+        
+        # Check if we found any images
+        if not img_paths:
+            raise RuntimeError(f"No images found in {base_path}.")
+        
+        # Read and preprocess images
+        images = []
+        transform_to_tensor = transforms.ToTensor()
+        
+        for img_path in img_paths:
+            img = Image.open(img_path).convert('RGB')
+            img_tensor = transform_to_tensor(img)
+            images.append(img_tensor)
+        
+        dataset = torch.stack(images) * 255  # Scale to [0, 255]
+        dataset = dataset.to(torch.uint8)
+        
+        # Create labels: 0 for normal, 1 for anomalous
+        labels = torch.zeros(len(dataset)) if not is_anomaly else torch.ones(len(dataset))
+        
+        super().__init__(
+            dataset,
+            num_bits=8,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device,
+            *args,
+            **kwargs
+        )
+        self.labels = labels
+
+    def _download_mvtec_ad(self, dataloc: os.PathLike, category: str):
+        """
+        Download the MVTec AD dataset if it doesn't exist, handling XZ compression.
+        """
+        import requests
+        import tarfile
+        import lzma
+        from tqdm import tqdm
+        import shutil
+        
+        # Official MVTec AD download URL (this might need to be updated)
+        base_url = "https://www.mydrive.ch/shares/38536/3830184030e49fe74747669442f0f282/download/420938113-1629952094"
+        url = f"{base_url}/{category}.xz"  # Note the .xz extension
+        
+        # Download to a temporary file
+        temp_path = os.path.join(dataloc, f"{category}.tar.xz")
+        
+        print(f"Downloading MVTec AD {category} dataset (XZ compressed)...")
+        
+        try:
+            # Stream the download with timeout and headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            response = requests.get(url, stream=True, headers=headers, timeout=30)
+            response.raise_for_status()  # Check for HTTP errors
+            
+            total_size = int(response.headers.get('content-length', 0))
+            
+            with open(temp_path, 'wb') as f, tqdm(
+                desc=f"Downloading {category}",
+                total=total_size,
+                unit='iB',
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as pbar:
+                for data in response.iter_content(chunk_size=8192):
+                    size = f.write(data)
+                    pbar.update(size)
+            
+            # Extract the XZ-compressed tar archive
+            print(f"Extracting {category} dataset...")
+            
+            # Method 1: Using tarfile with xz compression (Python 3.3+)
+            try:
+                with tarfile.open(temp_path, 'r:xz') as tar:
+                    tar.extractall(dataloc)
+            except Exception as e:
+                print(f"Tar extraction failed: {e}, trying manual xz extraction...")
+                
+                # Method 2: Manual extraction as fallback
+                # First decompress xz, then extract tar
+                decompressed_path = temp_path.replace('.xz', '')
+                
+                # Decompress xz
+                with lzma.open(temp_path) as compressed:
+                    with open(decompressed_path, 'wb') as decompressed:
+                        shutil.copyfileobj(compressed, decompressed)
+                
+                # Extract tar
+                with tarfile.open(decompressed_path, 'r:') as tar:
+                    tar.extractall(dataloc)
+                
+                # Clean up intermediate file
+                os.remove(decompressed_path)
+            
+            print(f"Download and extraction of {category} complete.")
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Download failed: {e}")
+            raise RuntimeError(f"Failed to download MVTec AD dataset. Please download manually from https://www.mvtec.com/company/research/datasets/mvtec-ad")
+        except Exception as e:
+            print(f"Failed to process MVTec AD dataset: {e}")
+            raise
+        finally:
+            # Clean up the temporary file if it exists
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def __getitem__(self, index: int):
+        x = self.transform(self.dataset[index])
+        y = self.labels[index]
+        return x, y
+
+class MVTecADSplit(DataSplit):
+    def __init__(
+        self,
+        dataloc: os.PathLike = None,
+        category: str = "bottle",
+        val_split: float = 0.1,
+        space_to_depth_factor: int = 1,
+        device: torch.device = None,
+        download: bool = True,
+    ):
+        """
+        Data split for MVTec AD dataset.
+        
+        Args:
+            dataloc: Path to the dataset directory
+            category: Category/class of objects
+            val_split: Fraction of training data to use for validation
+            space_to_depth_factor: Factor for space-to-depth transformation
+            device: Device to store data on
+            download: Whether to download the dataset if not found
+        """
+        if dataloc is None:
+            dataloc = os.path.join(os.getcwd(), "data", "mvtec_ad")
+            
+        # Training data (only normal samples)
+        self.train = MVTecADDequantized(
+            dataloc=dataloc,
+            train=True,
+            category=category,
+            is_anomaly=False,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device,
+            download=download
+        )
+        
+        # Split training data into train and validation
+        shuffle = torch.randperm(len(self.train))
+        val_size = int(len(self.train) * val_split)
+        self.val = torch.utils.data.Subset(self.train, shuffle[:val_size])
+        self.train = torch.utils.data.Subset(self.train, shuffle[val_size:])
+        
+        # Test data (both normal and anomalous samples)
+        test_normal = MVTecADDequantized(
+            dataloc=dataloc,
+            train=False,
+            category=category,
+            is_anomaly=False,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device,
+            download=download
+        )
+        
+        test_anomaly = MVTecADDequantized(
+            dataloc=dataloc,
+            train=False,
+            category=category,
+            is_anomaly=True,
+            space_to_depth_factor=space_to_depth_factor,
+            device=device,
+            download=download
+        )
+        
+        # Combine normal and anomalous test samples
+        self.test = torch.utils.data.ConcatDataset([test_normal, test_anomaly])
+
+    def get_train(self) -> torch.utils.data.Dataset:
+        return self.train
+
+    def get_test(self) -> torch.utils.data.Dataset:
+        return self.test
+
+    def get_val(self) -> torch.utils.data.Dataset:
+        return self.val

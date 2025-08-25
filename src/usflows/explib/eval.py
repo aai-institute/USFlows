@@ -557,11 +557,21 @@ class RadialFlowEvaluator:
             nlls = -ref_distribution.log_prob(base_samples).cpu().numpy()
             latent_norms = (self.flow.backward(base_samples) - self.loc).norm(p=self.p, dim=1).cpu().numpy()
 
+        # Compute Pearson correlation
+        pearson_r, _ = stats.pearsonr(nlls, latent_norms)
+        spearman_rho, _ = stats.spearmanr(nlls, latent_norms)
+        kendall_tau, _ = stats.kendalltau(nlls, latent_norms)
+
+
+
         # Scatter plot
         ax.scatter(nlls, latent_norms, alpha=0.5)
         ax.set_xlabel("Negative Log-Likelihood")
         ax.set_ylabel("Latent Norm")
         ax.set_title("Negative Log-Likelihood vs Latent Norm")
+
+        ax.text(0.6, 0.05, f"Pearson R: {pearson_r:.2f}\nSpearman Rho: {spearman_rho:.2f}\nKendall Tau: {kendall_tau:.2f}", 
+                transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
         return ax
     
@@ -596,10 +606,16 @@ class RadialFlowEvaluator:
             ref_log_probs = ref_distribution.log_prob(base_samples).cpu().numpy()
             learned_log_probs = self.flow.log_prob(base_samples).cpu().numpy()
 
+        pearson_r, _ = stats.pearsonr(ref_log_probs, learned_log_probs)
+        spearman_rho, _ = stats.spearmanr(ref_log_probs, learned_log_probs)
+        kendall_tau, _ = stats.kendalltau(ref_log_probs, learned_log_probs)
+
         # Scatter plot
         ax.scatter(ref_log_probs, learned_log_probs, alpha=0.5)
         ax.set_xlabel("Reference Log-Probability")
         ax.set_ylabel("Estimated Log-Probability")
         ax.set_title("Log-Probability Comparison")
+        ax.text(0.6, 0.05, f"Pearson R: {pearson_r:.2f}\nSpearman Rho: {spearman_rho:.2f}\nKendall Tau: {kendall_tau:.2f}",
+                transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
         return ax
