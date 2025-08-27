@@ -130,9 +130,12 @@ class HyperoptExperiment(Experiment):
                 best_loss = val_loss
                 
                 # Create checkpoint
-                
-                torch.save(flow.state_dict(), f"./checkpoint.pt")
-                
+                wdr = os.getcwd()
+                wdr_split = wdr.split("/")
+                expdir = [d for d in wdr_split if d.startswith("_trial_")][0]
+                trialdir = wdr_split[-1]
+                torch.save(flow.state_dict(), f"{config['storage_path']}/{expdir}/{trialdir}/checkpoint.pt")
+
                 # Advanced logging
                 try:
                     cfg_log = config["logging"]
@@ -184,55 +187,56 @@ class HyperoptExperiment(Experiment):
         if self.skip:
             return
         
+                
+        #ray.init()
+        
         if storage_path is None:
-            storage_path = os.path.expanduser("~")
+            storage_path = os.path.expanduser("~/ray_results")
+
+        runcfg = RunConfig(storage_path=storage_path)
+        runcfg.local_dir = f"{storage_path}/local/"
+        tuner_config = {"run_config": runcfg}
         
         self.temp_dir = os.path.join(storage_path, "temp")
         ray.init(_temp_dir=f"{storage_path}/temp/")
-        #ray.init()
-        
-        if storage_path is not None:
-            runcfg = RunConfig(storage_path=storage_path)
-            runcfg.local_dir = f"{storage_path}/local/"
-            tuner_config = {"run_config": runcfg}
-        else:
-            storage_path = os.path.expanduser("~/ray_results")
-            tuner_config = {}
+        self.trial_config["storage_path"] = storage_path
 
-        exptime = str(datetime.now())
-        tuner = tune.Tuner(
-            tune.with_resources(
-                tune.with_parameters(HyperoptExperiment._trial),
-                resources={"cpu": self.cpus_per_trial, "gpu": self.gpus_per_trial},
-            ),
-            tune_config=tune.TuneConfig(
-                scheduler=self.scheduler,
-                #search_alg=search_alg,
-                num_samples=self.num_hyperopt_samples,
-                **(self.tuner_params),
-            ),
-            param_space=self.trial_config,
-            **(tuner_config),
-        )
-        results = tuner.fit()
+        try:
+            exptime = str(datetime.now())
+            tuner = tune.Tuner(
+                tune.with_resources(
+                    tune.with_parameters(HyperoptExperiment._trial),
+                    resources={"cpu": self.cpus_per_trial, "gpu": self.gpus_per_trial},
+                ),
+                tune_config=tune.TuneConfig(
+                    scheduler=self.scheduler,
+                    #search_alg=search_alg,
+                    num_samples=self.num_hyperopt_samples,
+                    **(self.tuner_params),
+                ),
+                param_space=self.trial_config,
+                **(tuner_config),
+            )
+            results = tuner.fit()
 
-        # TODO: hacky way to determine the last experiment
-        exppath = (
-            storage_path
-            + [
-                "/" + f
-                for f in sorted(os.listdir(storage_path))
-                if f.startswith("_trial")
-            ][-1]
-        )
-        report_file = os.path.join(
-            report_dir, f"report_{self.name}_" + exptime + ".csv"
-        )
-        results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
-        best_result = results.iloc[results["val_loss_best"].argmin()].copy()
+            # TODO: hacky way to determine the last experiment
+            exppath = (
+                storage_path
+                + [
+                    "/" + f
+                    for f in sorted(os.listdir(storage_path))
+                    if f.startswith("_trial")
+                ][-1]
+            )
+            report_file = os.path.join(
+                report_dir, f"report_{self.name}_" + exptime + ".csv"
+            )
+            results = self._build_report(exppath, report_file=report_file, config_prefix="param_")
+            best_result = results.iloc[results["val_loss_best"].argmin()].copy()
 
-        self._test_best_model(best_result, exppath, report_dir, device=self.device, exp_id=exptime)
-        ray.shutdown()
+            self._test_best_model(best_result, exppath, report_dir, device=self.device, exp_id=exptime)
+        finally:
+            ray.shutdown()
     
     def _test_best_model(self, best_result: pd.Series, expdir: str, report_dir: str, device: torch.device = "cpu", exp_id: str = "foo" ) -> pd.Series:
         trial_id = best_result.trial_id
