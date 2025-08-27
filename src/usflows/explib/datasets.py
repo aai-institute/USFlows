@@ -260,6 +260,7 @@ class FashionMnistDequantized(DequantizedDataset):
         train: bool = True,
         label: T.Optional[int] = None,
         scale: bool = False,
+        three_channel: bool = False,  # NEW
         *args,
         **kwargs,
     ):
@@ -275,6 +276,10 @@ class FashionMnistDequantized(DequantizedDataset):
         dataset = idx2numpy.convert_from_file(path)
         if scale:
             dataset = dataset[:, ::3, ::3]
+        # If requested, convert grayscale -> 3-channel by repeating channel
+        if three_channel:
+            # dataset shape: (N, H, W) -> (N, 1, H, W) then repeat to 3 channels
+            dataset = np.repeat(dataset[:, None, :, :], 3, axis=1)
         #dataset = dataset.reshape(dataset.shape[0], -1)
         if label is not None:
             rel_path = (
@@ -303,11 +308,18 @@ class FashionMnistSplit(DataSplit):
         val_split: float = 0.1,
         label: T.Optional[int] = None,
         space_to_depth_factor: int = 1,
+        three_channel: bool = False,  # NEW
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
         self.dataloc = dataloc
-        self.train = FashionMnistDequantized(self.dataloc, train=True, label=label, space_to_depth_factor=space_to_depth_factor)
+        self.train = FashionMnistDequantized(
+            self.dataloc,
+            train=True,
+            label=label,
+            space_to_depth_factor=space_to_depth_factor,
+            three_channel=three_channel,  # PASS THROUGH
+        )
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
             self.train, shuffle[: int(len(self.train) * val_split)]
@@ -315,7 +327,7 @@ class FashionMnistSplit(DataSplit):
         self.train = torch.utils.data.Subset(
             self.train, shuffle[int(len(self.train) * val_split) :]
         )
-        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label, space_to_depth_factor=space_to_depth_factor)
+        self.test = FashionMnistDequantized(self.dataloc, train=False, label=label, space_to_depth_factor=space_to_depth_factor, three_channel=three_channel)
 
     def get_train(self) -> torch.utils.data.Dataset:
         return self.train
@@ -337,7 +349,8 @@ class MnistDequantized(DequantizedDataset):
         flatten=False,
         scale: bool = False,
         device: torch.device = None,
-        space_to_depth_factor: int = 1
+        space_to_depth_factor: int = 1,
+        three_channel: bool = False,  # NEW
     ):
         if train:
             rel_path = "MNIST/raw/train-images-idx3-ubyte"
@@ -352,6 +365,9 @@ class MnistDequantized(DequantizedDataset):
             dataset = dataset[:, ::3, ::3]
         if flatten:
             dataset = dataset.reshape(dataset.shape[0], -1)
+        # Convert to 3-channel if requested
+        if three_channel and dataset.ndim == 3:
+            dataset = np.repeat(dataset[:, None, :, :], 3, axis=1)
         if digit is not None:
             if train:
                 rel_path = "MNIST/raw/train-labels-idx1-ubyte"
@@ -384,7 +400,8 @@ class MnistSplit(DataSplit):
         digit: T.Optional[int] = None,
         scale: bool = False,
         device: torch.device = None,
-        space_to_depth_factor: int = 1
+        space_to_depth_factor: int = 1,
+        three_channel: bool = False,  # NEW
     ):
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data")
@@ -395,7 +412,8 @@ class MnistSplit(DataSplit):
             digit=digit,
             scale=scale,
             space_to_depth_factor=space_to_depth_factor,
-            device=device
+            device=device,
+            three_channel=three_channel,  # PASS THROUGH
         )
         shuffle = torch.randperm(len(self.train))
         self.val = torch.utils.data.Subset(
@@ -410,7 +428,8 @@ class MnistSplit(DataSplit):
             digit=digit,
             scale=scale,
             space_to_depth_factor=space_to_depth_factor,
-            device=device
+            device=device,
+            three_channel=three_channel,  # PASS THROUGH
         )
 
     def get_train(self) -> torch.utils.data.Dataset:
@@ -610,6 +629,7 @@ class MVTecADDequantized(DequantizedDataset):
         device: torch.device = None,
         space_to_depth_factor: int = 1,
         download: bool = True,
+        load_into_memory: bool = False,
         *args,
         **kwargs,
     ):
@@ -627,79 +647,84 @@ class MVTecADDequantized(DequantizedDataset):
         """
         if dataloc is None:
             dataloc = os.path.join(os.getcwd(), "data", "mvtec_ad")
-            
+
         # Create directory if it doesn't exist
         os.makedirs(dataloc, exist_ok=True)
-        
+
         # Check if dataset exists, download if needed
         category_path = os.path.join(dataloc, category)
         if not os.path.exists(category_path) and download:
             self._download_mvtec_ad(dataloc, category)
-            
+
         # Define paths
         split = "train" if train else "test"
         base_path = os.path.join(dataloc, category, split)
-        
+
         if not os.path.exists(base_path):
             raise RuntimeError(f"MVTec AD dataset not found at {base_path}. "
                               "Set download=True to download it automatically.")
-        
+
+        # Gather image paths depending on mode
         if train or not is_anomaly:
             # For training or normal test samples
             img_dir = os.path.join(base_path, "good")
-            
-            # Check if the good directory exists
             if not os.path.exists(img_dir):
                 raise RuntimeError(f"Good images directory not found at {img_dir}. "
-                                  "The dataset structure might be incorrect.")
-                
-            img_paths = [os.path.join(img_dir, f) 
-                        for f in os.listdir(img_dir) 
-                        if f.endswith(('.png', '.jpg', '.jpeg'))]
+                                   "The dataset structure might be incorrect.")
+            img_paths = [os.path.join(img_dir, f)
+                         for f in sorted(os.listdir(img_dir))
+                         if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            labels = [0] * len(img_paths)
         else:
-            # For anomalous test samples, we need to handle multiple anomaly types
-            anomaly_dirs = [d for d in os.listdir(base_path) 
-                           if os.path.isdir(os.path.join(base_path, d)) and d != "good"]
-            
-            # Check if there are any anomaly directories
+            # For anomalous test samples, handle multiple anomaly types
+            anomaly_dirs = [d for d in sorted(os.listdir(base_path))
+                            if os.path.isdir(os.path.join(base_path, d)) and d != "good"]
             if not anomaly_dirs:
                 raise RuntimeError(f"No anomaly directories found in {base_path}.")
-                
             img_paths = []
+            labels = []
             for anomaly_type in anomaly_dirs:
                 anomaly_dir = os.path.join(base_path, anomaly_type)
-                img_paths.extend([os.path.join(anomaly_dir, f) 
-                                for f in os.listdir(anomaly_dir) 
-                                if f.endswith(('.png', '.jpg', '.jpeg'))])
-        
-        # Check if we found any images
+                files = [os.path.join(anomaly_dir, f)
+                         for f in sorted(os.listdir(anomaly_dir))
+                         if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                img_paths.extend(files)
+                labels.extend([1] * len(files))
+
+        # Ensure we found images
         if not img_paths:
             raise RuntimeError(f"No images found in {base_path}.")
-        
-        # Read and preprocess images
-        images = []
+
+        # If requested, load everything into memory (backward compatible)
         transform_to_tensor = transforms.ToTensor()
-        
-        for img_path in img_paths:
-            img = Image.open(img_path).convert('RGB')
-            img_tensor = transform_to_tensor(img)
-            images.append(img_tensor)
-        
-        dataset = torch.stack(images) * 255  # Scale to [0, 255]
-        dataset = dataset.to(torch.uint8)
-        
-        # Create labels: 0 for normal, 1 for anomalous
-        labels = torch.zeros(len(dataset)) if not is_anomaly else torch.ones(len(dataset))
-        
-        super().__init__(
-            dataset,
-            num_bits=8,
-            space_to_depth_factor=space_to_depth_factor,
-            device=device,
-            *args,
-            **kwargs
+        self.device = device
+        self.space_to_depth_factor = space_to_depth_factor
+        self.num_bits = 8
+        self.num_levels = 2 ** self.num_bits
+        self.transform = transforms.Compose(
+            [
+                transforms.Lambda(lambda x: x / self.num_levels),
+                transforms.Lambda(lambda x: x + torch.rand_like(x) / self.num_levels),
+            ]
         )
-        self.labels = labels
+
+        self._load_into_memory = bool(load_into_memory)
+
+        if self._load_into_memory:
+            images = []
+            for img_path in img_paths:
+                img = Image.open(img_path).convert('RGB')
+                img_tensor = transform_to_tensor(img) * 255.0
+                images.append(img_tensor)
+            dataset = torch.stack(images)
+            # keep dtype float for safe operations; DequantizedDataset handled uint8 but transform works on float
+            super().__init__(dataset, num_bits=self.num_bits, space_to_depth_factor=space_to_depth_factor, device=device, *args, **kwargs)
+            self.labels = torch.tensor(labels, dtype=torch.long)
+        else:
+            # Store paths and labels and avoid loading images until requested
+            self.img_paths = img_paths
+            self.labels = torch.tensor(labels, dtype=torch.long)
+            # don't call parent constructor to avoid converting full dataset to tensor
 
     def _download_mvtec_ad(self, dataloc: os.PathLike, category: str):
         """
@@ -782,9 +807,46 @@ class MVTecADDequantized(DequantizedDataset):
                 os.remove(temp_path)
 
     def __getitem__(self, index: int):
-        x = self.transform(self.dataset[index])
+        # Support both loaded-into-memory and on-demand modes
+        if getattr(self, "_load_into_memory", False):
+            x = self.dataset[index]
+        else:
+            # Load image on demand
+            img_path = self.img_paths[index]
+            img = Image.open(img_path).convert('RGB')
+            img_tensor = transforms.ToTensor()(img) * 255.0
+            x = img_tensor
+
+        # Apply space-to-depth if needed
+        if getattr(self, "space_to_depth_factor", 1) > 1:
+            x = self._apply_space_to_depth(x)
+
+        # Move to device if set
+        if getattr(self, "device", None) is not None:
+            x = x.to(self.device)
+
+        # Apply dequantization transform (returns float)
+        x = self.transform(x)
         y = self.labels[index]
         return x, y
+
+    def _apply_space_to_depth(self, x: Tensor) -> Tensor:
+        """Apply space-to-depth on a single image tensor of shape (C, H, W)."""
+        f = int(self.space_to_depth_factor)
+        if f <= 1:
+            return x
+        # Ensure dimensions are compatible
+        c, h, w = x.shape
+        if h % f != 0 or w % f != 0:
+            raise RuntimeError(f"Image size ({h},{w}) not divisible by space_to_depth_factor {f}")
+        # Reshape and permute: (C, H, W) -> (C, H//f, f, W//f, f) -> (C, f, f, H//f, W//f) -> (C*f*f, H//f, W//f)
+        x = x.reshape(c, h // f, f, w // f, f).permute(0, 2, 4, 1, 3).reshape(c * f * f, h // f, w // f)
+        return x
+
+    def __len__(self):
+        if getattr(self, "_load_into_memory", False):
+            return len(self.dataset)
+        return len(self.img_paths)
 
 class MVTecADSplit(DataSplit):
     def __init__(
@@ -795,6 +857,7 @@ class MVTecADSplit(DataSplit):
         space_to_depth_factor: int = 1,
         device: torch.device = None,
         download: bool = True,
+        load_into_memory: bool = False,
     ):
         """
         Data split for MVTec AD dataset.
@@ -818,7 +881,8 @@ class MVTecADSplit(DataSplit):
             is_anomaly=False,
             space_to_depth_factor=space_to_depth_factor,
             device=device,
-            download=download
+            download=download,
+            load_into_memory=load_into_memory
         )
         
         # Split training data into train and validation

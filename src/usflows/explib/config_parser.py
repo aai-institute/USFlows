@@ -193,7 +193,10 @@ def parse_raw_config(d: dict) -> Any:
             C = getattr(import_module(module), cls)
             d.pop("__object__")
             d = parse_raw_config(d)
-            return C(**d)
+            try:
+                return C(**d)
+            except TypeError as e:
+                raise ValueError(f"Error while instantiating {C} with {d}: {e}")
         elif "__eval__" in d:
             return eval(d["__eval__"])
         elif "__class__" in d:
